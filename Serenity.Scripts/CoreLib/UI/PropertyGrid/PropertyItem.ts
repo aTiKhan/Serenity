@@ -29,17 +29,21 @@
         defaultValue?: any;
         localizable?: boolean;
         visible?: boolean;
+        allowHide?: boolean;
         formatterType?: string;
         formatterParams?: any;
         displayFormat?: string;
         alignment?: string;
         width?: number;
+        widthSet?: boolean;
         minWidth?: number;
         maxWidth?: number;
         labelWidth?: string;
         resizable?: boolean;
         sortable?: boolean;
         sortOrder?: number;
+        groupOrder?: number;
+        summaryType?: SummaryType;
         editLink?: boolean;
         editLinkItemType?: string;
         editLinkIdField?: string;
@@ -54,4 +58,15 @@
         quickFilterSeparator?: boolean;
         quickFilterCssClass?: string;
     }
+
+    export enum SummaryType {
+        Disabled = -1,
+        None = 0,
+        Sum = 1,
+        Avg = 2,
+        Min = 3,
+        Max = 4
+    }
+
+    Serenity.Decorators.registerEnum(SummaryType, "Serenity.SummaryType")
 }

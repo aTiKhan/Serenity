@@ -344,8 +344,8 @@
             super(input, opt);
 
             input.addClass('decimalQ');
-            var numericOptions = $.extend(Serenity.DecimalEditor.defaultAutoNumericOptions(), {
-                vMin: Q.coalesce(this.options.minValue, '0.00'),
+			var numericOptions = $.extend(Serenity.DecimalEditor.defaultAutoNumericOptions(), {
+				vMin: Q.coalesce(this.options.minValue, this.options.allowNegatives ? (this.options.maxValue != null ? ("-" + this.options.maxValue) : '-999999999999.99') : '0.00'),
                 vMax: Q.coalesce(this.options.maxValue, '999999999999.99')
             });
 
@@ -402,7 +402,8 @@
 
     export interface IntegerEditorOptions {
         minValue?: number;
-        maxValue?: number;
+		maxValue?: number;
+		allowNegatives?: boolean;
     }
 
     @Editor('Integer', [IDoubleValue])
@@ -415,7 +416,7 @@
             input.addClass('integerQ');
             var numericOptions = $.extend(Serenity.DecimalEditor.defaultAutoNumericOptions(),
                 {
-                    vMin: Q.coalesce(this.options.minValue, 0),
+					vMin: Q.coalesce(this.options.minValue, this.options.allowNegatives ? (this.options.maxValue != null ? ("-" + this.options.maxValue) : '-2147483647') : '0'),
                     vMax: Q.coalesce(this.options.maxValue, 2147483647),
                     aSep: null
                 });
@@ -460,7 +461,8 @@
         minValue?: string;
         maxValue?: string;
         decimals?: any;
-        padDecimals?: any;
+		padDecimals?: any;
+		allowNegatives?: boolean;
     }
 
     export interface EmailEditorOptions {
@@ -643,10 +645,9 @@
         }
     }
 
-    export interface EnumEditorOptions {
+    export interface EnumEditorOptions extends Select2CommonOptions {
         enumKey?: string;
         enumType?: any;
-        allowClear?: boolean;
     }
 
     @Editor('Enum')
@@ -677,10 +678,8 @@
             }
         }
 
-        protected getSelect2Options(): Select2Options {
-            var opt = super.getSelect2Options();
-            opt.allowClear = Q.coalesce(this.options.allowClear, true);
-            return opt;
+        protected allowClear() {
+            return Q.coalesce(this.options.allowClear, true);
         }
     }
 
@@ -860,6 +859,7 @@
                 removeButtons: 'SpecialChar,Anchor,Subscript,Styles',
                 format_tags: 'p;h1;h2;h3;pre',
                 removeDialogTabs: 'image:advanced;link:advanced',
+                removePlugins: 'uploadimage,image2',
                 contentsCss: Q.resolveUrl('~/Content/site/site.htmlcontent.css'),
                 entities: false,
                 entities_latin: false,
@@ -961,7 +961,7 @@
                 'CreatePlaceholder,BGColor,JustifyLeft,JustifyCenter,' +
                 'JustifyRight,JustifyBlock,Superscript,RemoveFormat';
 
-            (config as any).removePlugins += ',elementspath';
+            (config as any).removePlugins = 'elementspath,uploadimage,image2';
             return config;
         }
     }
@@ -981,7 +981,7 @@
                 'Anchor,Blockquote,CreatePlaceholder,BGColor,JustifyLeft,JustifyCenter,' +
                 'JustifyRight,JustifyBlock,Superscript,RemoveFormat';
 
-            (config as any).removePlugins += ',elementspath';
+            (config as any).removePlugins = 'elementspath,uploadimage,image2';
             return config;
         }
     }
@@ -1255,6 +1255,7 @@
         protected updateInterface(): void {
             var addButton = this.toolbar.findButton('add-file-button');
             addButton.toggleClass('disabled', this.get_readOnly());
+            this.fileSymbols.find('a.delete').toggle(!this.get_readOnly());
         }
 
         get_readOnly(): boolean {
@@ -1413,9 +1414,11 @@
         lookupKey?: string;
     }
 
-    @Editor('RadioButton', [IStringValue])
+    @Editor('RadioButton', [IStringValue, IReadOnly])
     @Element('<div/>')
-    export class RadioButtonEditor extends Widget<RadioButtonEditorOptions> {
+    export class RadioButtonEditor extends Widget<RadioButtonEditorOptions>
+        implements IReadOnly {
+
         constructor(input: JQuery, opt: RadioButtonEditorOptions) {
             super(input, opt);
 
@@ -1489,6 +1492,24 @@
         set value(v: string) {
             this.set_value(v);
         }
+
+        get_readOnly(): boolean {
+            return this.element.attr('disabled') != null;
+        }
+
+        set_readOnly(value: boolean): void {
+            if (this.get_readOnly() !== value) {
+                if (value) {
+                    this.element.attr('disabled', 'disabled')
+                        .find('input').attr('disabled', 'disabled');
+                }
+                else {
+                    this.element.removeAttr('disabled')
+                        .find('input').removeAttr('disabled');
+                }
+            }
+        }
+
     }
 
     export interface RecaptchaOptions {
@@ -1586,7 +1607,7 @@
         intervalMinutes?: any;
     }
 
-    @Editor('Time', [IDoubleValue])
+    @Editor('Time', [IDoubleValue, IReadOnly])
     @Element("<select />")
     export class TimeEditor extends Widget<TimeEditorOptions> {
 
@@ -1606,6 +1627,7 @@
             }
 
             this.minutes = $('<select/>').addClass('editor s-TimeEditor minute').insertAfter(input);
+            this.minutes.change(() => this.element.trigger("change"));
 
             for (var m = 0; m <= 59; m += (this.options.intervalMinutes || 5)) {
                 Q.addOption(this.minutes, m.toString(), ((m < 10) ? ('0' + m) : m.toString()));
@@ -1644,6 +1666,23 @@
 
         protected set_value(value: number): void {
             this.value = value;
+        }
+
+        get_readOnly(): boolean {
+            return this.element.hasClass('readonly');
+        }
+
+        set_readOnly(value: boolean): void {
+
+            if (value !== this.get_readOnly()) {
+                if (value) {
+                    this.element.addClass('readonly').attr('readonly', 'readonly');
+                }
+                else {
+                    this.element.removeClass('readonly').removeAttr('readonly');
+                }
+                Serenity.EditorUtils.setReadonly(this.minutes, value);
+            }
         }
     }
 
@@ -1700,7 +1739,7 @@
                 }
             });
         }
-            
+
         protected emptyItemText(): string {
             var txt = this.element.attr('placeholder');
             if (txt == null) {

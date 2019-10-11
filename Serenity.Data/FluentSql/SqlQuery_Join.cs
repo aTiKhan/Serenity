@@ -35,6 +35,13 @@
             }
         }
 
+        /// <summary>
+        /// Joins the specified join.
+        /// </summary>
+        /// <param name="join">The join.</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException">join</exception>
+        /// <exception cref="InvalidOperationException">Another join with different expression is already in the query.</exception>
         public SqlQuery Join(Join join)
         {
             if (join == null)
@@ -72,6 +79,16 @@
             return this;
         }
 
+        /// <summary>
+        /// Adds a LEFT JOIN to the query.
+        /// </summary>
+        /// <param name="toTable">To table.</param>
+        /// <param name="alias">The alias.</param>
+        /// <param name="onCriteria">The on criteria.</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException">
+        /// alias is null or alias.table is null or empty
+        /// </exception>
         public SqlQuery LeftJoin(string toTable, IAlias alias, ICriteria onCriteria)
         {
             if (alias == null)
@@ -91,6 +108,15 @@
             return this;
         }
 
+        /// <summary>
+        /// Adds a LEFT JOIN to the query
+        /// </summary>
+        /// <param name="alias">The alias.</param>
+        /// <param name="onCriteria">The on criteria.</param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException">
+        /// alias is null or alias.table is null or empty.
+        /// </exception>
         public SqlQuery LeftJoin(IAlias alias, ICriteria onCriteria)
         {
             if (alias == null)
@@ -110,6 +136,18 @@
             return this;
         }
 
+        /// <summary>
+        /// Adds a right join to the query.
+        /// </summary>
+        /// <param name="toTable">Right join to table.</param>
+        /// <param name="alias">The alias.</param>
+        /// <param name="onCriteria">The on criteria.</param>
+        /// <returns>SqlQuery itself.</returns>
+        /// <exception cref="System.ArgumentNullException">
+        /// alias is null
+        /// or
+        /// alias.table is null
+        /// </exception>
         public SqlQuery RightJoin(string toTable, IAlias alias, ICriteria onCriteria)
         {
             if (alias == null)
@@ -129,6 +167,17 @@
             return this;
         }
 
+        /// <summary>
+        /// Adds a right join to the query.
+        /// </summary>
+        /// <param name="alias">The alias with tablename/alias name.</param>
+        /// <param name="onCriteria">The ON criteria.</param>
+        /// <returns></returns>
+        /// <exception cref="System.ArgumentNullException">
+        /// alias is null
+        /// or
+        /// alias.table is null
+        /// </exception>
         public SqlQuery RightJoin(IAlias alias, ICriteria onCriteria)
         {
             if (alias == null)
@@ -148,6 +197,17 @@
             return this;
         }
 
+        /// <summary>
+        /// Adds an inner join to the query.
+        /// </summary>
+        /// <param name="alias">The alias.</param>
+        /// <param name="onCriteria">The ON criteria.</param>
+        /// <returns></returns>
+        /// <exception cref="System.ArgumentNullException">
+        /// alias is null 
+        /// or
+        /// alias.table is null
+        /// </exception>
         public SqlQuery InnerJoin(IAlias alias, ICriteria onCriteria)
         {
             if (alias == null)
@@ -187,6 +247,12 @@
             }
         }
 
+        /// <summary>
+        /// Ensures the joins in expression. For this to work, into row must provide
+        /// a list of joins and their expressions.
+        /// </summary>
+        /// <param name="expression">The expression.</param>
+        /// <returns>The query itself.</returns>
         public SqlQuery EnsureJoinsInExpression(string expression)
         {
             if (string.IsNullOrEmpty(expression))
@@ -205,6 +271,12 @@
             return this;
         }
 
+        /// <summary>
+        /// Ensures the join.
+        /// </summary>
+        /// <param name="join">The join.</param>
+        /// <returns>The query itself.</returns>
+        /// <exception cref="System.ArgumentNullException">join is null</exception>
         public SqlQuery EnsureJoin(Join join)
         {
             if (join == null)

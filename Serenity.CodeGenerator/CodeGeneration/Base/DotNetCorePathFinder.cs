@@ -42,39 +42,36 @@ namespace ICSharpCode.Decompiler
         ISet<string> packageBasePaths = new HashSet<string>(StringComparer.Ordinal);
         readonly string assemblyName;
         readonly string basePath;
-        readonly string targetFrameworkId;
-        readonly string version;
+        readonly Version version;
         readonly string dotnetBasePath = FindDotNetExeDirectory();
 
-        public DotNetCorePathFinder(string parentAssemblyFileName, string targetFrameworkId, string version)
+        public DotNetCorePathFinder(string parentAssemblyFileName, string targetFrameworkId, Version version)
         {
             this.assemblyName = Path.GetFileNameWithoutExtension(parentAssemblyFileName);
             this.basePath = Path.GetDirectoryName(parentAssemblyFileName);
-            this.targetFrameworkId = targetFrameworkId;
             this.version = version;
 
             var depsJsonFileName = Path.Combine(basePath, $"{assemblyName}.deps.json");
             if (File.Exists(depsJsonFileName))
                 packages = LoadPackageInfos(depsJsonFileName, targetFrameworkId).ToDictionary(i => i.Name);
 
-            var lookupPaths = new List<string>(LookupPaths);
+            var lookupPaths = LookupPaths.Where(x => Directory.Exists(x)).ToList();
+            if (Directory.Exists("/usr/share/dotnet/sdk/NuGetFallbackFolder"))
+                lookupPaths.Add("/usr/share/dotnet/sdk/NuGetFallbackFolder");
 
-            var devJsonFileName = Path.Combine(basePath, $"{assemblyName}.runtimeconfig.dev.json");
-            if (File.Exists(devJsonFileName))
+            if (Directory.Exists("/usr/local/share/dotnet/sdk/NuGetFallbackFolder"))
+                lookupPaths.Add("/usr/local/share/dotnet/sdk/NuGetFallbackFolder");
+
+            var runtimeConfigFileName = Path.Combine(basePath, $"{assemblyName}.runtimeconfig.dev.json");
+            if (File.Exists(runtimeConfigFileName))
             {
-                var runtimeConfig = JObject.Parse(File.ReadAllText(devJsonFileName));
-                var additionalProbingPaths = runtimeConfig["runtimeOptions"]?["additionalProbingPaths"] as JArray;
-                if (additionalProbingPaths != null)
+                var runtimeConfig = JObject.Parse(File.ReadAllText(runtimeConfigFileName));
+                var probingPaths = runtimeConfig["runtimeOptions"]?["additionalProbingPaths"];
+                if (probingPaths != null)
                 {
-                    foreach (var x in additionalProbingPaths)
-                    {
-                        if (x != null)
-                        {
-                            var path = x.ToString();
-                            if (lookupPaths.IndexOf(path) < 0 && path.IndexOf('|') < 0)
-                                lookupPaths.Add(x.ToString());
-                        }
-                    }
+                    foreach (var x in probingPaths.ToArray().OfType<JValue>().Select(x => x.ToString()))
+                        if (x.IndexOf('|') < 0 && lookupPaths.IndexOf(x) < 0 && Directory.Exists(x))
+                            lookupPaths.Add(x);
                 }
             }
 
@@ -85,9 +82,15 @@ namespace ICSharpCode.Decompiler
                     foreach (var item in pk.Value.RuntimeComponents)
                     {
                         var itemPath = Path.GetDirectoryName(item);
-                        var fullPath = Path.Combine(path, pk.Value.Name, pk.Value.Version, itemPath).ToLowerInvariant();
+                        var fullPath = Path.Combine(path, pk.Value.Name, pk.Value.Version, itemPath);
                         if (Directory.Exists(fullPath))
                             packageBasePaths.Add(fullPath);
+                        else
+                        {
+                            fullPath = Path.Combine(path, pk.Value.Name?.ToLowerInvariant(), pk.Value.Version, itemPath);
+                            if (Directory.Exists(fullPath))
+                                packageBasePaths.Add(fullPath);
+                        }
                     }
                 }
             }
@@ -107,7 +110,7 @@ namespace ICSharpCode.Decompiler
                 }
             }
 
-            return FallbackToDotNetSharedDirectory(name, new Version(version));
+            return FallbackToDotNetSharedDirectory(name, version);
         }
 
         static IEnumerable<DotNetCorePackageInfo> LoadPackageInfos(string depsJsonFileName, string targetFramework)
@@ -120,8 +123,10 @@ namespace ICSharpCode.Decompiler
             {
                 var type = library.First()["type"].ToString();
                 var path = library.First()["path"]?.ToString();
-                var runtimeInfo = runtimeInfos.FirstOrDefault(r => r.Name == library.Name)?
-                    .First()["runtime"]?.Children().OfType<JProperty>().Select(i => i.Name).ToArray();
+                var rti = runtimeInfos.FirstOrDefault(r => r.Name == library.Name)?.First();
+                var runtimeInfo = (rti?["runtime"]?.Children().OfType<JProperty>().Select(i => i.Name) ?? new string[0])
+                    .Concat(rti?["compile"]?.Children().OfType<JProperty>().Select(i => i.Name) ?? new string[0])
+                    .ToArray();
 
                 yield return new DotNetCorePackageInfo(library.Name, type, path, runtimeInfo);
             }
@@ -146,12 +151,26 @@ namespace ICSharpCode.Decompiler
         static string GetClosestVersionFolder(string basePath, Version version)
         {
             string result = null;
-            foreach (var folder in new DirectoryInfo(basePath).GetDirectories().Select(d => ConvertToVersion(d.Name)).Where(v => v.Item1 != null).OrderByDescending(v => v.Item1))
+            foreach (var folder in new DirectoryInfo(basePath).GetDirectories()
+                .Select(d => ConvertToVersion(d.Name)).Where(v => v.Item1 != null).OrderByDescending(v => v.Item1))
             {
                 if (folder.Item1 >= version)
                     result = folder.Item2;
             }
             return result ?? version.ToString();
+        }
+
+        internal static Tuple<Version, string> ConvertToVersion(string name)
+        {
+            try
+            {
+                return new Tuple<Version, string>(new Version(RemoveTrailingVersionInfo(name)), name);
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceWarning(ex.ToString());
+                return new Tuple<Version, string>(null, null);
+            }
         }
 
         static string RemoveTrailingVersionInfo(string name)
@@ -163,19 +182,6 @@ namespace ICSharpCode.Decompiler
                 shortName = shortName.Remove(dashIndex);
             }
             return shortName;
-        }
-
-        static Tuple<Version, string> ConvertToVersion(string name)
-        {
-            try
-            {
-                return new Tuple<Version, String>(new Version(RemoveTrailingVersionInfo(name)), name);
-            }
-            catch (Exception ex)
-            {
-                Trace.TraceWarning(ex.ToString());
-                return new Tuple<Version, string>(null, null);
-            }
         }
 
         static string FindDotNetExeDirectory()
@@ -269,33 +275,4 @@ namespace ICSharpCode.Decompiler
             }
         }
     }
-
-    //    public static void AddMessage(Dictionary<string, UnresolvedAssemblyNameReference> container, string fullName, MessageKind kind, string message)
-    //    {
-    //        if (container == null)
-    //            throw new ArgumentNullException(nameof(container));
-    //        if (!container.TryGetValue(fullName, out var referenceInfo))
-    //        {
-    //            referenceInfo = new UnresolvedAssemblyNameReference(fullName);
-    //            container.Add(fullName, referenceInfo);
-    //        }
-    //        referenceInfo.Messages.Add((kind, message));
-    //    }
-    //}
-
-    public sealed class UnresolvedAssemblyNameReference
-    {
-        public string FullName { get; }
-
-        public bool HasErrors => Messages.Any(m => m.Item1 == MessageKind.Error);
-
-        public List<Tuple<MessageKind, string>> Messages { get; } = new List<Tuple<MessageKind, string>>();
-
-        public UnresolvedAssemblyNameReference(string fullName)
-        {
-            this.FullName = fullName;
-        }
-    }
-
-    public enum MessageKind { Error, Warning, Info }
 }

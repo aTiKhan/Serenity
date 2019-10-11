@@ -11,6 +11,7 @@
     }
 
     @Serenity.Decorators.registerClass('Serenity.DataGrid', [IDataGrid])
+    @Serenity.Decorators.element("<div/>")
     export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IDataGrid {
 
         protected titleDiv: JQuery;
@@ -98,32 +99,38 @@
         }
 
         protected layout(): void {
-            if (!this.element.is(':visible')) {
+            if (!this.element.is(':visible') || this.slickContainer == null)
                 return;
-            }
 
-            if (this.slickContainer == null) {
-                return;
-            }
+            var responsiveHeight = this.element.hasClass('responsive-height');
+            var madeAutoHeight = this.slickGrid != null && this.slickGrid.getOptions().autoHeight;
+            var shouldAutoHeight = responsiveHeight && window.innerWidth < 768;
 
-            Q.layoutFillHeight(this.slickContainer);
+            if (shouldAutoHeight) {
+                if (this.element[0] && this.element[0].style.height != "auto")
+                    this.element[0].style.height = "auto";
 
-            if (this.element.hasClass('responsive-height')) {
-                if (this.slickGrid != null && this.slickGrid.getOptions().autoHeight) {
-                    this.slickContainer.children('.slick-viewport').css('height', 'auto');
-                    this.slickGrid.setOptions({ autoHeight: false });
-                }
-                if (this.slickGrid != null && (this.slickContainer.height() < 200 || $(window.window).width() < 768)) {
-                    this.element.css('height', 'auto');
-                    this.slickContainer.css('height', 'auto').children('.slick-viewport').css('height', 'auto');
+                if (!madeAutoHeight) {
+
+                    this.slickContainer.css('height', 'auto')
+                        .children('.slick-pane').each((i, e: HTMLElement) => {
+                            if (e.style.height != null && e.style.height != "auto")
+                                e.style.height = "auto";
+                        });
+
                     this.slickGrid.setOptions({ autoHeight: true });
                 }
             }
+            else {
+                if (madeAutoHeight) {
+                    this.slickContainer.children('.slick-viewport').css('height', 'auto');
+                    this.slickGrid.setOptions({ autoHeight: false });
+                }
 
-            if (this.slickGrid != null) {
-                this.slickGrid.resizeCanvas();
-                this.slickGrid.invalidate();
+                Q.layoutFillHeight(this.slickContainer);
             }
+
+            this.slickGrid.resizeCanvas();
         }
 
         protected getInitialTitle(): string {
@@ -145,7 +152,10 @@
             var list = [];
 
             var columns = this.allColumns.filter(function (x) {
-                return x.sourceItem && x.sourceItem.quickFilter === true;
+                return x.sourceItem && 
+                    x.sourceItem.quickFilter === true &&
+                    (x.sourceItem.readPermission == null ||
+                     Q.Authorization.hasPermission(x.sourceItem.readPermission));
             });
 
             for (var column of columns) {
@@ -322,27 +332,36 @@
             }
         }
 
+        protected canFilterColumn(column: Slick.Column): boolean {
+            return (column.sourceItem != null && 
+                column.sourceItem.notFilterable !== true &&
+                (column.sourceItem.readPermission == null ||
+                    Q.Authorization.hasPermission(column.sourceItem.readPermission)));
+        }
+
+        protected initializeFilterBar() {
+
+            this.filterBar.set_store(new Serenity.FilterStore(
+                this.allColumns
+                    .filter(c => this.canFilterColumn(c))
+                    .map(x => x.sourceItem)));
+
+            this.filterBar.get_store().add_changed((s: JQueryEventObject, e: any) => {
+                if (this.restoringSettings <= 0) {
+                    this.persistSettings(null);
+                    this.view && (this.view.seekToPage = 1);
+                    this.refresh();
+                }
+            });
+        }
+
         protected initializeAsync(): PromiseLike<void> {
             return super.initializeAsync()
                 .then<Slick.Column[]>(() => this.getColumnsAsync())
                 .then(columns => {
                     this.allColumns = columns;
                 this.postProcessColumns(this.allColumns);
-                var self = this;
-                if (this.filterBar) {
-                    this.filterBar.set_store(new Serenity.FilterStore(this.allColumns.filter(function (x) {
-                        return x.sourceItem && x.sourceItem.notFilterable !== true;
-                    }).map(function (x1) {
-                        return x1.sourceItem;
-                        })));
-                    this.filterBar.get_store().add_changed((s: JQueryEventObject, e: any) => {
-                        if (this.restoringSettings <= 0) {
-                            self.persistSettings(null);
-                            self.view && (self.view.seekToPage = 1);
-                            self.refresh();
-                        }
-                    });
-                }
+                this.filterBar && this.initializeFilterBar();
 
                 var visibleColumns = this.allColumns.filter(function (x2) {
                     return x2.visible !== false;
@@ -469,11 +488,11 @@
 
             this.slickGrid.onClick.subscribe(this.slickGridOnClick);
 
-            this.slickGrid.onColumnsReordered.subscribe((e2: JQuery, p2: any) => {
+            this.slickGrid.onColumnsReordered.subscribe((e2: JQueryEventObject, p2: any) => {
                 return this.persistSettings(null);
             });
 
-            this.slickGrid.onColumnsResized.subscribe((e3: JQuery, p3: any) => {
+            this.slickGrid.onColumnsResized.subscribe((e3: JQueryEventObject, p3: any) => {
                 return this.persistSettings(null);
             });
         }
@@ -515,8 +534,9 @@
             }
         }
 
-        protected viewDataChanged(e: JQuery, rows: TItem[]): void {
+        protected viewDataChanged(e: any, rows: TItem[]): void {
             this.markupReady();
+            this.layout();
         }
 
         protected bindToViewEvents(): void {
@@ -652,20 +672,8 @@
             var filterBarDiv = $('<div/>').appendTo(this.element);
             var self = this;
             this.filterBar = new Serenity.FilterDisplayBar(filterBarDiv);
-            if (!this.isAsyncWidget()) {
-                this.filterBar.set_store(new Serenity.FilterStore(this.allColumns.filter(function (x) {
-                    return (x.sourceItem != null) && x.sourceItem.notFilterable !== true;
-                }).map(function (x1) {
-                    return x1.sourceItem;
-                    })));
-                this.filterBar.get_store().add_changed((s: JQueryEventObject, e: any) => {
-                    if (this.restoringSettings <= 0) {
-                        self.persistSettings(null);
-                        self.view && (self.view.seekToPage = 1);
-                        self.refresh();
-                    }
-                });
-            }
+            if (!this.isAsyncWidget())
+                this.initializeFilterBar();
         }
 
         protected getPagerOptions(): Slick.PagerOptions {
@@ -1059,7 +1067,8 @@
             };
 
             Serenity.WX.changeSelect2(widget, (e1: JQueryEventObject) => {
-                this.quickFilterChange(e1);
+                // use timeout give cascaded dropdowns a chance to update / clear themselves
+                window.setTimeout(() => this.quickFilterChange(e1), 0);
             });
 
             this.add_submitHandlers(submitHandler);
@@ -1326,23 +1335,26 @@
             return Q.Authorization.hasPermission(item.readPermission);
         }
 
-        protected restoreSettings(settings?: PersistedGridSettings, flags?: GridPersistanceFlags): void {
-            if (settings == null) {
-                var storage = this.getPersistanceStorage();
-                if (storage == null) {
-                    return;
-                }
-                var json = Q.trimToNull(storage.getItem(this.getPersistanceKey()));
-                if (json != null && Q.startsWith(json, '{') && Q.endsWith(json, '}')) {
-                    settings = JSON.parse(json);
-                }
-                else {
-                    return;
-                }
-            }
+        protected getPersistedSettings(): PersistedGridSettings {
+            var storage = this.getPersistanceStorage();
+            if (storage == null)
+                return null;
 
-            if (!this.slickGrid) {
+            var json = Q.trimToNull(storage.getItem(this.getPersistanceKey()));
+            if (json != null && Q.startsWith(json, '{') && Q.endsWith(json, '}'))
+                return JSON.parse(json);
+
+            return null;
+        }
+
+        protected restoreSettings(settings?: PersistedGridSettings, flags?: GridPersistanceFlags): void {
+            if (!this.slickGrid)
                 return;
+
+            if (settings == null) {
+                settings = this.getPersistedSettings();
+                if (settings == null)
+                    return;
             }
 
             var columns = this.slickGrid.getColumns();

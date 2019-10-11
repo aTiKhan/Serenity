@@ -1,6 +1,8 @@
 ﻿using Serenity.Abstractions;
+using Serenity.Services;
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace Serenity.Web
 {
@@ -8,20 +10,22 @@ namespace Serenity.Web
     /// Adds AND OR operator support to any IPermissionService implementation
     /// </summary>
     /// <remarks>
-    /// Register this class in your application start, to allow | &amp; operators
+    /// Register this class in your application start, to allow !, |, &amp;, () operators
     /// in your permission services, e.g.
     /// <code>
     /// registrar.RegisterInstance&lt;IPermissionService&gt;(new LogicOperatorPermissionService(new MyPermissionService()))
     /// </code>
     /// </remarks>
-    public class LogicOperatorPermissionService : IPermissionService
+    public partial class LogicOperatorPermissionService : IPermissionService
     {
-        private static readonly char[] and = new char[] { '&' };
-        private static readonly char[] or = new char[] { '|' };
-        private static readonly char[] chars = new Char[] { '|', '&' };
+        private static readonly char[] chars = new Char[] { '|', '&', '!', '(', ')' };
         private IPermissionService permissionService;
-        private ConcurrentDictionary<string, string[][]> cache = new ConcurrentDictionary<string, string[][]>();
+        private ConcurrentDictionary<string, string[]> cache = new ConcurrentDictionary<string, string[]>();
 
+        /// <summary>
+        /// Creates a new LogicOperatorPermissionService wrapping passed IPermissionService
+        /// </summary>
+        /// <param name="permissionService">Permission service to wrap with AND/OR functionality</param>
         public LogicOperatorPermissionService(IPermissionService permissionService)
         {
             Check.NotNull(permissionService, "permissionService");
@@ -29,47 +33,25 @@ namespace Serenity.Web
             this.permissionService = permissionService;
         }
 
+        /// <summary>
+        /// Returns true if user has specified permission
+        /// </summary>
+        /// <param name="permission">Permission to check</param>
+        /// <returns>True if user has specified permission</returns>
         public bool HasPermission(string permission)
         {
             if (string.IsNullOrEmpty(permission) ||
                 permission.IndexOfAny(chars) < 0)
                 return permissionService.HasPermission(permission);
 
-            string[][] expr;
-            if (!cache.TryGetValue(permission, out expr))
+            string[] rpnTokens;
+            if (!cache.TryGetValue(permission, out rpnTokens))
             {
-                var parts = permission.Split(or, StringSplitOptions.RemoveEmptyEntries);
-                expr = new string[parts.Length][];
-                for (var i = 0; i < parts.Length; i++)
-                {
-                    expr[i] = parts[i].Split(and, StringSplitOptions.RemoveEmptyEntries);
-                }
-
-                cache[permission] = expr;
+                var tokens = PermissionExpressionParser.Tokenize(permission);
+                cache[permission] = rpnTokens = PermissionExpressionParser.ShuntingYard(tokens).ToArray();
             }
 
-            for (var r = 0; r < expr.Length; r++)
-            {
-                var p = expr[r];
-
-                if (p.Length == 0)
-                    continue;
-
-                bool fail = false;
-                for (var n = 0; n < p.Length; n++)
-                {
-                    if (!permissionService.HasPermission(p[n]))
-                    {
-                        fail = true;
-                        break;
-                    }
-                }
-
-                if (!fail)
-                    return true;
-            }
-
-            return false;
+            return PermissionExpressionParser.Evaluate(rpnTokens, permissionService.HasPermission);
         }
     }
 }

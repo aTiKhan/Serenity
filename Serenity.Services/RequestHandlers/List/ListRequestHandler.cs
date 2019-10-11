@@ -68,6 +68,9 @@
 
         protected virtual bool ShouldSelectField(Field field)
         {
+            if (DistinctFields != null)
+                return DistinctFields.Contains(field);
+
             var mode = field.MinSelectLevel;
             
             if (mode == SelectLevel.Always)
@@ -79,9 +82,22 @@
 
             if (mode == SelectLevel.Auto)
             {
-                // assume that non-foreign calculated and reflective fields should be selected in list mode
-                bool isForeign = (field.Flags & FieldFlags.Foreign) == FieldFlags.Foreign;
-                mode = isForeign ? SelectLevel.Details : SelectLevel.List;
+                bool notMapped = (field.Flags & FieldFlags.NotMapped) == FieldFlags.NotMapped;
+                if (notMapped)
+                {
+                    // normally not-mapped fields are skipped in SelectFields method, 
+                    // but some relations like MasterDetailRelation etc. use this method (ShouldSelectFields)
+                    // to determine if they should populate those fields themselves.
+                    // so we return here Explicit so that they only populate them if such 
+                    // fields are explicitly included (e.g. related column is visible)
+                    mode = SelectLevel.Explicit;
+                }
+                else
+                {
+                    // assume that non-foreign calculated and reflective fields should be selected in list mode
+                    bool isForeign = (field.Flags & FieldFlags.Foreign) == FieldFlags.Foreign;
+                    mode = isForeign ? SelectLevel.Details : SelectLevel.List;
+                }
             }
 
             bool explicitlyExcluded = Request.ExcludeColumns != null &&
@@ -487,6 +503,36 @@
                 }
         }
 
+        public Field[] GetDistinctFields()
+        {
+            if (!Request.DistinctFields.IsEmptyOrNull())
+            {
+                Query.Distinct(true);
+                Query.ApplySort(Request.DistinctFields);
+
+                var result = Request.DistinctFields.Select(x =>
+                {
+                    var field = Row.FindFieldByPropertyName(x.Field) ??
+                        Row.FindField(x.Field);
+
+                    if (ReferenceEquals(null, field) ||
+                        (field.Flags & FieldFlags.NotMapped) == FieldFlags.NotMapped ||
+                        !AllowSelectField(field))
+                        return null;
+
+                    return field;
+                }).ToArray();
+
+                // if any of fields are invalid, return an empty array to avoid errors
+                if (result.Any(x => ReferenceEquals(null, x)))
+                    return new Field[0];
+
+                return result;
+            }
+
+            return null;
+        }
+
         public TListResponse Process(IDbConnection connection, TListRequest request)
         {
             StateBag.Clear();
@@ -506,27 +552,50 @@
             var query = CreateQuery();
             this.Query = query;
 
+            DistinctFields = GetDistinctFields();
+            if (DistinctFields != null)
+                Response.Values = new List<object>();
+
             PrepareQuery(query);
 
-            ApplyKeyOrder(query);
+            if (DistinctFields == null)
+                ApplyKeyOrder(query);
 
-            query.ApplySkipTakeAndCount(request.Skip, request.Take, request.ExcludeTotalCount);
+            query.ApplySkipTakeAndCount(request.Skip, request.Take, 
+                request.ExcludeTotalCount || DistinctFields != null);
 
             ApplyContainsText(query, request.ContainsText);
 
-            ApplySort(query);
+            if (DistinctFields == null)
+                ApplySort(query);
 
             ApplyFilters(query);
 
             OnBeforeExecuteQuery();
 
-            Response.TotalCount = query.ForEach(Connection, delegate()
+            if (DistinctFields == null || DistinctFields.Length > 0)
             {
-                var clone = ProcessEntity(Row.Clone());
+                Response.TotalCount = query.ForEach(Connection, delegate ()
+                {
+                    var clone = ProcessEntity(Row.Clone());
 
-                if (clone != null)
-                    Response.Entities.Add(clone);
-            });
+                    if (clone != null)
+                    {
+                        if (DistinctFields != null)
+                        {
+                            foreach (var field in DistinctFields)
+                                Response.Values.Add(field.AsObject(clone));
+                        }
+                        else
+                            Response.Entities.Add(clone);
+                    }
+                });
+            }
+            else
+            {
+                // mark response to specify that one or more fields are invalid
+                Response.Values = null;
+            }
 
             Response.SetSkipTakeTotal(query);
 
@@ -550,6 +619,7 @@
             ignoredEqualityFilters.Add(field);
         }
 
+        public Field[] DistinctFields { get; private set; }
         public IDbConnection Connection { get; private set; }
         Row IListRequestHandler.Row { get { return this.Row; } }
         public SqlQuery Query { get; private set; }

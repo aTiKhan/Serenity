@@ -7,13 +7,28 @@ using System.Reflection.Emit;
 
 namespace Serenity.Reflection
 {
+    /// <summary>
+    /// Fast reflection utils (not very fast in .NET4+)
+    /// </summary>
     public static class FastReflection
     {
+        /// <summary>
+        /// Creates a delegate for constructor.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>Delegate for constructor</returns>
         public static Func<object> DelegateForConstructor(Type type)
         {
             return DelegateForConstructor<object>(type);
         }
 
+        /// <summary>
+        /// Creates a delegate for constructor.
+        /// </summary>
+        /// <typeparam name="TReturn">The type of the return.</typeparam>
+        /// <param name="type">The type.</param>
+        /// <returns></returns>
+        /// <exception cref="MissingMethodException">No constructor</exception>
         public static Func<TReturn> DelegateForConstructor<TReturn>(Type type)
         {
 #if COREFX
@@ -30,7 +45,7 @@ namespace Serenity.Reflection
                 throw new MissingMethodException(String.Format(
                     "There is no parameterless constructor for type {0}", type));
 
-            var dm = new DynamicMethod("ctor0", type, Type.EmptyTypes);
+            var dm = new DynamicMethod("ctor0", type, Type.EmptyTypes, true);
             ILGenerator il = dm.GetILGenerator();
             il.DeclareLocal(type);
             il.Emit(OpCodes.Newobj, ctor);

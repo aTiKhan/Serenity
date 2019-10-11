@@ -1,3 +1,285 @@
+## 3.9.11 (2019-08-26)
+
+Features:
+  - removing mono.cecil from tooling, please take latest CodeGenerationHelpers.ttinclude from Serene/StartSharp that doesn't require Cecil reference
+  - add option to show checkboxes only in some rows for GridRowSelectionMixin
+
+Bugfixes:
+  - fix bug with clearing slick event handlers
+  - fix property grid item orders might get messed up, if tabs and categories are in mixed order, e.g. same category name used in a tab, but separate locations
+
+## 3.9.10 (2019-07-30)
+
+Features:
+  - introduce EntityGridDialog which is a mixture of an EntityGrid and EntityDialog, than allows editing 
+    records in a side panel on grid [StartSharp]
+  - complete missing XML docs for Serenity.Data
+  - change error message to suggest IgnoreName instead of NotMapped for skipping property name check with CheckNames
+  - update packages in node based sergen cli
+  - added a toggle method to Serenity.TabsExtensions
+  
+Bugfixes:
+  - if user changed CustomTemplates via the config UI, it was not used properly in sergen until restart
+  - handle issue with template registration when a project directory has a Modules parent directory in full path
+  - [IMPORTANT!] fluentmigrator output might reveal connection string in exception message when migrations fail. 
+    please set CustomErrors=RemoteOnly in your web.config, and ASPNETCORE_ENVIRONMENT to PRODUCTION for .NET Core. 
+	Also apply changes in SiteInitialization.DataMigrations.cs and DataMigrations.cs.
+
+## 3.9.9 (2019-05-24)
+
+Features:
+  - SqlSettings.DefaultCommandTimeout global setting to set command timeouts, and connection.SetCommandTimeout extension method to set timeout for a connection (only works with WrappedConnection)
+  - made set of criteria operator constants available in script side as Serenity.Criteria.Operator
+  - complete missing XML documentation for Serenity.Core
+
+## 3.9.8 (2019-04-16)
+
+Bugfixes:
+  - sergen nuget package missing System.Threading.Tasks.Extensions.dll used by scriban 2.0
+
+## 3.9.7 (2019-04-15)
+
+Features:
+  - update to asp.net core 2.2, make sure you install 2.2 sdk for your Visual Studio version (SDK 2.2.106 for VS 2017, SDK 2.2.203 for VS 2019 as of writing), updated many packages including Newtonsoft.Json, FakeItEasy, Microsoft.AspNet.Mvc
+  - add better error handling when a property has [LeftJoin] or [InnerJoin] attribute but no [ForeignKey] attribute.
+
+## 3.9.6 (2019-04-05)
+
+Features:
+  - added annotation type support, which allows separating undesired dependencies, like UI related attributes from row properties into a annotation class.
+  - added AutoColumnWidthMixin which auto sizes grid columns based on content width [StartSharp]
+  - improve responsive layout algorithm for data grids in mobile devices
+  - recommended method to ignore checking a property name when form/columns class has a BasedOnRow(CheckNames = true) is now [IgnoreName], not [NotMapped] attribute, though old one still works for compability.
+
+## 3.9.5 (2019-03-27)
+
+Features:
+  - handle toastr invalid path casing
+  
+## 3.9.4 (2019-03-27)
+
+Bugfixes:
+  - fix syntax error in DotnetCorePathFinder
+  
+## 3.9.3 (2019-03-27)
+
+Features:
+  - better handling for nuget locations in linux / mac
+
+## 3.9.2 (2019-03-27)
+
+Features:
+  - skip packages without id for dotnet sergen restore, e.g. Microsoft.AspNetCore.App
+
+## 3.9.1 (2019-03-27)
+
+Features:
+  - check runtimeconfig.dev.json for nuget folders (attempting to fix linux / mac transform issue)
+
+## 3.9.0 (2019-03-15)
+
+Features:
+  - added basic attributes to support plugin architecture (work in progress...)
+  - [Breaking Change] Serenity.Web NuGet package no longer contains / has reference to Serenity script, css and image files, so you need to manually install Serenity.Scripts NuGet package in your project after updating. 
+  Also update Serenity.Web.Assets package. If using AspNetCore add reference to Serenity.Web.Assets and Serenity.Web.Scripts packages in CSPROJ file next to Serenity.Web reference.
+
+Bugfixes:
+  - StackExchange.Exceptional delete, protect etc. actions wasn't working in ASP.NET Core properly due to AntiForgery system [StartSharp]
+
+## 3.8.7 (2019-02-27)
+
+Features:
+  - update bootstrap dependency to 3.4.1
+
+## 3.8.6 (2019-02-09)
+
+Features:
+  - modern flat design for grids, dialogs and toolbars [StartSharp]
+  - when there are items without a tab, instead of showing an empty tab caption, create those property items before the tab (thanks @dfaruque)
+  - ability to register data scripts using classes like lookup scripts
+  - row field value name indexed get access should also look field by property name and also in dictionary data if available
+  - made target optional for PropertyGrid.save and it returns the new/passed target object. added value property to PropertyGrid.
+  
+## 3.8.5 (2019-01-03)
+
+Bugfixes:
+  - ensure not-mapped fields that are populated by MasterDetailRelation or LinkingSetRelation are only loaded if explicitly included (e.g. column is visible) for ListRequestHandler and loaded in default Details mode for RetrieveRequestHandler
+
+## 3.8.4 (2019-01-02)
+
+Bugfixes:
+  - fix inplace add script error in lookup editor
+
+## 3.8.3 (2018-12-29)
+
+Features:
+  - added idle (session) timeout feature and related sample [StartSharp]
+  - implemented impersonate as (login as) functionality in users page [StartSharp]
+  - backported two factor authentication sample to .NET core [StartSharp]
+  - added from address setting for mailing in .NET core version [StartSharp]
+  - added selectedItem getter in SelectEditor (thanks @dfaruque)
+  - changed protection level of clearItems, addItem and addOption in lookup editor to public (thanks @dfaruque)
+  - ability to specify location of button separator (thanks @Jin)
+  - added GridRadioSelectionMixin (thanks @Jin)
+  - moved most of lookup editor code like cascading, filtering etc. into select2editor base class so that they can be reused in custom editors
+  - enum editor supports multiple option
+  
+Bugfixes:
+  - fix ui look of datetimeeditor (thanks @adam feng)
+  - fix fonts folder casing issue in linux
+  - fixed OracleSchemaProvider based on pull request by @kilroyFR
+  - hotkeyContext of tool button definition is ignored (thanks @hannesb)
+
+## 3.8.2 (2018-12-04)
+
+Features:
+  - skip enum members that has Ignore attribute in ServerTypingsGenerator
+  - trigger change handler when now button is clicked in date/time editor
+  - trigger change event of TimeEditor hour input when minute changes
+
+Bugfixes:
+  - set minutes section readonly when time editor is readonly
+  - hide delete buttons on images when MultipleImageUploadEditor is readonly
+  - fix typo on unsubscribe viewOnDataChanged of SlickGrid
+
+## 3.8.1 (2018-11-03)
+
+Bugfixes:
+  - resolve package downgrade issue with System.Data.SqlClient
+
+## 3.8.0 (2018-11-03)
+
+Features:
+  - updated to .net core 2.1, updated many packages
+  - when a field can't be loaded from database using getFromReader, show the name of the field and row type so that developer can understand which field has an invalid type
+  - added local text generation ability (optional) to server typings so that local texts can be accessed with completion and compile time checking. currently only processes row field texts and nested local texts.
+  - serenity guide is now hosted at https://serenity.is/docs
+  - added readonly option to CheckTreeEditor and subclasses like CheckLookupEditor
+  - improve UniversalAssemblyResolver so that more packages can be located / loaded by sergen
+  - divide InBrace function of CodeWriter to StartBrace and EndBrace functions so blocks can be manually opened and closed
+  
+Bugfixes:
+  - if allowNegatives is true and minValue / maxValue is not specified, minValue is set to 999999999999.99 instead of -999999999999.99 in decimal editor
+  - only switch to main tab if current tab is being made disabled
+  - add / to handler paths to make them only available at root, see https://github.com/volkanceylan/Serenity/issues/4017
+  
+## 3.7.7 (2018-09-15)
+
+Features:
+  - enabled StackExchange.Exceptional (e.g. exception logging) in ASP.NET Core version [StartSharp]
+  - added docs for migrating Serene project to StartSharp inplace / to a new project [StartSharp]
+  - added sample daily background task that generates PDF from a report and sends it by e-mail [StartSharp]
+  - better handling when header filters mixin is working client side with formatted column text instead of underlying value [StartSharp]
+  - add cke_dialog class to allow header filter search input work under dialogs [StartSharp]
+  - use timeout give cascaded dropdowns a chance to update / clear themselves, also fixes quick filter clear problem
+  - updated Scriban to 1.2.3
+  - implemented IReadOnly in RadioButtonEditor (thanks @dfaruque)
+  - made ApplyDefaultValues return row for chaining, added unassignedOnly option to the method
+  - modified css classes used for OneThirdWidthAttribute, QuarterWidthAttribute, ThreeQuarterWidthAttribute and TwoThirdWidthAttribute so that they stay around 250-350 pixels in worst case. might be a breaking change for your existing layouts.
+  - added JustThis option to form layout attributes like HalfWidth etc, so that you won't have to cancel form widths to just set width for one item
+  - added JustThis option to LabelWidthAttribute just like FormWidthAttribute
+  - added VariantField which should correspond to sql_variant (sergen doesn't auto use it yet)
+  - stop auto numeric from raising errors when an out of range value set manually, only fix value on tab out if some action performed to change value
+  - added AllowNegatives property to IntegerEditor and DecimalEditor, which alongside AllowNegativesByDefault static property controls ability to edit negative values in editors when MinValue is not explicitly set
+  - added widthset to PropertyItem which determines if an explicit width value is assigned to property in columns.cs etc.
+  - split part that loads persisted settings when settings = null in DataGrid.restoreSettings into its own function, getPersistedSettings
+
+Bugfixes:
+  - if there was an exception, shouldn't commit transaction but dispose (rollback) it in .net core service endpoints
+  - resolve issue that fields with a space inside name can't be removed from grouping [StartSharp]
+  - check value of [ReadOnly(false)] attribute before setting item as read only
+  - ResetLabelWidth attribute shouldn't require a value
+  - gray out now button in DateTimeEditor when readonly
+  - handle issue with extra whitespaces in generated Row.cs after scriban update
+  - fix typo for tabbingDirections in slick.grid.js (thanks @globtech1)
+  - delete .orig file in DeleteFileAndRelated as well (thanks @globtech1)
+  
+## 3.7.6 (2018-07-10)
+
+Features:
+  - updated Serenity.Web.Assets package
+
+## 3.7.5 (2018-07-10)
+
+Features:
+  - added drag & drop grouping mixin and related sample [StartSharp]
+  - added customizable summaries mixin and related sample [StartSharp]
+  - group headers and summary footers uses column formatter if available
+  - ignore when one or more of requested distinct fields are not allowed and instead of raising exception return null to gracefully handle issue
+  
+Bugfixes:
+  - handle ckeditor warning about upload plugin
+
+## 3.7.4 (2018-07-05)
+
+Features:
+  - introduced AllowHideAttribute which when set on a property to false, doesn't let that column to be hidden in column picker dialog
+  - added collapseAll() and expandAll() to TreeGridMixin.ts, thanks @dfaruque
+  - Bengali translation, thanks @dfaruque
+  - remove quick filter if user doesn't have permission to column
+  - advanced filter should only show columns that user has read permission to (thanks @kilroyFR)
+  - renamed ColumnFiltersMixin to HeaderFiltersMixin [StartSharp]
+  - better positioning for header filter popup [StartSharp]
+  - added ability to check for roles like permissions with Role:RoleKey if role has a key set (a new field added to Roles table) [StartSharp]
+  - fix SqlErrorStore error logging in non sql server type database servers
+  
+Bugfixes:
+  - fix typos in [DefaultHandler] implementation for Save and Delete handlers
+  - avoid duplicate key exception while adding implict permissions in UserPermissionService
+  - fix some ClientTypes conditional files left behind even if related features are not selected
+
+## 3.7.3 (2018-06-28)
+
+Features:
+  - updated Serenity.Web.Assets package
+
+
+## 3.7.2 (2018-06-28)
+
+Features:
+  - added ability to select distinct fields to ListRequest and its handler by using DistinctFields which works similar to Sort property
+  - excel style column filtering grid mixin and related sample [StartSharp]
+  - call init async on widget if the widget is async as well
+
+Bugfixes:
+  - removed BW operator from StringFiltering (thanks @marcobisio)
+  - added missing return statement that causes switch on advanced filter contains to fall back to startsWith operator (thanks @edwardch)
+  - replaced default keyPrefix with config.KeyPrefix in RedisDistributedCache (thanks @MungoWang)
+  - handle null reference exception gracefully when row type doesn't have a nested fields type
+  - .net core memory cache raises an exception if timespan is less than zero (#3514)
+
+## 3.7.1 (2018-05-16)
+
+Bugfixes:
+  - fix sergen generating empty files due to a change in template engine (scriban) we use
+
+## 3.7.0 (2018-05-14)
+
+Features:
+  - support for UNION including INTERSECT, EXCEPT and/or ALL (where DB support is available) to SqlQuery using .Union method
+  - added ability to determine Name field by using new [NameProperty] attribute instead of INameRow interface if name field is of non-string type
+  - introduced [DefaultHandler] attribute, which when placed on a service handler, e.g. ListRequestHandler, SaveHandler etc, allows behaviors like MasterDetailRelationBehavior, LinkingSetRelationBehavior, UpdatableExtensionBehavior etc to use your custom handlers (MySaveHandler etc.) instead of generic ones for that row type. This allows logic in your custom handlers to be reused for related records, e.g. detail rows for MasterDetailRelation without having to write a behavior.  
+  - added [DataAuditLog] attribute which allows simple audit logging for change operations to any entity (StartSharp)
+  - set filename field after upload so that audit logging can take the final value
+  - data audit log viewer sample (StartSharp)
+  - split master details grid sample (StartSharp)
+  - add MigrationAttribute to enforce migration versioning
+  - switched to SourceLink from GitLink
+  - removed .Net45.csproj versions for some Serenity libraries like Core, Data, Entity, Services...
+  - updated all packages including AspNetCore, AspNet.Mvc, Newtonsoft.Json, Nuglify, Selenium, CKEditor etc.
+  - use double right arrow character for organization dropdown (StartSharp)
+  - added documentation about upgrading from Serene to StartSharp, inplace or by migration (StartSharp)
+  - handle *.ts *.cs includes for ServerTypings / ClientTypes to get less merge conflicts on .csproj files
+  - added debounce function
+  - got rid of .Net45.csproj files for Serenity.Core, Serenity.Data, Serenity.Data.Entity, Serenity.Services and Serenity.Caching packages, switched to SourceLink
+  
+Bugfixes:
+  - resolve intellisense issue on project creation (StartSharp)
+  - presencefield bug on updatable extension (thanks @marcobisio)
+  - fix missing element in Recaptcha Widget Editor (thanks @edson)
+  - fix typo in closequote for sql2000dialect (thanks @hannesb)
+  - FastReflection should try to skip visibility checks
+  
 ## 3.6.0 (2018-03-31)
 
 Features:

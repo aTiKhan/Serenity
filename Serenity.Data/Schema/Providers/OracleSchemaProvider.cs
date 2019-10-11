@@ -4,10 +4,27 @@ using System.Linq;
 
 namespace Serenity.Data.Schema
 {
+    /// <summary>
+    /// Oracle metadata provider.
+    /// </summary>
+    /// <seealso cref="Serenity.Data.Schema.ISchemaProvider" />
     public class OracleSchemaProvider : ISchemaProvider
     {
+        /// <summary>
+        /// Gets the default schema.
+        /// </summary>
+        /// <value>
+        /// The default schema.
+        /// </value>
         public string DefaultSchema { get { return null; } }
 
+        /// <summary>
+        /// Gets the field infos.
+        /// </summary>
+        /// <param name="connection">The connection.</param>
+        /// <param name="schema">The schema.</param>
+        /// <param name="table">The table.</param>
+        /// <returns></returns>
         public IEnumerable<FieldInfo> GetFieldInfos(IDbConnection connection, string schema, string table)
         {
             return connection.Query<FieldInfo>(@"
@@ -16,7 +33,7 @@ namespace Serenity.Data.Schema
                     c.data_type ""DataType"",
                     COALESCE(NULLIF(c.data_precision, 0), c.char_length) ""Size"",
                     c.data_scale ""Scale"",
-                    CASE WHEN c.nullable = 'N' THEN 1 ELSE 0 END ""IsNullable"",
+                    CASE WHEN c.nullable = 'N' THEN 0 ELSE 1 END ""IsNullable""
                 FROM all_tab_columns c
                 WHERE 
                     c.owner = :sma
@@ -29,6 +46,13 @@ namespace Serenity.Data.Schema
             });
         }
 
+        /// <summary>
+        /// Gets the foreign keys.
+        /// </summary>
+        /// <param name="connection">The connection.</param>
+        /// <param name="schema">The schema.</param>
+        /// <param name="table">The table.</param>
+        /// <returns></returns>
         public IEnumerable<ForeignKeyInfo> GetForeignKeys(IDbConnection connection, string schema, string table)
         {
             return connection.Query<ForeignKeyInfo>(@"
@@ -51,11 +75,25 @@ namespace Serenity.Data.Schema
             });
         }
 
+        /// <summary>
+        /// Gets the identity fields.
+        /// </summary>
+        /// <param name="connection">The connection.</param>
+        /// <param name="schema">The schema.</param>
+        /// <param name="table">The table.</param>
+        /// <returns></returns>
         public IEnumerable<string> GetIdentityFields(IDbConnection connection, string schema, string table)
         {
             return new List<string>();
         }
 
+        /// <summary>
+        /// Gets the primary key fields.
+        /// </summary>
+        /// <param name="connection">The connection.</param>
+        /// <param name="schema">The schema.</param>
+        /// <param name="table">The table.</param>
+        /// <returns></returns>
         public IEnumerable<string> GetPrimaryKeyFields(IDbConnection connection, string schema, string table)
         {
             return connection.Query<string>(@"
@@ -73,14 +111,18 @@ namespace Serenity.Data.Schema
                 });
         }
 
+        /// <summary>
+        /// Gets the table names.
+        /// </summary>
+        /// <param name="connection">The connection.</param>
+        /// <returns></returns>
         public IEnumerable<TableName> GetTableNames(IDbConnection connection)
         {
-            return connection.Query("SELECT owner, table_name FROM all_tables")
-                .Select(x => new TableName
-                {
-                    Schema = x.owner,
-                    Table = x.table_name
-                });
+            return connection.Query<TableName>(@"
+                SELECT owner ""Schema"", table_name ""Table"" 
+                FROM all_tables
+                WHERE owner != 'SYS' 
+                ORDER BY owner, table_name");
         }
     }
 }

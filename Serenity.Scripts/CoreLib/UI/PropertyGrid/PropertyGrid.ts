@@ -14,13 +14,23 @@
 
             div.addClass('s-PropertyGrid');
             this.editors = [];
-            this.items = this.options.items || [];
+            var items = this.options.items || [];
+            this.items = [];
 
-            var useTabs = Q.any(this.items, function (x) {
+            var useTabs = Q.any(items, function (x) {
                 return !Q.isEmptyOrNull(x.tab);
             });
 
             if (useTabs) {
+                var itemsWithoutTab = items.filter(f => Q.isEmptyOrNull(f.tab));
+                if (itemsWithoutTab.length > 0) {
+                    this.createItems(this.element, itemsWithoutTab);
+
+                    $("<div class='pad'></div>").appendTo(this.element);
+                }
+
+                var itemsWithTab = items.filter(f => !Q.isEmptyOrNull(f.tab));
+
                 var ul = $("<ul class='nav nav-tabs property-tabs' role='tablist'></ul>")
                     .appendTo(this.element);
 
@@ -29,15 +39,15 @@
 
                 var tabIndex = 0;
                 var i = 0;
-                while (i < this.items.length) {
-                    var tab = { $: Q.trimToEmpty(this.items[i].tab) };
+                while (i < itemsWithTab.length) {
+                    var tab = { $: Q.trimToEmpty(itemsWithTab[i].tab) };
                     var tabItems = [];
 
                     var j = i;
                     do {
-                        tabItems.push(this.items[j]);
-                    } while (++j < this.items.length &&
-                        Q.trimToEmpty(this.items[j].tab) === tab.$);
+                        tabItems.push(itemsWithTab[j]);
+                    } while (++j < itemsWithTab.length &&
+                        Q.trimToEmpty(itemsWithTab[j].tab) === tab.$);
                     i = j;
 
                     var li = $("<li><a data-toggle='tab' role='tab'></a></li>")
@@ -69,7 +79,7 @@
                 }
             }
             else {
-                this.createItems(this.element, this.items);
+                this.createItems(this.element, items);
             }
 
             this.updateInterface();
@@ -137,6 +147,7 @@
                     fieldContainer = categoryDiv;
                 }
                 var editor = this.createField(fieldContainer, item);
+                this.items.push(item);
                 this.editors.push(editor);
             }
         }
@@ -529,7 +540,9 @@
             }
         }
 
-        save(target: any): void {
+        save(target?: any): any {
+            if (target == null)
+                target = Object.create(null);
             for (var i = 0; i < this.editors.length; i++) {
                 var item = this.items[i];
                 if (item.oneWay !== true && this.canModifyItem(item)) {
@@ -537,6 +550,17 @@
                     Serenity.EditorUtils.saveValue(editor, item, target);
                 }
             }
+            return target;
+        }
+
+        public get value(): any {
+            return this.save();
+        }
+
+        public set value(val: any) {
+            if (val == null)
+                val = Object.create(null);
+            this.load(val);
         }
 
         private canModifyItem(item: PropertyItem) {

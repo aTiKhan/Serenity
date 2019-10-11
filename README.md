@@ -16,11 +16,11 @@ It aims to make development easier while reducing maintenance costs by avoiding 
 
 ## Documentation and Tutorials
 
-See [Serenity Developer Guide](https://www.gitbook.com/book/volkanceylan/serenity-guide) at https://www.gitbook.com/book/volkanceylan/serenity-guide for documentation, and step by step tutorials.
+See [Serenity Developer Guide](https://serenity.is/docs/) at https://serenity.is/docs/ for documentation, and step by step tutorials.
 
 **Translations of Serenity Developer Guide:**
-- [Chinese Simplified (thanks @WuShenghui)](https://www.gitbook.com/book/volkanceylan/serenity-zh-cn)
-- [Türkçe Başlangıç Kılavuzu (thanks @ademc)](https://www.gitbook.com/book/ademc/serenity-gelistirici-dokumani)
+- [Chinese Simplified (thanks @WuShenghui)](https://volkanceylan.gitbooks.io/serenity-zh-cn)
+- [Türkçe Başlangıç Kılavuzu (thanks @ademc)](https://ademc.gitbooks.io/serenity-gelistirici-dokumani)
 
 **Serenity Blog:**
 - http://serenity.is/blog/
@@ -66,12 +66,6 @@ Visit [this blog post](http://serenity.is/blog/2017/08/08/what-is-in-premium) fo
 ## Commercial Support
 
 Paid support options are available from the author and a team of Serenity professionals. [Contact us](mailto:volkanceylan@gmail.com) for details.
-
-## Donating
-
-If Serenity was helpful to you, please consider donating to keep Serenity alive and moving forward.
-
-http://serenity.is/#Donate
 
 ## Video Tutorials (thanks a lot to @samdubey and @sayuga for these contributions)
 
