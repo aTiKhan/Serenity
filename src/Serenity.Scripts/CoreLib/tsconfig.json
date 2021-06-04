@@ -1,0 +1,51 @@
+﻿{
+  "compileOnSave": true,
+  "compilerOptions": {
+    "preserveConstEnums": false,
+    "experimentalDecorators": true,
+    "declaration": true,
+    "emitBOM": true,
+    "noEmit": true,
+    "noImplicitAny": true,
+    "sourceMap": true,
+    "module": "ES2015",
+    "moduleResolution": "Node",
+    "skipLibCheck": true,
+    "typeRoots": [
+      "../node_modules/@types"
+    ],
+    "types": [
+      "jquery",
+      "jquery.blockui",
+      "jquery.cookie",
+      "jquery.validation",
+      "jqueryui",
+      "bootstrap",
+      "sortablejs",
+      "toastr",
+      "react"
+    ],
+    "inlineSources": true,
+    "outDir": "../dist",
+    "suppressImplicitAnyIndexErrors": true,
+    "target": "ES5",
+    "lib": [
+      "ES5",
+      "ES2015",
+      "DOM"
+    ],
+    "noEmitHelpers": false,
+    "jsx": "react"
+  },
+  "files": [
+    "./Globals/jQueryStatic.ts",
+    "./Globals/Promise.ts",
+    "./Globals/Select2.ts",
+    "./Globals/Validate.ts",
+    "./Slick/Globals.ts",
+    "./Serenity/Globals.ts",
+    "./UI/Widgets/Globals.ts",
+    "./CoreLib.ts"
+  ],
+  "exclude": ["**/*.spec.ts"]
+}

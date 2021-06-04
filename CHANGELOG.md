@@ -1,3 +1,286 @@
+## 5.0.43 (2021-05-29)
+
+Features:
+  - updated jspdf to latest version
+  - speed up server typings command via caching and improving assembly resolving
+
+## 5.0.42 (2021-05-22)
+
+Features:
+  - better error handling for file uploads if server returns an error message or HTTP error
+
+## 5.0.41 (2021-05-10)
+
+Features:
+  - ability to disable toastr dialog positioning by not including position-toast in positionClass option
+  - better atribute base class for service lookup editor derived client type
+
+## 5.0.40 (2021-05-10)
+
+Features:
+  - handle stylesheet issue when running slickgrid tests in jsdom environment
+  - implement similar logic to service lookup editor like lookup editor for client type base attribute type determination
+
+## 5.0.39 (2021-04-30)
+
+Features:
+  - add extra plugin interfaces for configure servies / background jobs
+  - handle bootstrap 4 nav tab markup
+  - use dispose instead of destroy for bootstrap 4
+  - added full namespaced class name for widgets
+
+Bugfixes:
+  - SqlQuery union should not emit parens for first query as it breaks in Sqlite
+  - fixed operator for max value validation in date editor
+  - quick filter date time range handle utc properly
+
+## 5.0.38 (2021-03-25)
+
+Features:
+  - rename JsonFilterAttribute back to JsonFilter. Please prefer [JsonRequest] attribute as JsonFilter is now obsolete
+
+## 5.0.37 (2021-03-25)
+
+Features:
+  - Added tests for connection ById and TryById methods using mocks
+  - Added SqlQuery tests
+  - Added tests for MasterDetailRelationBehavior
+  - 
+
+Bugfixes:
+  - Fix TwoLevelCache.Get returns null when local cache does not have an item but distributed cache has
+  - Rename JsonFilter to JsonFilterAttribute, made AllowXYZ properties settable as attribute argument
+
+## 5.0.36 (2021-01-26)
+
+Bugfixes:
+  - Fix null reference error while setting FileUploadEditor value to null directly
+  
+## 5.0.35 (2021-01-25)
+
+Features:
+  - Added documentation for Serenity.Entity
+
+## 5.0.34 (2021-01-18)
+
+Features:
+  - Added IIsSensitiveMessage interface that controls if the exception message can be revealed to the end user in all environments, implement it for ValidationError
+  - Added ISaveExceptionBehavior and IDeleteExceptionBehavior which can be used to preview exception and throw different exceptions instead of database ones etc. This replaces ISqlExceptionHumanizer.
+
+Bugfixes:
+  - Sergen transform might fail if typeRoots in tsconfig.json is null
+  - Fix ui progress bar styling
+
+## 5.0.33 (2021-01-16)
+
+Features:
+  - Also scan for annotation types in referenced assemblies during Cecil import generation in Sergen
+
+## 5.0.32 (2021-01-16)
+
+Features:
+  - Improve dotnet sergen restore performance
+  - Don't copy files under wwwroot\Scripts\serenity for submodules, can now get them through static web assets
+
+## 5.0.31 (2021-01-16)
+
+Features:
+  - Improve base type detection in client types generator
+  - Implement getFallbackTemplate for Entity/Property dialogs so templates under Views\Templates are no longer necessary
+
+## 5.0.30 (2021-01-15)
+
+Bugfixes:
+  - Register nested permission display names in user permissions UI
+
+## 5.0.29 (2021-01-15)
+
+Features:
+  - Output sergen.exe directly to bin directory, exclude Debug/Release and TargetFramework. You may need to update reference if you are using Serenity as submodule.
+  - Generate XYZColumns.columnsKey just like XYZForm.formKey
+  - Use TypingsToPackage item type to determine typings that will be packaged, also use msbuild to determine package references in sergen
+
+## 5.0.28 (2021-01-14)
+
+Bugfixes:
+  - Bring back exception logging in service endpoints
+  - Resolve issue while restoring typings in sergen
+
+## 5.0.27 (2021-01-13)
+
+Features:
+  - Obsolete ICustomizedFormScript, use ICustomizePropertyItems instead
+  - Add ImplicitPermissionAttribute to Serenity.Net.Core (implementation only in StartSharp currently)  
+  - Add ExportColumns to ListRequest which will be used for Excel export column list etc instead of IncludeColumns which has a different purpose and not guranteed to be persist order as it is a hashset
+  - Add IDataReportRenderer abstraction for rendering a data only report to excel format
+  - Move IExternalReport interface to Serenity.Services
+  - Move DynamicDataReport to Serenity.Services but rename to TabularDataReport as the public interface has changed
+  - Add an IExcelExporter interface to abstract exporting data from List services to Excel
+  - Add ISqlExceptionHumanizer interface abstraction for producing user friendly exceptions from sql exceptions like FK, PK etc.
+  - Move DataAuditLogAttribute to Serenity.Net.Data
+  - Start splitting more features into Razor class libraries, like Northwind, Basic Samples etc.
+  - Improved Sergen to better work with razor class libraries
+  - Add restore option to control file patterns to include/exclude in restore
+  - Update sergen restore command to handle version variables, and Directory.Build.props
+  - Reuse typings folder which will contain index.d.ts files matching @types npm structure, restore and prefer typings in recursive project references
+  - Modify sergen TSTypeLister to get list of files directly from tsconfig.json instead of hardcoded files if possible
+  - Also produce typings\serenity.corelib\index.d.ts which is compatible with typeRoots option in tsconfig
+  - Use MsBuild.Evaluation library to resolve project references and packed typings
+  - Allow FormScript / ColumnScript without specifiying key, but use type FullName in that case (Module attribute won't be used in any case)
+  - Handle "." in folder names, allow project.name as a root dir by default for Sergen MVC command
+  - Also provide static web assets with Serenity.Scripts (for now optional)
+
+## 5.0.26 (2021-01-09)
+
+Features:
+  - Add optional exception logging to image / upload checker
+  - Add localizations for image check results
+  - Also include typing files under wwwroot/Scripts/serenity while scanning script types
+  - Convert include exclude tables for Data Explorer to regex (StartSharp)
+  - Add DataProtectionKeysFolder setting (StartSharp) 
+  - Improve WkhtmlToPdf location finding, better error message (StartSharp)
+  - Add exception logging to file uploads (StartSharp)
+  
+Bugfixes:
+  - Add missing progress_bar.gif
+  - Fix mail forward (StartSharp)
+  - Fix password editor in mail client (StartSharp)
+  - Fix component factory prop derived by inherited classes (StartSharp)
+  - Fix data explorer schema provider assembly (StartSharp)
+  - Hide note editor from Other Form One Tab sample (StartSharp)
+  - Remove where from Northwind Sales By Category view
+
+## 5.0.25 (2021-01-07)
+
+Features:
+  - Improve CSS relative URL rewrite handling in CssBundleManager, add tests for rewrite logic
+
+## 5.0.24 (2021-01-06)
+
+Bugfixes:
+  - fix error with sergen during new module code generation
+
+## 5.0.22 (2021-01-05)
+
+Bugfixes:
+  - HtmlContentEditor.CKEditorBasePath had to end with a slash
+
+## 5.0.21 (2021-01-05)
+
+Bugfixes:
+  - TimeEditor left at Serenity.Serenity namespace due to typo
+
+## 5.0.20 (2021-01-01)
+
+Features:
+  - Serenity.NET 5 which only supports .NET 5+
+  - Embrace dependency injection which makes testing easier, and many integrated features in .NET / ASP.NET Core itself, like caching, options etc.
+  - [Breaking Change] Due to dependency injection usage and obsoleting of Serenity specific Authentication, Dependency etc. classes there are many breaking changes, see Serenity docs and GitHub repo for upgrade notes.
+  - Prepared Stargen upgrade tool for StartSharp users
+  - Removed "Dependency" class which was a service locator abstraction, and used Dependency Injection (DI) instead (https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection?view=aspnetcore-5.0)
+  - Removed Config class and used Options pattern where possible (https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/options?view=aspnetcore-5.0)
+  - There is almost no static classes / state in Serenity framework now
+  - Replaced "ILocalCache" interface with .NET Core's "IMemoryCache"
+  - Replaced Serenity specific "IDistributedCache" interface and their implementations Serenity.Caching.Redis / Serenity.Caching.Couchbase with .NET Core's "IDistributedCache"
+  - Removed "IAuthenticationService" interface and "AuthenticationService" static class, introduced an injectable "IUserAccessor" abstraction
+  - Removed Serenity specific "Log" class, and used .NET Core's own logging system
+  - Replaced ExtensibilityHelper.SelfAssemblies with a ITypeSource abstraction
+  - Replaced static SqlConnections with ISqlConnections abstraction, it is now theorically possible to use dynamic connection strings per request (multi tenancy++)
+  - Use DI with lookup scripts, data scripts etc.
+  - Introduced IRequestContext for service handlers
+  - Row base class is replaced with IRow interface, and there is a generic Row< TFields > base class with access to its Fields type
+  - Rows can theorically have different set of custom fields and attributes per request (multi tenancy++)
+  - Service behaviors rewritten for DI and they can get constructor injection
+  - Script/CSS bundling use options pattern, and bundles can be specified at runtime, also IFileProvider of .NET used so non-physical files can be included in bundles.
+  - Default sql dialect can be set per async context
+  - Redesigned upload system, opens way to use different storage providers like Azure, S3 etc.
+  - Rewrote core script library with modular typescript
+  
+## 3.14.5 (2020-11-24)
+
+Features:
+  - support ICustomQueryParameter interface of Dapper, used to control parameter type like varchar (ansi), fixed length etc.
+
+Bugfixes:
+  - try another logic similar to original one implemented for changeSelect2
+
+## 3.14.4 (2020-11-23)
+
+Bugfixes:
+  - fix changeSelect2 is raised even when value is set through .value property due to check using hasClass instead of data
+
+## 3.14.3 (2020-10-21)
+
+Bugfixes:
+  - prefix `__rownum__` alias with x as Oracle does not seem to like it
+
+## 3.14.2 (2020-10-19)
+
+Features:
+  - option to disable layout timer in datagrid
+
+Bugfixes:
+  - row number over order by does not gurantee order and might mess paging in some rare cases on SQL 2005/2008
+  - missing localization for "set to now" in date time editor
+  - datetime editor time part is not readonly when editor itself is readonly
+  - keyprefix not used properly for get in RedisDistributedCache
+  - fix infinite resizing on some cases in datagrid due to layout timer
+  - reading pathLink.href directly results in full address like localhost:6543/ instead of just /, so use getAttribute to fix Q.Config.AppPath
+
+## 3.14.1 (2020-09-09)
+
+Bugfixes:
+  - fix setting a date editor date to today in UTC minus time zone resulting in one day before
+  - make sure quick search text and field is persisted after user change if quickSearch persistance flag is true
+
+## 3.14.0 (2020-08-06)
+
+Features:
+  - ability to enable local sorting on remote view, might be useful for in memory grid editors, override getViewOptions to enable and set localSort to true
+  - bring back flexify decorator for backward compatibility (please don't use it)
+  
+Bugfixes:
+  - datepicker icon not displayed in Serene due to url encoding problem
+  - set datepicker img width default to 16px by css as it is now a svg
+  - checked null in GetName() and GetText() Enum extention methods (#4252)
+  - restore Select2Item interface under Serenity namespace
+  - fix issue with validation error highlighting of select2 editors
+  - don't return last set value in date time picker, if the value was now or today. should resolve issues with validation on create.
+
+
+## 3.13.7 (2020-07-21)
+
+Bugfixes:
+  - also include Serenity.CoreLib.d.ts under Scripts/typings/serenity/ as older projects still use that one in tsconfig.json (if you have it there, change path to Scripts/serenity/Serenity.CoreLib.d.ts
+
+## 3.13.6 (2020-07-20)
+
+Bugfixes:
+  - include recaptcha and maskededitor in corelib again
+
+## 3.13.5 (2020-07-09)
+
+Features:
+  - added FieldInsertPermissionAttribute, FieldUpdatePermissionAttribute, FieldModifyPermissionAttribute which works similar to FieldReadPermissionAttribute to set relevant permission on all fields, which can be overridden field level on particular fields
+  - add ability to clear local text registry through a new IRemoveAll interface. required for runtime translation reloading in .NET Core as it is not possible to register a new ILocalTextRegistry unlike .NET framework
+
+## 3.13.4 (2020-06-12)
+
+Features:
+  - added option to use bootstrap modal for dialogs instead of jQuery UI.
+  - Q.alert, Q.confirm etc works without jQuery UI and it can use Bootstrap if available. it fallbacks to browser native dialogs if both is not loaded, though options will only be limited to the message.
+  - Q.blockUI can work without blockUI plugin, but just for full screen blocking
+  - serenity corelib itself can be loaded without loading external scripts like jQuery, jQuery UI, toastr etc. but functionality will be limited. useful for testing and frontend pages.
+  - removed dependency on saltaralle mscorlib.js. no longer have to include it, unless you have some code that uses "ss." namespace in your project. most of them can be converted to "Q." alternatives. search for (ss as any) or (ss.) in your code before removing.
+  - introduced splitted parts of Serenity.CoreLib.js so that only required libs can be loaded when needed. useful for frontend apps. the list of libs: serenity-core.js (contains Q and core types / functions), serenity-widget.js (contains base widget type, ui related typings, toolbar etc. depends on core), serenity-forms.js (contains validation, templated panel, property grid, property panel, depends on core and widget), serenity-editors.js (contains most editor types, depends on core and widget), serenity-slick.js (contains remoteview and other slickgrid related types, depends on core), serenity-dialogs.js (contains templated dialog, property dialog and entity dialog, depends on core, widget and forms), serenity-quickfilter.js (contains quick search and quick filter bar, depends on core, widget and editors), serenity-filterpanel.js (contains filter panel and dialog, depends on core, widget, editors, quickfilter, forms and dialogs), serenity-grids.js (contains data and entity grid, depends on core, slick, widget, forms, editors, dialogs, quickfilter and filterpanel).
+  - optional flatpickr support for date/time editors. enabled with DateEditor.useFlatpickr = true or used automatically when flatpickr is loaded in page and jQuery UI datepicker itself not.
+  - a new layout watcher that can call layout for elements when their width / height / or visibility change by using a timer. used to resolve slickgrid layout issues.
+  - replace COREFX ifdefs with NET45 as .NET CORE and ASP.NET CORE is now the default. this will open way to use other IDEs like Visual Studio Code for .NET CORE projects. OmniSharp extension VSCODE does not work well with #IFs and project references.
+  
+Bugfixes:
+  - make sure DateTimeField does not fail on read if the data reader returns a DateTimeOffset
+  - if date/time kind is local, should convert the value to universal time before formatting, as .net format function does not do this conversion automatically
+  
 ## 3.12.6 (2020-04-12)
 
 Bugfixes:
