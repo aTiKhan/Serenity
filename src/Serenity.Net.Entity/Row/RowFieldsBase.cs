@@ -64,9 +64,8 @@ namespace Serenity.Data
             initializeLock = new object();
 
             DetermineRowType();
-            DetermineTableName();
-            DetermineDatabaseAndSchema();
             DetermineConnectionKey();
+            DetermineTableName(new DialectExpressionSelector(SqlSettings.DefaultDialect));
             DetermineModuleIdentifier();
             DetermineLocalTextPrefix();
         }
@@ -93,9 +92,10 @@ namespace Serenity.Data
                 rowFactory = () => (IRow)Activator.CreateInstance(rowType);
         }
 
-        private void DetermineTableName()
+        private void DetermineTableName(DialectExpressionSelector expressionSelector)
         {
-            var attr = rowType.GetCustomAttribute<TableNameAttribute>();
+            var attr = expressionSelector.GetBestMatch(rowType.GetCustomAttributes<TableNameAttribute>(),
+                x => x.Dialect);
 
             if (tableName != null)
             {
@@ -103,21 +103,22 @@ namespace Serenity.Data
                     throw new InvalidProgramException(string.Format(
                         "Tablename in row type {0} can't be overridden by attribute!",
                             rowType.Name));
-
-                return;
             }
-
-            if (attr != null)
+            else if (attr != null)
             {
                 tableName = attr.Name;
-                return;
+            }
+            else
+            {
+
+                var name = rowType.Name;
+                if (name.EndsWith("Row"))
+                    name = name[0..^3];
+
+                tableName = name;
             }
 
-            var name = rowType.Name;
-            if (name.EndsWith("Row"))
-                name = name[0..^3];
-
-            tableName = name;
+            tableOnly = ParseDatabaseAndSchema(tableName, out database, out schema);
         }
 
         /// <summary>
@@ -150,11 +151,6 @@ namespace Serenity.Data
             database = tableName.Substring(0, idx1);
             schema = tableName.Substring(idx1 + 1, idx2 - idx1 - 1);
             return tableName[(idx2 + 1)..];
-        }
-
-        private void DetermineDatabaseAndSchema()
-        {
-            tableOnly = ParseDatabaseAndSchema(tableName, out database, out schema);
         }
 
         private void DetermineConnectionKey()
@@ -252,12 +248,14 @@ namespace Serenity.Data
                 GetRowFieldsAndProperties(out Dictionary<string, FieldInfo> rowFields, out Dictionary<string, IPropertyInfo> rowProperties);
 
                 this.dialect = dialect ?? throw new ArgumentNullException(nameof(dialect));
-
                 var expressionSelector = new DialectExpressionSelector(dialect);
+
                 var rowCustomAttributes = rowType.GetCustomAttributes().ToList();
 
+                DetermineTableName(expressionSelector);
+
                 var fieldsReadPerm = rowType.GetCustomAttribute<FieldReadPermissionAttribute>();
-                if (fieldsReadPerm != null && fieldsReadPerm.ApplyToLookups)
+                if (fieldsReadPerm != null && !fieldsReadPerm.ApplyToLookups)
                     fieldsReadPerm = null; // ignore as need to specially handle in initialize
 
                 PermissionAttributeBase fieldsModifyPerm = rowType.GetCustomAttribute<FieldModifyPermissionAttribute>();
@@ -305,15 +303,42 @@ namespace Serenity.Data
 
                             var expressions = property.GetAttributes<ExpressionAttribute>();
                             if (expressions.Any())
-                                expression = expressionSelector.GetBestMatch(expressions, x => x.Dialect);
+                            {
+                                try
+                                {
+                                    expression = expressionSelector.GetBestMatch(expressions, x => x.Dialect);
+                                }
+                                catch (AmbiguousMatchException ex)
+                                {
+                                    throw new AmbiguousMatchException(string.Format(
+                                        "Error while determining expression for row type {0}, property '{1}'",
+                                        rowType.FullName, property.Name), ex);
+                                }
+                            }
 
                             scale = property.GetAttribute<ScaleAttribute>();
                             selectLevel = property.GetAttribute<MinSelectLevelAttribute>();
                             foreignKey = property.GetAttribute<ForeignKeyAttribute>();
-                            leftJoin = property.GetAttributes<LeftJoinAttribute>()
-                                .FirstOrDefault(x => x.ToTable == null && x.OnCriteria == null);
-                            innerJoin = property.GetAttributes<InnerJoinAttribute>()
-                                .FirstOrDefault(x => x.ToTable == null && x.OnCriteria == null);
+
+                            try
+                            {
+                                leftJoin = expressionSelector.GetBestMatch(
+                                    property.GetAttributes<LeftJoinAttribute>()
+                                        .Where(x => x.ToTable == null && x.OnCriteria == null),
+                                    x => x.Dialect);
+
+                                innerJoin = expressionSelector.GetBestMatch(
+                                    property.GetAttributes<InnerJoinAttribute>()
+                                        .Where(x => x.ToTable == null && x.OnCriteria == null),
+                                    x => x.Dialect);
+                            }
+                            catch (AmbiguousMatchException ex)
+                            {
+                                throw new AmbiguousMatchException(string.Format(
+                                    "Error while determining join attributes for row type {0}, property '{1}'",
+                                        rowType.FullName, property.Name), ex);
+                            }
+
                             defaultValue = property.GetAttribute<DefaultValueAttribute>();
                             textualField = property.GetAttribute<TextualFieldAttribute>();
                             dateTimeKind = property.GetAttribute<DateTimeKindAttribute>();
@@ -333,13 +358,16 @@ namespace Serenity.Data
                                             property.Name, origin, expressionSelector, "", rowCustomAttributes));
 
                                     if (display == null)
-                                        display = new DisplayNameAttribute(propertyDictionary.OriginDisplayName(property.Name, origin));
+                                        display = new DisplayNameAttribute(propertyDictionary.OriginDisplayName(
+                                            property.Name, origin, expressionSelector));
 
                                     if (size == null)
-                                        size = propertyDictionary.OriginAttribute<SizeAttribute>(property.Name);
+                                        size = propertyDictionary.OriginAttribute<SizeAttribute>(
+                                            property.Name, expressionSelector);
 
                                     if (scale == null)
-                                        scale = propertyDictionary.OriginAttribute<ScaleAttribute>(property.Name);
+                                        scale = propertyDictionary.OriginAttribute<ScaleAttribute>(
+                                            property.Name, expressionSelector);
                                 }
                                 catch (DivideByZeroException)
                                 {
@@ -447,7 +475,9 @@ namespace Serenity.Data
 
                         if (foreignKey != null)
                         {
-                            field.ForeignTable = foreignKey.Table;
+                            field.ForeignTable = foreignKey.Table ??
+                                expressionSelector.GetBestMatch(foreignKey.RowType
+                                    .GetCustomAttributes<TableNameAttribute>(), x => x.Dialect).Name;
                             field.ForeignField = foreignKey.Field;
                         }
 
@@ -515,15 +545,36 @@ namespace Serenity.Data
                                 }
                             }
 
-                            foreach (var attr in property.GetAttributes<LeftJoinAttribute>())
-                                if (attr.ToTable != null && attr.OnCriteria != null)
-                                    new LeftJoin(joins, attr.ToTable, attr.Alias,
-                                        new Criteria(attr.Alias, attr.OnCriteria) == new Criteria(field));
+                            var propJoinAttributes = ((IEnumerable<ISqlJoin>)property.GetAttributes<LeftJoinAttribute>())
+                                .Concat(property.GetAttributes<InnerJoinAttribute>())
+                                .Where(x => x.ToTable != null && x.OnCriteria != null)
+                                .GroupBy(x => x.Alias, StringComparer.OrdinalIgnoreCase);
 
-                            foreach (var attr in property.GetAttributes<InnerJoinAttribute>())
-                                if (attr.ToTable != null && attr.OnCriteria != null)
-                                    new InnerJoin(joins, attr.ToTable, attr.Alias,
-                                        new Criteria(attr.Alias, attr.OnCriteria) == new Criteria(field));
+                            foreach (var propJoinGroup in propJoinAttributes)
+                            {
+                                ISqlJoin bestMatch;
+                                try
+                                {
+                                    bestMatch = expressionSelector.GetBestMatch(propJoinGroup, x => x.Dialect);
+                                }
+                                catch (AmbiguousMatchException ex)
+                                {
+                                    throw new AmbiguousMatchException(string.Format(
+                                        "Error while determining join attributes for row type {0}, property '{1}'",
+                                            rowType.FullName, property.Name), ex);
+                                }
+
+                                if (bestMatch is LeftJoinAttribute lja)
+                                {
+                                    new LeftJoin(joins, lja.ToTable, lja.Alias,
+                                        new Criteria(lja.Alias, lja.OnCriteria) == new Criteria(field));
+                                }
+                                else if (bestMatch is InnerJoinAttribute ija)
+                                {
+                                    new InnerJoin(joins, ija.ToTable, ija.Alias,
+                                        new Criteria(ija.Alias, ija.OnCriteria) == new Criteria(field));
+                                }
+                            }
 
                             field.PropertyName = property.Name;
                             byPropertyName[field.PropertyName] = field;
@@ -551,14 +602,30 @@ namespace Serenity.Data
                     }
                 }
 
-                foreach (var attr in rowCustomAttributes.OfType<LeftJoinAttribute>())
-                    new LeftJoin(joins, attr.ToTable, attr.Alias, new Criteria(attr.OnCriteria));
+                var rowJoinAttributes = rowCustomAttributes.OfType<ISqlJoin>()
+                    .GroupBy(x => x.Alias, StringComparer.OrdinalIgnoreCase);
 
-                foreach (var attr in rowCustomAttributes.OfType<InnerJoinAttribute>())
-                    new InnerJoin(joins, attr.ToTable, attr.Alias, new Criteria(attr.OnCriteria));
+                foreach (var rowJoinGroup in rowJoinAttributes)
+                {
+                    ISqlJoin bestMatch;
+                    try
+                    {
+                        bestMatch = expressionSelector.GetBestMatch(rowJoinGroup, x => x.Dialect);
+                    }
+                    catch (AmbiguousMatchException ex)
+                    {
+                        throw new AmbiguousMatchException(string.Format(
+                            "Error while determining join attributes for row type {0}, join alias '{1}'",
+                                rowType.FullName, rowJoinGroup.Key), ex);
+                    }
 
-                foreach (var attr in rowCustomAttributes.OfType<OuterApplyAttribute>())
-                    new OuterApply(joins, attr.InnerQuery, attr.Alias);
+                    if (bestMatch is LeftJoinAttribute lja)
+                        new LeftJoin(joins, lja.ToTable, lja.Alias, new Criteria(lja.OnCriteria));
+                    else if (bestMatch is InnerJoinAttribute ija)
+                        new InnerJoin(joins, ija.ToTable, ija.Alias, new Criteria(ija.OnCriteria));
+                    else if (bestMatch is OuterApplyAttribute oua)
+                        new OuterApply(joins, oua.InnerQuery, oua.Alias);
+                }
 
                 primaryKeys = this.Where(x => x.flags.HasFlag(FieldFlags.PrimaryKey))
                     .ToArray();

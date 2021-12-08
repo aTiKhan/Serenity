@@ -1,3 +1,86 @@
+## 5.1.1 (2021-10-29)
+
+Bugfixes:
+  - fix issue with tslib, corelib and rollup causing Serenity.CoreLib.js to fail
+
+## 5.1.0 (2021-10-26)
+
+Features:
+  - better handling for custom types like dynamic, list etc. for code generation in endpoints
+  - generate c# keywords like string, int, long instead of system type names like String, Int32, Int64 for property types, closes #6026  
+  - remove unnecessary space from title for fields that start with underscore, closes #6041
+  - add ColumnsType to MasterDetailRelationAttribute that will be used instead of IncludeColumns, and IncludeColumnNames which is a string array instead of comma separated string, closes #6048
+
+Bugfixes:
+  - fix summaries not shown under groups at first when grouping changed by drag drop
+  - add NotNull attribute to generated row primary keys that are not nullable
+  - fix possible issue in rare cases with dapper query overloads that accept dynamic type params
+  
+## 5.0.51 (2021-09-18)
+
+Features:
+  - cleanup code analysis warnings
+  - include base class properties while searching for id / name properties in server typings row generation
+  - temporary workaround for database caret references, which is a legacy feature
+  
+Bugfixes:
+  - fix extension comparison for meta files in DiskUploadStorage
+  - add export to generated permission keys namespaces, thanks @marcobisio
+  - swallow exception in TemporaryFileStorage as this may cause startup errors and result in application pool crash while trying to create temporary folder, better to ignore than crash
+
+## 5.0.50 (2021-09-07)
+
+Features:
+  - fix dateeditor validation for min max dates using jquery format instead of Q.format
+
+## 5.0.49 (2021-09-02)
+
+Features:
+  - embed debug info inside dlls
+
+## 5.0.48 (2021-09-02)
+
+Features:
+  - another attempt to make sourcelink debugging work again
+
+## 5.0.47 (2021-09-02)
+
+Features:
+  - attempt to make sourcelink debugging work again, hopefully
+
+Bugfixes:
+  - handle css bundle url rewrite case when bundle key contains slashes
+
+## 5.0.46 (2021-08-31)
+
+Features:
+  - add option to include an ErrorId in service errors
+  - make dependency injection for service handlers easier by implementing auto register, and optional generic classes, and get rid of repositories all together, see next commit in common-features repository CustomerEndpoint and sample handler codes
+  - update sergen to remove repository class and add request handlers instead, and update generated endpoint classes to use new DI friendly structure
+  - get rid of ".Entities" namespace suffix for generated rows, the less namespaces the better
+  
+Bugfixes:
+  - server typings generator should ignore arguments with *[FromServices]* attribute while generating code.
+
+## 5.0.45 (2021-07-20)
+
+Features:
+  - sergen generates and uses columnKey on first code generation
+  
+Bugfixes:
+  - fix typos in api docs 
+  - fix FieldReadPermission ApplyToLookups option used incorrectly
+  - postgres issue with code generation when a schema other than public is used
+  - jquery validate options classList add/remove raises errors if the class is an empty string
+
+## 5.0.44 (2021-07-12)
+
+Features:
+  - allow getItemMetadata to return css class for slick cells
+  
+Bugfixes:
+  - Fix min value issue in decimal editor
+
 ## 5.0.43 (2021-05-29)
 
 Features:
@@ -564,7 +647,7 @@ Features:
 Bugfixes:
   - if allowNegatives is true and minValue / maxValue is not specified, minValue is set to 999999999999.99 instead of -999999999999.99 in decimal editor
   - only switch to main tab if current tab is being made disabled
-  - add / to handler paths to make them only available at root, see https://github.com/volkanceylan/Serenity/issues/4017
+  - add / to handler paths to make them only available at root, see https://github.com/serenity-is/Serenity/issues/4017
   
 ## 3.7.7 (2018-09-15)
 

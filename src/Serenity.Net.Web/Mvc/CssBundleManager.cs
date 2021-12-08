@@ -12,7 +12,7 @@ namespace Serenity.Web
 {
     public class CssBundleManager : ICssBundleManager
     {
-        private readonly object sync = new object();
+        private readonly object sync = new();
 
         private bool isEnabled;
         private Dictionary<string, string> bundleKeyBySourceUrl;
@@ -101,6 +101,8 @@ namespace Serenity.Web
 
                     var bundleKey = pair.Key;
                     var bundleName = "CssBundle." + bundleKey;
+                    var bundleRewriteRoot = string.Concat(Enumerable.Repeat("../",
+                        Math.Max(bundleKey.Split('/', StringSplitOptions.RemoveEmptyEntries).Length, 1)));
                     var bundleParts = new List<Func<string>>();
                     var scriptNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -234,7 +236,7 @@ namespace Serenity.Web
                                 code = sr.ReadToEnd();
                             }
 
-                            code = RewriteUrls(sourceUrl, code, "../");
+                            code = RewriteUrls(sourceUrl, code, bundleRewriteRoot);
                             return code;
                         });
                     }

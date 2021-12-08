@@ -62,7 +62,7 @@ Action<string, string, string> myPack = (s, id, project) => {
 
 	writeHeader("dotnet pack " + csproj);
 
-	var exitCode = StartProcess("dotnet", "pack " + csproj + " -c:" + configuration + " -o:" + nupkgDir);
+	var exitCode = StartProcess("dotnet", "pack " + csproj + " -p:ContinuousIntegrationBuild=true -c:" + configuration + " -o:\"" + nupkgDir + "\"");
 	if (exitCode > 0)
 		throw new Exception("Error while packing " + csproj);
 };
@@ -100,9 +100,9 @@ Action myPush = delegate() {
     foreach (var package in System.IO.Directory.GetFiles(nupkgDir, "*.nupkg"))
     {
         NuGetPush(package, new NuGetPushSettings {
-            Source = "https://www.nuget.org/api/v2/package"
+            Source = "https://api.nuget.org/v3/index.json"
         });
-    }   
+    }       
 };
 
 Action<Dictionary<string, string>, JObject, string> addDeps = (p, deps, fw) => {
