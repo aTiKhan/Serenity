@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFrameworks>net5.0</TargetFrameworks>
+    <TargetFramework>net5.0</TargetFramework>
     <TypeScriptExperimentalDecorators>True</TypeScriptExperimentalDecorators>
     <TypeScriptBuildMode>true</TypeScriptBuildMode>
     <TypeScriptCompileBlocked>true</TypeScriptCompileBlocked>
@@ -12,8 +12,9 @@
 
   <ItemGroup>
     <None Remove="*\tsconfig.json;style\*.css;texts\**\*.json;" />
-    <Content Update="package*.json">
+    <Content Update="*.json">
       <CopyToOutputDirectory>false</CopyToOutputDirectory>
+      <Pack>false</Pack>
     </Content>
     <Content Remove="texts\**\*.json" />
     <Content Update="*\tsconfig.json">
@@ -43,7 +44,6 @@
     <TypeScriptCompile Remove="dist\**;node_modules\**;test\**;wwwroot\Serenity.CoreLib.d.ts" />
     <None Include="wwwroot\Serenity.CoreLib.d.ts" />
     <ToCompileCoreLib Include="CoreLib\**\*.ts;CoreLib\tsconfig.json;rollup.config.js"></ToCompileCoreLib>
-    <ToSerenityLess Include="style\**\*.less"></ToSerenityLess>
   </ItemGroup>
 
   <ItemGroup>
@@ -51,16 +51,24 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
+    <NpmPackageFile Include="$(ProjectDir)package.json" Condition="Exists('$(ProjectDir)package.json')" />
   </ItemGroup>
-  <Target Name="NpmInstall" BeforeTargets="BeforeBuild" Condition="!Exists('node_modules\terser\bin\terser') Or !Exists('node_modules\less\bin\lessc')">
-    <Message Text="Installing NPM packages..." Importance="high"></Message>
-    <Exec Command="npm install" />
+  <Target Name="ComputeNpmPackageMetadata">
+    <ItemGroup>
+      <NpmPackageFile>
+        <StampFile>$([System.IO.Path]::Combine('%(RootDir)%(Directory)', 'node_modules', '.install-stamp'))</StampFile>
+        <WorkingDirectory>%(RootDir)%(Directory)</WorkingDirectory>
+        <Command Condition="$(RestorePackagesWithLockFile) != 'true'">npm install</Command>
+        <Command Condition="$(RestorePackagesWithLockFile) == 'true'">npm ci</Command>
+      </NpmPackageFile>
+    </ItemGroup>
+  </Target>
+  <Target Name="NpmInstall" BeforeTargets="BeforeBuild" DependsOnTargets="ComputeNpmPackageMetadata" Inputs="@(NpmPackageFile)" Outputs="%(NpmPackageFile.StampFile)">
+    <Touch Files="@(NpmPackageFile->'%(StampFile)')" AlwaysCreate="true" />
+    <Exec Command="@(NpmPackageFile->'%(Command)')" WorkingDirectory="%(WorkingDirectory)" ContinueOnError="true" />
   </Target>
   <Target Name="CompileCoreLib" AfterTargets="AfterBuild" Inputs="@(ToCompileCoreLib)" Outputs="dist\Serenity.CoreLib.js;dist\Serenity.CoreLib.d.ts;wwwroot\Serenity.CoreLib.js;wwwroot\Serenity.CoreLib.min.js;wwwroot\Serenity.CoreLib.js.map;wwwroot\Serenity.CoreLib.d.ts">
     <Exec Command="npm run build" />
     <Copy SourceFiles="dist\Serenity.CoreLib.js;dist\Serenity.CoreLib.min.js;dist\Serenity.CoreLib.js.map;dist\Serenity.CoreLib.d.ts" DestinationFolder="wwwroot" />
-  </Target>
-  <Target Name="CompileSerenityLess" AfterTargets="AfterBuild" Inputs="@(ToSerenityLess)" Outputs="style\serenity.css">
-    <Exec Command="npx lessc &quot;$(ProjectDir)style\serenity.less&quot; &gt; &quot;$(ProjectDir)style\serenity.css&quot;" />
   </Target>
 </Project>

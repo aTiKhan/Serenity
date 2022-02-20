@@ -1,3 +1,103 @@
+## 5.2.3 (2021-01-20)
+
+Bugfixes:
+  - bootstrap modal dialog stays under jQuery UI dialogs (StartSharp)
+  - error in console while closing a bootstrap modal when a jquery ui dialog is open
+  - inline action font style normal
+  - remove schema names from worklog tables
+
+## 5.2.2 (2022-01-18)
+
+Features:
+  - add bootstrap v5.1.3 RTL versions to Serenity.Assets
+  - don't generate unused less file for apps created from recent templates
+  - removed unused less commands from project file
+  - add support for generating a separate .rtl bundle if any bundle parts contains {.rtl} placeholder
+  - add RTL support to new pro theme (StartSharp)
+  - added rtl rules for dashboard, pro-theme and pro-extensions
+  - used rtlcss for x.rtl.css on build of pro packages
+  - update npm version check in project creation wizard (npm 8+ / node 16+)
+  - project wizard removes empty typings folders when features are deselected
+
+Bugfixes:
+  - fix padding / alignment of multiple select
+  - fix classes and html dir generation in Layout.cshtml (StartSharp)
+  - fix worklog module class name typo in WorkLogGrid
+
+## 5.2.1 (2022-01-16)
+
+Bugfixes:
+  - Serenity.Scripts contains package.json etc as content files due to a change in NET6 SDK possibly
+
+## 5.2.0 (2022-01-15)
+
+  - bootstrap 5 support (5.1.3)
+  - pro theme with simplified (1/3 size) bootstrap 5 compatible css (StartSharp)
+  - new dark theme cosmos (StartSharp)
+  - no longer use select2, slickgrid etc. css files (all in pro theme, StartSharp)
+  - completely removed AdminLTE
+  - redesigned dashboard with new charts, chat panel etc.
+  - use chartjs instead of morris
+  - use css variables for easy color scheme / theme development (StartSharp)
+  - no longer use less for css
+  - classic theme layout option via s-classic-layout on html element (header instead of a sidebar band) (StartSharp)
+  - use nprogress instead of pace (StartSharp)
+  - custom enum flags editor and sample (StartSharp)
+  - use bs5 collapsible for sidebar (StartSharp)
+  - separate templates for VS 2022 / VS 2019. required due to VS 2022 extension incompatibility / amd64 (StartSharp)
+  - bring back module selection dialog on project creation (StartSharp)
+  - abstract navigation model
+  - use line awesome instead with shims instead of font awesome 4 (StartSharp)
+  - added sample work log module (StartSharp)
+  - fix all pro-theme issues (https://github.com/serenity-is/Serenity/milestone/1?closed=1)
+  
+
+## 5.1.3 (2022-01-15)
+
+Bugfixes:
+  - fix missing static web assets issue in Serenity.Scripts due to target framework bug
+
+## 5.1.2 (2022-01-14)
+
+Features:
+  - this is a preparation release for new Bootstrap 5 based pro theme in StartSharp. Some changes might potentially break Bootstrap 3 apps. Revert to 5.1.1 if you have any issues.
+  - added CustomData dictionary properties to ServiceRequest / ServiceResponse, avoid using them and define custom subclasses except in rare cases where that's not possible
+  - don't set CSRF-TOKEN header for crossDomain requests as it is causing a CORS pre-flight validation
+  - allow join attributes to be used based on dialects
+  - add option to negate dialect match, throw an error if there are multiple matches for the same dialect
+  - add ability for dialects to optionally change SqlQuery.ToString() by implementing ISqlQueryToString interface
+  - made OuterApplyAttribute, LeftJoinAttribute, InnerJoinAttribute, and ExpressionAttribute accept ServerType to set their Dialect, added NegateDialect property
+  - allow tablename to be changed based on dialect as well
+  - allow foreign keys to be selected based on dialect
+  - use NavigationGroup / NavigationSection attributes to reorganize existing navigation items to groups / sections (StartSharp pro theme)
+  - add bs- prefix where needed for data attributes for bs5 compability
+  - allow option to pass a multiplier and delta for column widths which is useful when switching to a larger font, as widths set server side may not match expected size  
+  - add bootstrap 5.1.3, line awesome with font awesome shims, tabler icons, and preact 10.6.4
+  - add nprogress (to be used instead of pace)
+  - change dropdown type timeouts down to 200 ms from 500 ms for a more responsive ui, don't show search icon before actually calling the service
+  - remove sourcemappingurls from bundled css as it is not supported at the moment in nuglify etc.
+  - add latest open sans and poppins fonts
+  - removing source maps for bootstrap as sass code is not useful while inspecting
+  - removed legacy serenity less files, and use output serenity.css instead (now serenity.css is for legacy BS3 apps only)
+  - removed less dependency
+  - added INavigationModel, and INavigationModelFactory interfaces
+  - removed todo from UniqueFieldSaveBehavior and UniqueConstraintSaveBehavior (#6176)
+  - added Oracle12cDialect which prefers offset fetch instead of rownum
+  - get rid of "Update" button and use "Save" both for "Create" and "Update" modes
+  - move to latest stable version of node / npm (16.13.2 / 8.1.2)
+  - better npm install implementation for Serenity.Scripts / Serenity.Assets
+  
+Bugfixes:
+  - check for form content type before trying to read from form in JsonRequestAttribute
+  - SaveRequestHandler should not modify the request entity but clone it as it can be modified in validate request phase, for example trimming etc.
+  - clone may leave assignedFields in invalid state
+  - fix bs5 modal showing
+  - fix bs5 close button markup
+  - fix group separator naming in ScriptCulture.cs
+  - fix restore command in linux
+  - grouping panel should not scroll with the grid columns, it has no relation to horizontal scroll of the grid
+  - fix pane top when there is frozen columns and grouping panel is visible (#6213)
+
 ## 5.1.1 (2021-10-29)
 
 Bugfixes:

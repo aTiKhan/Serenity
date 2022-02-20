@@ -29,6 +29,7 @@ export interface CommonDialogOptions  {
 
 export interface AlertOptions extends CommonDialogOptions {
     okButton?: string | boolean;
+    okButtonClass?: string;
 }
 
 
@@ -83,12 +84,20 @@ function uiDialogMessage(options: CommonDialogOptions, message: string, dialogCl
 }
 
 let _isBS3: boolean;
+let _isBS5Plus: boolean;
 
 export function isBS3(): boolean {
     if (_isBS3 != null)
         return _isBS3;
     // @ts-ignore
     return (_isBS3 = !!($.fn.modal && $.fn.modal.Constructor && $.fn.modal.Constructor.VERSION && ($.fn.modal.Constructor.VERSION + "").charAt(0) == '3'));
+}
+
+export function isBS5Plus(): boolean {
+    if (_isBS5Plus != null)
+        return _isBS5Plus;
+    // @ts-ignore
+    return (_isBS5Plus = typeof bootstrap !== "undefined" && (!bootstrap.Modal || !bootstrap.Modal.VERSION || (!bootstrap.Modal.VERSION + "").charAt(0) != '4'));
 }
 
 const defaultTxt = {
@@ -108,8 +117,8 @@ function txt(k: string) {
 }
 
 export function bsModalMarkup(title: string, body: string, modalClass?: string) {
-    var closeButton = `<button type="button" class="close" data-dismiss="modal" aria-label="${txt('CloseButton')}">` + 
-        `<span aria-hidden="true">&times;</span></button>`;
+    var closeButton = `<button type="button" class="${isBS5Plus() ? "btn-" : ""}close" data-${isBS5Plus() ? "bs-" :  ""}dismiss="modal" aria-label="${txt('CloseButton')}">` + 
+        `${isBS5Plus() ? "" : '<span aria-hidden="true">&times;</span>'}</button>`;
     return (
 `<div class="modal ${modalClass}" tabindex="-1" role="dialog">
 <div class="modal-dialog" role="document">
@@ -153,8 +162,14 @@ function bsModalMessage(options: CommonDialogOptions, message: string, modalClas
     if (options.onOpen)
         div.one('shown.bs.modal', options.onOpen);
 
-    if (options.onClose)
-        div.one('hidden.bs.modal', e => options.onClose(options.result));
+    div.one('hidden.bs.modal', e => {
+        try {
+            options.onClose && options.onClose(options.result);
+        }
+        finally {
+            div.remove();
+        }
+    });
 
     var footer = div.find('.modal-footer');
 
@@ -174,8 +189,11 @@ function bsModalMessage(options: CommonDialogOptions, message: string, modalClas
 
     div.modal({
         backdrop: false,
-        show: true
+        show: !isBS5Plus()
     });
+
+    if (isBS5Plus())
+        div.modal('show');
 }
 
 let _useBrowserDialogs: boolean;
@@ -219,7 +237,7 @@ export function alert(message: string, options?: AlertOptions) {
         if (options.okButton == null || options.okButton) {
             options.buttons.push({
                 text: typeof options.okButton == "boolean" ? txt('OkButton') : options.okButton,
-                cssClass: useBS ? 'btn-default' : undefined,
+                cssClass: options.okButtonClass ?? (useBS ? 'btn-danger' : undefined),
                 result: 'ok'
             });
         }
@@ -235,6 +253,7 @@ export function alert(message: string, options?: AlertOptions) {
 
 export interface ConfirmOptions extends CommonDialogOptions {
     yesButton?: string | boolean;
+    yesButtonClass?: string;
     noButton?: string | boolean;
     cancelButton?: string | boolean;
     onCancel?: () => void;
@@ -262,7 +281,7 @@ export function confirm(message: string, onYes: () => void, options?: ConfirmOpt
         if (options.yesButton == null || options.yesButton) {
             options.buttons.push({
                 text: typeof options.yesButton == "boolean" ? txt('YesButton') : options.yesButton,
-                cssClass: useBS ? 'btn-primary' : undefined,
+                cssClass: options.yesButtonClass ?? (useBS ? 'btn-primary' : undefined),
                 result: 'yes',
                 click: onYes
             });
@@ -270,7 +289,7 @@ export function confirm(message: string, onYes: () => void, options?: ConfirmOpt
         if (options.noButton == null || options.noButton) {
             options.buttons.push({
                 text: typeof options.noButton == "boolean" ? txt('NoButton') : options.noButton,
-                cssClass: useBS ? 'btn-default' : undefined,
+                cssClass: useBS ? (isBS5Plus() ? 'btn-danger' : 'btn-default'): undefined,
                 result: 'no',
                 click: options.onNo
             });
@@ -278,7 +297,7 @@ export function confirm(message: string, onYes: () => void, options?: ConfirmOpt
         if (options.cancelButton) {
             options.buttons.push({
                 text: typeof options.cancelButton == "boolean" ? txt('CancelButton') : options.cancelButton,
-                cssClass: useBS ? 'btn-default' : undefined,
+                cssClass: useBS ? (isBS5Plus() ? 'btn-secondary': 'btn-default') : undefined,
                 result: 'cancel',
                 click: options.onCancel
             });
@@ -361,6 +380,25 @@ export function information(message: string, onOk: () => void, options?: Confirm
         dialogClass: "s-InformationDialog",
         modalClass: "s-InformationModal",
         yesButton: txt("OkButton"),
+        yesButtonClass: 'btn-info',
+        noButton: false,
+    }, options));
+}
+
+
+export function success(message: string, onOk: () => void, options?: ConfirmOptions) {
+    if (useBrowserDialogs()) {
+        window.alert(message);
+        onOk && onOk();
+        return;
+    }
+
+    confirm(message, onOk, extend<ConfirmOptions>({
+        title: txt("SuccessTitle"),
+        dialogClass: "s-SuccessDialog",
+        modalClass: "s-SuccessModal",
+        yesButton: txt("OkButton"),
+        yesButtonClass: 'btn-success',
         noButton: false,
     }, options));
 }
@@ -369,7 +407,8 @@ export function warning(message: string, options?: AlertOptions) {
     alert(message, extend<AlertOptions>({
         title: txt("WarningTitle"),
         dialogClass: "s-WarningDialog",
-        modalClass: "s-WarningModal"
+        modalClass: "s-WarningModal",
+        okButtonClass: 'btn-warning'
     }, options));
 }
 

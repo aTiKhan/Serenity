@@ -11,21 +11,25 @@ namespace Serenity.CodeGenerator
     public class RestoreCommand : BaseFileSystemCommand
     {
         protected IBuildProjectSystem ProjectSystem { get; }
+        public IEnumerable<string> ProjectReferences { get; }
 
-        public RestoreCommand(IFileSystem fileSystem, IBuildProjectSystem projectSystem)
+        public RestoreCommand(IFileSystem fileSystem, IBuildProjectSystem projectSystem,
+            IEnumerable<string> projectReferences = null, IEnumerable<string> pkgDefs = null)
             : base(fileSystem)
         {
             ProjectSystem = projectSystem ?? throw new ArgumentNullException(nameof(projectSystem));
+            ProjectReferences = projectReferences;
         }
 
-        public ExitCodes Run(string csproj)
+        public ExitCodes Run(string csproj, bool verbose = false)
         {
             if (csproj == null)
                 throw new ArgumentNullException(nameof(csproj));
 
             if (!File.Exists(csproj))
             {
-                Console.Error.WriteLine($"Project file {csproj} is not found!");
+                if (verbose)
+                    Console.Error.WriteLine($"Project file {csproj} is not found!");
                 return ExitCodes.ProjectNotFound;
             }
 
@@ -99,8 +103,15 @@ namespace Serenity.CodeGenerator
 
             try
             {
-                foreach (var reference in EnumerateProjectReferences(csproj, new HashSet<string>(StringComparer.OrdinalIgnoreCase)))
+                var projectRefs = ProjectReferences?.Where(x => 
+                    !IgnoreProjectRefs.Contains(Path.GetFileNameWithoutExtension(x))) ?? 
+                        EnumerateProjectReferences(csproj, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+                foreach (var reference in projectRefs)
                 {
+                    if (verbose)
+                        Console.WriteLine("Project Reference: " + reference);
+
                     IBuildProject project;
                     try
                     {
@@ -108,6 +119,9 @@ namespace Serenity.CodeGenerator
                     }
                     catch
                     {
+                        if (verbose)
+                            Console.WriteLine("Could not Load Project Reference!: " + reference);
+
                         continue;
                     }
 
@@ -121,10 +135,20 @@ namespace Serenity.CodeGenerator
                             StringComparison.OrdinalIgnoreCase) == true))
                     {
                         var sourceFile = Path.Combine(Path.GetDirectoryName(reference),
-                            item.EvaluatedInclude);
+                            item.EvaluatedInclude).Replace('\\', Path.DirectorySeparatorChar);
+
+                        if (verbose)
+                            Console.WriteLine("Checking source file: " + sourceFile);
 
                         if (!File.Exists(sourceFile))
+                        {
+                            if (verbose)
+                                Console.WriteLine("Source file does NOT exist: " + sourceFile);
                             continue;
+                        }
+
+                        if (verbose)
+                            Console.WriteLine("Source file exists: " + sourceFile);
 
                         if (!string.Equals(item.ItemType, "TypingsToPackage", StringComparison.OrdinalIgnoreCase) &&
                             item.GetMetadataValue("Pack") != "true")
@@ -135,6 +159,9 @@ namespace Serenity.CodeGenerator
                         {
                             foreach (var path in packagePath.Split(';', StringSplitOptions.RemoveEmptyEntries))
                             {
+                                if (verbose)
+                                    Console.WriteLine("Checking project package path " + path);
+
                                 if (!PathHelper.ToUrl(path).StartsWith("typings/", StringComparison.OrdinalIgnoreCase))
                                     continue;
 
@@ -195,7 +222,11 @@ namespace Serenity.CodeGenerator
                 {
                     nuspecFile = Path.Combine(packageFolder, id.ToLowerInvariant() + ".nuspec");
                     if (!File.Exists(nuspecFile))
+                    {
+                        if (verbose)
+                            Console.WriteLine("Can't find nuspec file: " + nuspecFile);
                         continue;
+                    }
                 }
 
                 Console.ForegroundColor = ConsoleColor.Cyan;
@@ -236,8 +267,14 @@ namespace Serenity.CodeGenerator
                         if (!relative.StartsWith("typings/", StringComparison.OrdinalIgnoreCase))
                             relative = "wwwroot/" + relative;
 
+                        if (verbose)
+                            Console.WriteLine("Found a file to restore: " + relative);
                         restoreFile(file, relative);
                     }
+                }
+                else if (verbose)
+                {
+                    Console.WriteLine("Can't find package content directory: " + nuspecFile);
                 }
 
                 var typingsRoot = Path.Combine(packageFolder, "typings");
@@ -248,6 +285,11 @@ namespace Serenity.CodeGenerator
                 {
                     foreach (var file in Directory.GetFiles(typingsRoot, "*.ts", SearchOption.AllDirectories))
                     {
+                        if (verbose)
+                        { 
+                            Console.WriteLine(typingsRoot);
+                            Console.WriteLine(file);
+                        }   
                         var relative = "typings/" + file[(typingsRoot.Length + 1)..];
                         restoreFile(file, relative);
                     }
@@ -301,7 +343,17 @@ namespace Serenity.CodeGenerator
             return ExitCodes.Success;
         }
 
-        private IEnumerable<string> EnumerateProjectReferences(string csproj, HashSet<string> visited, int depth = 0)
+        private static readonly HashSet<string> IgnoreProjectRefs = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Serenity.Net.Core",
+            "Serenity.Net.Data",
+            "Serenity.Net.Entity",
+            "Serenity.Net.Services",
+            "Serenity.Net.Web"
+        };
+
+        private IEnumerable<string> EnumerateProjectReferences(string csproj, HashSet<string> visited, 
+            int depth = 0)
         {
             var allReferences = new List<string>();
             try
@@ -315,20 +367,25 @@ namespace Serenity.CodeGenerator
                     if (string.Equals(item.ItemType, "ProjectReference",
                         StringComparison.OrdinalIgnoreCase))
                     {
-                        if (!string.IsNullOrEmpty(item.EvaluatedInclude))
-                        {
-                            var path = Path.Combine(Path.GetDirectoryName(csproj), item.EvaluatedInclude);
-                            if (File.Exists(path) && visited?.Contains(path) != true)
-                            {
-                                path = Path.GetFullPath(path);
-                                allReferences.Add(path);
+                        if (string.IsNullOrEmpty(item.EvaluatedInclude))
+                            continue;
 
-                                if (visited != null && depth < 5)
-                                {
-                                    foreach (var subref in EnumerateProjectReferences(path, visited, depth + 1))
-                                        allReferences.Add(subref);
-                                }
-                            }
+                        var path = Path.Combine(Path.GetDirectoryName(csproj), item.EvaluatedInclude);
+                        if (!File.Exists(path) || visited?.Contains(path) == true)
+                            continue;
+
+                        if (IgnoreProjectRefs.Contains(Path.GetFileNameWithoutExtension(path)))
+                            continue;
+
+                        path = Path.GetFullPath(path);
+                        allReferences.Add(path);
+                        if (visited?.Contains(path) == true)
+                            continue;
+
+                        if (visited != null && depth < 5)
+                        {
+                            foreach (var subref in EnumerateProjectReferences(path, visited, depth + 1))
+                                allReferences.Add(subref);
                         }
                     }
                 }
