@@ -1,10 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Globalization;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     /// <summary>
     /// Field with Int16 value
@@ -75,12 +69,8 @@ namespace Serenity.Data
             var value = _getValue(row);
             if (value == null)
                 writer.WriteNull();
-            else //if (EnumType == null) şimdilik enum tipi belirtilse de string e çevrilerek yazma işlemi iptal, flag ile daha sonra ekleyelim
+            else
                 writer.WriteValue(value.Value);
-            //else if (EnumType.IsEnum)
-            //    writer.WriteValue(Enum.GetName(EnumType, value.Value));
-            //else if (EnumType.IsSubclassOf(typeof(DataEnum)))
-            //    writer.WriteValue(DataEnum.ConvertFromInt32(EnumType, value.Value).Key);
         }
 
         /// <summary>

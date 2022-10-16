@@ -1,26 +1,35 @@
 ﻿using Newtonsoft.Json.Linq;
 using Serenity.CodeGeneration;
-using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Linq;
 
 namespace Serenity.CodeGenerator
 {
-    public class ServerTypingsCommand
+    public class ServerTypingsCommand : BaseFileSystemCommand
     {
-        public static void Run(string csproj, List<ExternalType> tsTypes)
+        private readonly bool modules;
+
+        public ServerTypingsCommand(IGeneratorFileSystem fileSystem, bool modules) 
+            : base(fileSystem)
         {
-            var projectDir = Path.GetDirectoryName(csproj);
-            var config = GeneratorConfig.LoadFromFile(Path.Combine(projectDir, "sergen.json"));
+            this.modules = modules;
+        }
+
+        public void Run(string csproj, List<ExternalType> tsTypes)
+        {
+            var projectDir = fileSystem.GetDirectoryName(csproj);
+            var config = GeneratorConfig.LoadFromFile(fileSystem, fileSystem.Combine(projectDir, "sergen.json"));
+
+            if (modules && config.ServerTypings?.ModuleTypings == false)
+                return;
+
+            if (!modules && config.ServerTypings?.NamespaceTypings == false)
+                return;
 
             string[] assemblyFiles = null;
 
             if (config.ServerTypings == null ||
                 config.ServerTypings.Assemblies.IsEmptyOrNull())
             {
-                var targetFramework = ProjectFileHelper.ExtractTargetFrameworkFrom(csproj);
+                var targetFramework = ProjectFileHelper.ExtractTargetFrameworkFrom(fileSystem, csproj);
 
                 if (string.IsNullOrEmpty(targetFramework))
                 {
@@ -29,8 +38,8 @@ namespace Serenity.CodeGenerator
                     Environment.Exit(1);
                 }
 
-                string outputName = ProjectFileHelper.ExtractAssemblyNameFrom(csproj)
-                    ?? Path.ChangeExtension(Path.GetFileName(csproj), null);
+                string outputName = ProjectFileHelper.ExtractAssemblyNameFrom(fileSystem, csproj)
+                    ?? fileSystem.ChangeExtension(fileSystem.GetFileName(csproj), null);
 
                 var outputExtension = ".dll";
                 if (targetFramework.StartsWith("net", StringComparison.OrdinalIgnoreCase) &&
@@ -38,20 +47,20 @@ namespace Serenity.CodeGenerator
                     targetFramework.IndexOf('.', StringComparison.Ordinal) < 0)
                     outputExtension = ".exe";
 
-                var outputPath1 = Path.Combine(Path.GetDirectoryName(csproj), "bin/Debug/" + targetFramework + "/" + outputName + outputExtension)
-                    .Replace('/', Path.DirectorySeparatorChar);
-                var outputPath2 = Path.Combine(Path.GetDirectoryName(csproj), "bin/Release/" + targetFramework + "/" + outputName + outputExtension)
-                    .Replace('/', Path.DirectorySeparatorChar);
+                var outputPath1 = fileSystem.Combine(fileSystem.GetDirectoryName(csproj),
+                    PathHelper.ToPath("bin/Debug/" + targetFramework + "/" + outputName + outputExtension));
+                var outputPath2 = fileSystem.Combine(fileSystem.GetDirectoryName(csproj), 
+                    PathHelper.ToPath("bin/Release/" + targetFramework + "/" + outputName + outputExtension));
 
-                if (File.Exists(outputPath1))
+                if (fileSystem.FileExists(outputPath1))
                 {
-                    if (File.Exists(outputPath2) &&
-                        File.GetLastWriteTime(outputPath1) < File.GetLastWriteTime(outputPath2))
+                    if (fileSystem.FileExists(outputPath2) &&
+                        fileSystem.GetLastWriteTime(outputPath1) < fileSystem.GetLastWriteTime(outputPath2))
                         assemblyFiles = new[] { outputPath2 };
                     else
                         assemblyFiles = new[] { outputPath1 };
                 }
-                else if (File.Exists(outputPath2))
+                else if (fileSystem.FileExists(outputPath2))
                     assemblyFiles = new[] { outputPath2 };
                 else
                 {
@@ -79,21 +88,21 @@ namespace Serenity.CodeGenerator
                 assemblyFiles = config.ServerTypings.Assemblies;
                 for (var i = 0; i < assemblyFiles.Length; i++)
                 {
-                    var assemblyFile1 = Path.GetFullPath(assemblyFiles[i].Replace('/', Path.DirectorySeparatorChar));
+                    var assemblyFile1 = PathHelper.ToUrl(fileSystem.GetFullPath(PathHelper.ToPath(assemblyFiles[i])));
                     var binDebugIdx = assemblyFile1.IndexOf("/bin/Debug/", StringComparison.OrdinalIgnoreCase);
                     string assemblyFile2 = assemblyFile1;
                     if (binDebugIdx >= 0)
-                        assemblyFile2 = assemblyFile1.Substring(0, binDebugIdx) + "/bin/Release/" + assemblyFile1[(binDebugIdx + "/bin/Release".Length)..];
+                        assemblyFile2 = string.Concat(assemblyFile1.AsSpan(0, binDebugIdx), "/bin/Release/", assemblyFile1[(binDebugIdx + "/bin/Release".Length)..]);
 
                     assemblyFiles[i] = assemblyFile1;
 
-                    if (File.Exists(assemblyFile1))
+                    if (fileSystem.FileExists(assemblyFile1))
                     {
-                        if (File.Exists(assemblyFile2) &&
-                            File.GetLastWriteTime(assemblyFile1) < File.GetLastWriteTime(assemblyFile2))
+                        if (fileSystem.FileExists(assemblyFile2) &&
+                            fileSystem.GetLastWriteTime(assemblyFile1) < fileSystem.GetLastWriteTime(assemblyFile2))
                             assemblyFiles[i] = assemblyFile2;
                     }
-                    else if (File.Exists(assemblyFile2))
+                    else if (fileSystem.FileExists(assemblyFile2))
                         assemblyFiles[i] = assemblyFile2;
                     else
                     {
@@ -107,19 +116,19 @@ namespace Serenity.CodeGenerator
             }
 
             if (config.RootNamespace.IsEmptyOrNull())
-                config.RootNamespace = config.GetRootNamespaceFor(csproj);
+                config.RootNamespace = config.GetRootNamespaceFor(fileSystem, csproj);
 
-            var generator = new ServerTypingsGenerator(assemblyFiles.ToArray())
+            var generator = new ServerTypingsGenerator(fileSystem, assemblyFiles.ToArray())
             {
                 LocalTexts = config.ServerTypings != null && config.ServerTypings.LocalTexts
             };
 
-            var appSettings = Path.Combine(projectDir, "appsettings.json");
-            if (generator.LocalTexts && File.Exists(appSettings))
+            var appSettings = fileSystem.Combine(projectDir, "appsettings.json");
+            if (generator.LocalTexts && fileSystem.FileExists(appSettings))
             {
                 try
                 {
-                    var obj = JObject.Parse(File.ReadAllText(appSettings));
+                    var obj = JObject.Parse(fileSystem.ReadAllText(appSettings));
                     if ((obj["AppSettings"] as JObject)?["LocalTextPackages"] is JObject packages)
                     {
                         foreach (var p in packages.PropertyValues())
@@ -134,21 +143,43 @@ namespace Serenity.CodeGenerator
                 }
             }
 
-            var outDir = Path.Combine(projectDir, (config.ServerTypings?.OutDir.TrimToNull() ?? "Imports/ServerTypings")
-                .Replace('/', Path.DirectorySeparatorChar));
+            var outDir = fileSystem.Combine(projectDir, 
+                PathHelper.ToPath((config.ServerTypings?.OutDir.TrimToNull() ?? 
+                    (modules ? "Modules/ServerTypes" : "Imports/ServerTypings"))));
+
+            if (modules)
+            {
+                var modulesDir = fileSystem.Combine(projectDir, "Modules");
+                var rootNsDir = fileSystem.Combine(projectDir, config.RootNamespace);
+                if (fileSystem.DirectoryExists(rootNsDir) &&
+                    !fileSystem.DirectoryExists(modulesDir))
+                {
+                    modulesDir = rootNsDir;
+                    if (generator.ModuleTypings)
+                        outDir = config.RootNamespace + "/ServerTypes";
+                }
+            }
 
             Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.Write("Transforming ServerTypings at: ");
+            Console.Write("Transforming " + (modules ? "ServerTypes" : "ServerTypings") + " at: ");
             Console.ResetColor();
             Console.WriteLine(outDir);
 
             generator.RootNamespaces.Add(config.RootNamespace);
+            generator.ModuleTypings = modules && config?.ServerTypings?.ModuleTypings != false;
+            generator.NamespaceTypings = !modules && config?.ServerTypings?.NamespaceTypings != false;
 
             foreach (var type in tsTypes)
                 generator.AddTSType(type);
 
-            var codeByFilename = generator.Run();
-            MultipleOutputHelper.WriteFiles(outDir, codeByFilename, "*.ts");
+            var generatedSources = generator.Run();
+
+            MultipleOutputHelper.WriteFiles(fileSystem, 
+                fileSystem.Combine(projectDir, PathHelper.ToPath(outDir)),
+                generatedSources.Where(x => x.Module == modules)
+                    .Select(x => (x.Filename, x.Text)),
+                deleteExtraPattern: new[] { "*.ts" },
+                endOfLine: config.EndOfLine);
         }
     }
 }

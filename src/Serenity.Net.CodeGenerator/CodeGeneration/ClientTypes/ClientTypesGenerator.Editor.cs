@@ -1,10 +1,8 @@
-﻿using System;
-
-namespace Serenity.CodeGeneration
+﻿namespace Serenity.CodeGeneration
 {
     public partial class ClientTypesGenerator : ImportGeneratorBase
     {
-        private void GenerateEditor(ExternalType type, string name)
+        private void GenerateEditor(ExternalType type, string name, string key)
         {
             cw.Indented("public partial class ");
             sb.Append(name);
@@ -22,7 +20,7 @@ namespace Serenity.CodeGeneration
             cw.InBrace(delegate
             {
                 cw.Indented("public const string Key = \"");
-                sb.Append(type.FullName);
+                sb.Append(key ?? type.FullName);
                 sb.AppendLine("\";");
                 sb.AppendLine();
 
@@ -40,26 +38,60 @@ namespace Serenity.CodeGeneration
             });
         }
 
+        static readonly string[] EditorAttributeNames = new[]
+        {
+            "Serenity.EditorAttribute",
+            "@serenity-is/corelib:EditorAttribute",
+            "Serenity.ElementAttribute",
+            "@serenity-is/corelib:ElementAttribute",
+            "Serenity.Decorators.registerEditor",
+            "@serenity-is/corelib:Decorators.registerEditor",
+            "Decorators.registerEditor",
+            "registerEditor",
+            "Serenity.Decorators.element",
+            "@serenity-is/corelib:Decorators.element",
+            "Decorators.element"
+        };
+
+        public static readonly string[] EditorBaseClasses = new[]
+        {
+            "Serenity.Extensions.GridEditorBase",
+            "GridEditorBase",
+            "@serenity-is/extensions:GridEditorBase",
+            "Serenity.LookupEditorBase",
+            "LookupEditorBase",
+            "@serenity-is/corelib:LookupEditorBase",
+            "LookupEditor",
+            "@serenity-is/corelib:LookupEditor",
+            "ServiceLookupEditor",
+            "@serenity-is/corelib:ServiceLookupEditor",
+            "ServiceLookupEditorBase",
+            "@serenity-is/corelib:ServiceLookupEditorBase",
+        };
+
+        //static readonly string[] widgetBaseClasses = new[]
+        //{
+        //    "Serenity.Widget",
+        //    "Serenity.Widget<any>",
+        //    "@serenity-is/corelib:Widget",
+        //    "@serenity-is/corelib:Widget<any>"
+        //};
+
         private bool IsEditorType(ExternalType type)
         {
-            if (type.IsAbstract)
+            if (type.IsAbstract == true)
                 return false;
 
-            if (type.GenericParameters.Count > 0)
+            if (type.GenericParameters?.Count > 0)
                 return false;
 
-            if (!HasBaseType(type, "Serenity.Widget") &&
-                !HasBaseType(type, "Serenity.Widget<any>"))
-                return false;
+            if (HasBaseType(type, EditorBaseClasses))
+                return true;
 
-            return
-                GetAttribute(type, "Serenity.EditorAttribute", inherited: true) != null ||
-                GetAttribute(type, "Serenity.ElementAttribute", inherited: true) != null ||
-                GetAttribute(type, "Serenity.Decorators.registerEditor", inherited: true) != null ||
-                GetAttribute(type, "Serenity.Decorators.editor", inherited: true) != null ||
-                GetAttribute(type, "Serenity.Decorators.element", inherited: true) != null ||
-                HasBaseType(type, "Serenity.Extensions.GridEditorBase") ||
-                HasBaseType(type, "Serenity.LookupEditorBase");
+            if (GetAttribute(type, inherited: true, attributeNames: EditorAttributeNames) != null)
+                return true;
+
+            return false;
         }
     }
 }

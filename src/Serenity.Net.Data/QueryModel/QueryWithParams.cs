@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Dictionary = System.Collections.Generic.Dictionary<string, object>;
 
 namespace Serenity.Data
@@ -31,7 +30,10 @@ namespace Serenity.Data
         /// </summary>
         protected Dictionary parameters;
 
-        private int nextAutoParam;
+        /// <summary>
+        /// The next auto param counter
+        /// </summary>
+        protected int nextAutoParam;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="QueryWithParams"/> class.

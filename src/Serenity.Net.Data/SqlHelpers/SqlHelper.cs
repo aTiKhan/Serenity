@@ -1,11 +1,7 @@
 ﻿using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Data;
 using System.Data.Common;
 using System.IO;
-using System.Text;
 using Dictionary = System.Collections.Generic.Dictionary<string, object>;
 
 namespace Serenity.Data
@@ -73,10 +69,10 @@ namespace Serenity.Data
         /// <summary>
         /// Logs the command.
         /// </summary>
-        /// <param name="type">The type.</param>
+        /// <param name="method">The type.</param>
         /// <param name="command">The command.</param>
         /// <param name="logger">Logger</param>
-        public static void LogCommand(string type, IDbCommand command, ILogger logger)
+        public static void LogCommand(string method, IDbCommand command, ILogger logger)
         {
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
@@ -85,34 +81,33 @@ namespace Serenity.Data
             {
                 if (command is SqlCommand sqlCmd)
                 {
-                    logger.LogDebug("{0}{1}{2}", Environment.NewLine, SqlCommandDumper.GetCommandText(sqlCmd));
+                    logger.LogDebug("SQL - {method}[{uid}] - START\n{sql}", method, command.GetHashCode(), SqlCommandDumper.GetCommandText(sqlCmd));
                     return;
                 }
 
-                StringBuilder sb = new StringBuilder((command.CommandText ?? "").Length + 1000);
-                sb.Append(type);
-                sb.Append("\r\n");
-                sb.Append(command.CommandText);
-                if (command.Parameters != null && command.Parameters.Count > 0)
+                if (command.Parameters?.Count <= 0)
                 {
-                    sb.Append(" --- PARAMS --- ");
-                    foreach (DbParameter p in command.Parameters)
-                    {
-                        sb.Append(p.ParameterName);
-                        sb.Append("=");
-                        if (p.Value == null || p.Value == DBNull.Value)
-                            sb.Append("<NULL>");
-                        else
-                            sb.Append(p.Value.ToString());
-                        sb.Append(" ");
-                    }
+                    logger.LogDebug("SQL - {method}[{uid}] - START\n{sql}", method, command.GetHashCode(), command.CommandText);
+                    return;
                 }
 
-                logger.LogDebug(sb.ToString());
+                StringBuilder sb = new("");
+                foreach (DbParameter p in command.Parameters)
+                {
+                    sb.Append(p.ParameterName);
+                    sb.Append("=");
+                    if (p.Value == null || p.Value == DBNull.Value)
+                        sb.Append("<NULL>");
+                    else
+                        sb.Append(p.Value.ToString());
+                    sb.Append("; ");
+                }
+
+                logger.LogDebug("SQL - {method}[{uid}] - START\n{sql}\n--PARAMS--\n{params}", method, command.GetHashCode(), command.CommandText, sb.ToString());
             }
             catch (Exception ex)
             {
-                logger.LogDebug("Error logging command: " + ex.ToString());
+                logger.LogDebug("Error logging command: ", ex);
             }
         }
 
@@ -155,11 +150,11 @@ namespace Serenity.Data
                 if (value != null && value != DBNull.Value)
                 {
 #pragma warning disable CS0618
-                    var mappedType = Dapper.SqlMapper.GetDbType(value);
+                    var mappedType = Dapper.SqlMapper.LookupDbType(value.GetType(), "n/a", false, out var _); ;
 #pragma warning restore CS0618
 
-                    if (mappedType != param.DbType)
-                        param.DbType = mappedType;
+                    if (mappedType != param.DbType && mappedType != null)
+                        param.DbType = mappedType.Value;
 
                     if (param.DbType == DbType.DateTime &&
                         (dialect ?? SqlSettings.DefaultDialect).UseDateTime2)
@@ -267,8 +262,11 @@ namespace Serenity.Data
             {
                 int result;
                 command.Connection.EnsureOpen();
+                var stopwatch = ValueStopwatch.StartNew();
                 try
                 {
+                    logger ??= command.Connection.GetLogger();
+
                     if (logger?.IsEnabled(LogLevel.Debug) == true)
                         LogCommand("ExecuteNonQuery", command, logger);
 
@@ -283,7 +281,8 @@ namespace Serenity.Data
                 }
 
                 if (logger?.IsEnabled(LogLevel.Debug) == true)
-                    logger.LogDebug("END - ExecuteNonQuery");
+                    logger.LogDebug("SQL - {method}[{uid}] - END - {ElapsedMilliseconds} ms",
+                        "ExecuteNonQuery", command.GetHashCode(), stopwatch.ElapsedMilliseconds);
 
                 return result;
             }
@@ -481,15 +480,19 @@ namespace Serenity.Data
             try
             {
                 IDbCommand command = NewCommand(connection, commandText, param);
+                var stopwatch = ValueStopwatch.StartNew();
                 try
                 {
+                    logger ??= connection.GetLogger();
+
                     if (logger?.IsEnabled(LogLevel.Debug) == true)
                         LogCommand("ExecuteReader", command, logger);
 
                     var result = command.ExecuteReader();
 
                     if (logger?.IsEnabled(LogLevel.Debug) == true)
-                        logger.LogDebug("END - ExecuteReader");
+                        logger.LogDebug("SQL - {method}[{uid}] - END - {ElapsedMilliseconds} ms",
+                            "ExecuteReader", command.GetHashCode(), stopwatch.ElapsedMilliseconds);
 
                     return result;
                 }
@@ -552,15 +555,19 @@ namespace Serenity.Data
             using IDbCommand command = NewCommand(connection, commandText, param);
             try
             {
+                var stopwatch = ValueStopwatch.StartNew();
                 try
                 {
+                    logger ??= connection.GetLogger();
+
                     if (logger?.IsEnabled(LogLevel.Debug) == true)
                         LogCommand("ExecuteScalar", command, logger);
 
                     var result = command.ExecuteScalar();
 
                     if (logger?.IsEnabled(LogLevel.Debug) == true)
-                        logger.LogDebug("END - ExecuteScalar");
+                        logger.LogDebug("SQL - {method}[{uid}] - END - {ElapsedMilliseconds} ms", 
+                            "ExecuteScalar", command.GetHashCode(), stopwatch.ElapsedMilliseconds);
 
                     return result;
                 }

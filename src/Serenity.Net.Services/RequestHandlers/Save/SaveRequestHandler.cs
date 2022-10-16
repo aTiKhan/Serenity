@@ -1,14 +1,4 @@
-﻿using Serenity.Abstractions;
-using Serenity.Data;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Globalization;
-using System.Linq;
-using System.Reflection;
-using System.Security.Claims;
-
-namespace Serenity.Services
+﻿namespace Serenity.Services
 {
     public class SaveRequestHandler<TRow, TSaveRequest, TSaveResponse> : ISaveRequestProcessor,
         ISaveHandler<TRow, TSaveRequest, TSaveResponse>
@@ -296,6 +286,8 @@ namespace Serenity.Services
                 Old = new TRow();
                 LoadOldEntity();
             }
+            else
+                Old = null;
 
             ValidateRequest();
             SetInternalFields();

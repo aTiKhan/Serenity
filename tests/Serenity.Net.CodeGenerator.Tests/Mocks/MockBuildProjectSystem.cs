@@ -1,14 +1,12 @@
 ﻿using Serenity.CodeGenerator;
-using System;
-using System.IO.Abstractions;
 
 namespace Serenity.Tests
 {
     public class MockBuildProjectSystem : IBuildProjectSystem
     {
-        private readonly IFileSystem fileSystem;
+        private readonly IGeneratorFileSystem fileSystem;
 
-        public MockBuildProjectSystem(IFileSystem fileSystem)
+        public MockBuildProjectSystem(IGeneratorFileSystem fileSystem)
         {
             this.fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
         }

@@ -1,24 +1,26 @@
 ﻿using Serenity.CodeGeneration;
-using System;
-using System.Collections.Generic;
-using System.IO;
 
 namespace Serenity.CodeGenerator
 {
-    public class ClientTypesCommand
+    public class ClientTypesCommand : BaseFileSystemCommand
     {
-        public static void Run(string csproj, List<ExternalType> tsTypes)
+        public ClientTypesCommand(IGeneratorFileSystem fileSystem) 
+            : base(fileSystem)
         {
-            var projectDir = Path.GetDirectoryName(csproj);
-            var config = GeneratorConfig.LoadFromFile(Path.Combine(projectDir, "sergen.json"));
+        }
+
+        public void Run(string csproj, List<ExternalType> tsTypes)
+        {
+            var projectDir = fileSystem.GetDirectoryName(csproj);
+            var config = GeneratorConfig.LoadFromFile(fileSystem,
+                fileSystem.Combine(projectDir, "sergen.json"));
 
             config.ClientTypes ??= new GeneratorConfig.ClientTypesConfig();
 
             if (config.RootNamespace.IsEmptyOrNull())
-                config.RootNamespace = config.GetRootNamespaceFor(csproj);
+                config.RootNamespace = config.GetRootNamespaceFor(fileSystem, csproj);
 
-            var outDir = Path.Combine(projectDir, (config.ClientTypes.OutDir.TrimToNull() ?? "Imports/ClientTypes")
-                .Replace('/', Path.DirectorySeparatorChar));
+            var outDir = fileSystem.Combine(projectDir, PathHelper.ToPath(config.ClientTypes.OutDir.TrimToNull() ?? "Imports/ClientTypes"));
 
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.Write("Transforming ClientTypes at: ");
@@ -31,8 +33,11 @@ namespace Serenity.CodeGenerator
             foreach (var type in tsTypes)
                 generator.AddTSType(type);
 
-            var codeByFilename = generator.Run();
-            MultipleOutputHelper.WriteFiles(outDir, codeByFilename, "*.ts");
+            var generatedSources = generator.Run();
+            MultipleOutputHelper.WriteFiles(fileSystem, outDir, 
+                generatedSources.Select(x => (x.Filename, x.Text)), 
+                deleteExtraPattern: null,
+                endOfLine: config.EndOfLine);
         }
     }
 }

@@ -1,12 +1,5 @@
-﻿using Serenity.ComponentModel;
-using Serenity.Data.Mapping;
-using Serenity.Reflection;
-using System;
-using System.Collections.Generic;
+﻿using Serenity.Reflection;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Linq;
-using System.Reflection;
 using System.Reflection.Emit;
 
 namespace Serenity.Data
@@ -68,6 +61,15 @@ namespace Serenity.Data
             DetermineTableName(new DialectExpressionSelector(SqlSettings.DefaultDialect));
             DetermineModuleIdentifier();
             DetermineLocalTextPrefix();
+
+            CreateGeneratedFields();
+        }
+
+        /// <summary>
+        /// Should be only used by row source generator to create field objects it generated
+        /// </summary>
+        protected virtual void CreateGeneratedFields()
+        {
         }
 
         private void DetermineRowType()
@@ -400,6 +402,9 @@ namespace Serenity.Data
                             updatePermission = fieldsUpdatePerm ?? fieldsUpdatePerm ?? fieldsReadPerm;
                         }
 
+                        if (fieldInfo.FieldType.GetCustomAttribute<NotMappedAttribute>() != null)
+                            addFlags |= FieldFlags.NotMapped;
+
                         if (field is null)
                         {
                             if (property == null)
@@ -415,11 +420,7 @@ namespace Serenity.Data
                             prm[2] = display != null ? new LocalText(display.DisplayName) : null;
                             prm[3] = size != null ? size.Value : 0;
 
-                            var defaultFlags = FieldFlags.Default;
-                            if (fieldInfo.FieldType.GetCustomAttribute<NotMappedAttribute>() != null)
-                                defaultFlags |= FieldFlags.NotMapped;
-
-                            prm[4] = (defaultFlags ^ removeFlags) | addFlags;
+                            prm[4] = (FieldFlags.Default ^ removeFlags) | addFlags;
                             prm[5] = null;
                             prm[6] = null;
 
@@ -436,7 +437,7 @@ namespace Serenity.Data
                         }
                         else
                         {
-                            if (size != null)
+                            if (size != null && size.Value != field.Size)
                                 throw new InvalidProgramException(string.Format(
                                     "Field size '{0}' in type {1} can't be overridden by Size attribute!",
                                         fieldInfo.Name, rowType.FullName));
@@ -639,14 +640,20 @@ namespace Serenity.Data
                         idField = primaryKeys[0];
                 }
 
+                foreach (var field in this)
+                {
+                    if (ReferenceEquals(idField, field) ||
+                        ReferenceEquals(nameField, field) ||
+                        field.GetAttribute<LookupIncludeAttribute>() != null)
+                        field.IsLookup = true;
+                }
+
                 InferTextualFields();
                 AfterInitialize();
             }
 
             isInitialized = true;
         }
-
-        private readonly Field[] EmptyFields = new Field[0];
 
         /// <summary>
         /// Gets the fields by attribute.

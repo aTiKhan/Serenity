@@ -1,6 +1,4 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System.Collections.Generic;
+﻿using Newtonsoft.Json.Linq;
 
 namespace Serenity.ComponentModel
 {
@@ -75,7 +73,7 @@ namespace Serenity.ComponentModel
 
         /// <summary>
         /// Gets or sets the category of the property in form.
-        /// Only meaningfull for forms.
+        /// Only meaningful for forms.
         /// </summary>
         /// <value>
         /// The category.

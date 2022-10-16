@@ -1,7 +1,4 @@
-﻿using System;
-using System.Reflection;
-
-namespace Serenity.ComponentModel
+﻿namespace Serenity.ComponentModel
 {
     /// <summary>
     /// Indicates that the target property should use a "ServiceLookup" editor.
@@ -10,13 +7,18 @@ namespace Serenity.ComponentModel
     public class ServiceLookupEditorAttribute : ServiceLookupEditorBaseAttribute
     {
         /// <summary>
+        /// Editor type key
+        /// </summary>
+        public const string Key = "ServiceLookup";
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="ServiceLookupEditorAttribute"/> class.
         /// </summary>
         /// <param name="service">The service, e.g. Northwind/Customer/List.</param>
         /// <param name="idField">Id field.</param>
         /// <param name="textField">Text field.</param>
         public ServiceLookupEditorAttribute(string service, string idField, string textField)
-            : base("ServiceLookup")
+            : base(Key)
         {
             SetOption("service", service);
             SetOption("idField", idField);
@@ -29,7 +31,7 @@ namespace Serenity.ComponentModel
         /// rows id and name fields.
         /// </summary>
         public ServiceLookupEditorAttribute(Type itemType)
-            : base("ServiceLookup")
+            : base(Key)
         {
             ItemType = itemType ?? throw new ArgumentNullException("itemType");
         }

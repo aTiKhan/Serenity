@@ -1,9 +1,4 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Data;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     /// <summary>
     /// Field with JSON value
@@ -74,7 +69,7 @@ namespace Serenity.Data
         public JsonSerializerSettings Settings { get; set; }
 
         /// <summary>
-        /// Ases the SQL value.
+        /// Gets the value of this row as an SQL value.
         /// </summary>
         /// <param name="row">The row.</param>
         /// <returns></returns>

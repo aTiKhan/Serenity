@@ -1,6 +1,4 @@
-﻿using Serenity.Data;
-
-namespace Serenity.Services
+﻿namespace Serenity.Services
 {
     /// <summary>
     /// A list behavior that can be used as a mixin within a ListRequestHandler lifecycle
@@ -29,7 +27,7 @@ namespace Serenity.Services
         /// <param name="handler">Calling list request handler</param>
         void OnBeforeExecuteQuery(IListRequestHandler handler);
 
-        /// <summary>Called after qery is sent to database</summary>
+        /// <summary>Called after query is sent to database</summary>
         /// <param name="handler">Calling list request handler</param>
         void OnAfterExecuteQuery(IListRequestHandler handler);
 

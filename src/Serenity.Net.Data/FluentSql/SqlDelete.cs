@@ -1,7 +1,4 @@
-﻿using System;
-using System.Text;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     /// <summary>
     ///   Class to generate queries of form <c>DELETE FROM tablename WHERE [conditions]</c>.</summary>
@@ -86,7 +83,7 @@ namespace Serenity.Data
         /// <summary>
         ///   Formats a DELETE query.</summary>
         /// <param name="tableName">
-        ///   Tablename.</param>
+        ///   Table name.</param>
         /// <param name="where">
         ///   Where part of the query.</param>
         /// <returns>

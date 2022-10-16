@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     public partial class SqlQuery
     {
@@ -56,7 +51,7 @@ namespace Serenity.Data
                 sb.Append("\n\n");
             }
 
-            // sub queries should be enclosed in paranthesis
+            // sub queries should be enclosed in parenthesis
             if (query.Parent != null && !query.OmitParens)
                 sb.Append("(");
 
@@ -432,7 +427,7 @@ namespace Serenity.Data
                 }
             }
 
-            // sub queries should be enclosed in paranthesis
+            // sub queries should be enclosed in parenthesis
             if (query.Parent != null && !query.OmitParens)
                 sb.Append(")");
 

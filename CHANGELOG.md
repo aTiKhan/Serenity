@@ -1,9 +1,224 @@
-## 5.2.3 (2021-01-20)
+## 6.2.5 (2022-10-15)
+
+Features:
+  - publish tsbuild as npm package (@serenity-is/tsbuild)
+  
+Bugfixes:
+  - don't sort desc column first, if multiple SortOrder attributes are defined (#6559)
+
+## 6.2.4 (2022-10-13)
+
+  - ignore DataGrid.defaultRowHeight and DataGrid.defaultHeaderHeight in getSlickOptions() as they cause sleekgrid to fail rendering in Serene etc. where they are not set.
+
+## 6.2.3 (2022-10-13)
+
+Features:
+  - move restoretypings target to Serenity.Net.Web.targets, this allows restoring typings\lib\index.d.ts files without having to run dotnet sergen restore
+
+## 6.2.2 (2022-10-13)
+
+Bugfixes:
+  - fix referenced packages node_modules index.d.ts restoring for modular coding in Serenity.Pro.Coder.targets [StartSharp]
+  - recreate package-lock.json on template build [StartSharp] so node_modules populated correctly. delete your package-lock.json and node_modules than run npm i if you have such an issue.
+
+## 6.2.1 (2022-10-11)
+
+Bugfixes:
+  - handle case where logger factory is null in DefaultSqlConnections causing sergen generate command to fail
+
+## 6.2.0 (2022-10-10)
+
+Features:
+  - implement logging support for SqlHelper via WrappedConnection and DefaultSqlConnections
+  - improve logging for SqlHelper, include ms and command hash code
+  - added brotli support to dynamic scripts and script bundles
+  - converted serenity json texts to static web assets. AddAllTexts() is obsolete, use services.AddBaseTexts(env.WebRootFileProvider).AddJsonTexts(env.WebRootFileProvider, "Scripts/site/texts").AddJsonTexts(env.ContentRootFileProvider, "App_Data/texts")
+  - convert module texts to static web assets in common and pro packages
+  - converted all StartSharp modules to modular TypeScript [StartSharp]
+  - renamed ScriptInitialization.ts to ScriptInit.ts
+  - removed namespace typings [StartSharp]
+  - removed StartSharp.Web.js [StartSharp]
+  - enable logging for sql only in development, added a appsettings.Development.json [StartSharp]
+  - pass keepNames option as true to esbuild so widgets can keep their css class names like s-RolePermissionDialog etc
+  - no need for PreserveCompliationContext as it is set by Razor sdk
+  - moved SourceMapSecurityMiddlewareExtensions to usual namespace (Serenity.Extensions.DependencyInjection)
+  
+Bugfixes:
+  - fix interfaces and enums are declared multiple times in Q / Slick / Serenity namespaces in Serenity.CoreLib.d.ts
+  - update sleekgrid to fix script error with selection models
+  - fix clean plugin for tsbuild
+  
+
+## 6.1.9 (2022-10-02)
+
+Features:
+  - enabled source generator (Serenity.Pro.Coder) in StartSharp template
+  - [Breaking Change] Q.Config.responsiveDialogs is now assumed to be true by default (this should not affect anyone unless using a very old version like 2.x etc)
+  - move idPrefix up to widget, introduce renderContents method which can be overridden to manually to initialize widget content via another method instead of an html template
+  - remove unused jsRender method
+
+## 6.1.8 (2022-09-29)
+
+Bugfixes:
+  - fix source mapping for corelib.js
+  - [Breaking Change] please override getPropertyItemsData instead of getPropertyItems (bug since 6.1.0) when there is not a form key / columns key
+
+## 6.1.7 (2022-09-29)
+
+Bugfixes:
+  - don't include package.json / tsconfig.json files inside Serenity.Scripts nuget package as content files 
+
+## 6.1.6 (2022-09-29)
+
+Bugfixes:
+  - resolve issue with msbuild locator causing sergen restore to fail
+
+## 6.1.5 (2022-09-21)
+
+Bugfixes:
+  - fix sergen servertypings not removing suffixes like .Entities
+
+## 6.1.4 (2022-09-20)
+  - fix slickgrid headers trimmed in smaller screen when in a sub dialog
+
+## 6.1.3 (2022-09-05)
+
+Bugfixes:
+  - wrap grid creation in jquery ready for modular page in sergen
+  - fix possible null ref exception when Cecil returns null for typeDef.Resolve()
+
+## 6.1.2 (2022-09-05)
+
+Bugfixes:
+  - fix output dir for razor sdk projects modular servertypes
+  - fix for modular import from self file
+
+## 6.1.1 (2022-09-04)
+
+Bugfixes:
+  - must set nameIsHtml in GridRowSelectionMixin.createSelectColumn
+
+## 6.1.0 (2022-09-04)
+
+Features:
+  - rewrote slickgrid (sleekgrid) in typescript (https://github.com/serenity-is/sleekgrid)
+  - formatters can add classes, attributes and tooltip to the target cell directly via ctx properties
+  - allow setting end of line character to lf/crlf manually in sergen.json via "EndOfLine" setting.
+  - published @serenity-is/corelib as an npm package (modular version with embedded source)
+  - useAsync option for datagrid, entitygrid, propertydialog and entitydialog
+  - ability to retrieve data as json from dynamic scripts e.g. lookups etc via /DynamicData instead of /DynJS.axd
+  - code generator will generate code with only usings that are actually used implemented via helper methods in Scriban templates
+  - [Breaking Change] Columns and Form dynamic scripts returns an object (PropertyItemsData) instead of array. It should not be a breaking change if you receive those scripts via Q.getColumns, Q.getForm etc. methods (legacy), but make sure you update both Serenity.Scripts and Serenity.Web to 6.1.0 at least.
+  - Q.ScriptData methods won't raise a client side error if a script that does not seem to be registered (registeredscripts) is tried to be loaded, it will try, then fail if server does not return it
+  - preparation for es6 modular typescript code generation / transform / source generators (StartSharp)
+  - new .NET Source Generators for clienttypes, servertypings and mvc commands in addition to a row fields source generator via RowTemplate class (StartSharp, Serenity.Pro.Coder nuget package)
+  - [Breaking Change] global Promise interface augmentation is removed, please update your target to ES6 in tsconfig.json if you use Promise.resolve etc. anywhere
+
+## 6.0.8 (2022-07-12)
+
+Features:
+  - add option to set background color when using padwithfill
+
+## 6.0.7 (2022-07-11)
+
+Bugfixes:
+  - fix utf 8 bom not written to generated files in last two versions
+
+## 6.0.6 (2022-07-11)
+
+Features:
+  - remove app specific texts from Serenity
+
+## 6.0.5 (2022-07-11)
+
+Features:
+  - add key for EmailEditor (please prefer EmailAddressEditor)
+
+## 6.0.4 (2022-07-10)
+
+Features:
+  - remove System.IO.Abstractions dependency from Serenity.CodeGenerator as preparation for source generators
+  - add key constant to all editor, foramtter, filtering attributes
+  - use pnpm if installed
+  - use libman instead of npm for typings where possible
+
+Bugfixes:
+  - fix cast error occuring in TSTypeLister in rare cases
+  - fix generated texts not accessible
+  - slick grid getCellNode should return an element not jQuery object
+  
+
+## 6.0.3 (2022-06-24)
+
+Features:
+  - remove ss type related code from import generator
+  - allow and handle IEnumerable, IList, ISet, IDictionary types in response types in addition to List, Dictionary etc. in response types for server typings generator
+  - don't generate proxy method for service actions implementing IActionResult
+  - add handleRoute method to entity grid allowing to override default route handling behavior
+  - better handling for multi part routes when restoring location hash in case the first part causes a service call
+
+Bugfixes:
+  - raise an error in FormatFileName when OriginalName passed is null
+  - pass original name to generated .jpg file when temporary file is scaled and a .jpg file is generated on upload
+
+## 6.0.2 (2022-06-16)
+
+Features:
+  - add autoRename = null option to upload storage which means overwrite [Breaking Change]
+  - also apply flag to the existing generated field for notmapped field types
+  - added JoinNonEmpty methods to StringHelper (like StringHelper.Join but for arrays similar to string.Join)
+  - add ability to directly set a value without checking expiration status in TwoLevelCache
+  - use C# 10 global usings feature in Serenity source
+
+Bugfixes:
+  - fix syntax error with tabindex property in slickgrid.js
+  - fix project refs check in sergen
+  - load validation messages after page is ready (after local texts are ready). (#6389)
+
+## 6.0.1 (2022-04-21)
+
+Features:
+  - rewrote typescript parser in c# using a modified / optimized version of https://github.com/ToCSharp/TypeScriptAST
+  - increased performance of sergen client types command using new typescript parser
+  - added ServiceLookupPermissionAttribute which will simplify permission checks for service lookups
+  - sergen generates AuthorizeList attributes on top of the List and ListExcel methods in endpoints (#6364)
+  - sergen generates TextualField field type as lowercase string keyword (#6341)
+  - made AutoParam consistent after cloning SqlQuery (#6330)
+  - added ISqlDialectMapper interface
+  
+Bugfixes:
+  - upload editor progress fix
+  - setting Old property to the null to prevent a few issues while re-using a save request handler. (#6356)
+  - null check added where to sergen connections checked. (#6360)
+
+## 6.0.0 (2022-03-26)
+
+Features:
+  - moving to .NET 6 and ASP.NET Core as .NET 5 will soon be out of support
+  - will only support Visual Studio 2022 with latest updates as Visual Studio 2019 does not support .NET 6. please don't update to Serenity 6 if you still have to use VS2019.
+  - [BREAKING CHANGE] replaced System.Drawing.Common with ImageSharp, as System.Drawing.Common is only officially supported in Windows now.
+  - updated Dapper, FluentMigrator and many other packages to their latest versions
+
+## 5.2.4 (2022-03-09)
+ 
+Features:
+  - a better console ui for sergen with multiple selection support
+  - added on demand service resolver interface - IServiceResolve
+  - use System.Text.Json for sergen transform
+  - allow passing project refs optionally to sergen
+  - don't register keys with logical operators in NestedPermissionKeyRegistration
+
+Bugfixes:
+  - resolve more errors with corelib when jquery not loaded, $ is not jquery, or document not initialized. fix bootstrap 5+ check (bootstrap 4 was also returning 5+)  
+  - SqlUpdate.SetTo xml comment correction (#6225)
+  
+
+## 5.2.3 (2022-01-20)
 
 Bugfixes:
   - bootstrap modal dialog stays under jQuery UI dialogs (StartSharp)
   - error in console while closing a bootstrap modal when a jquery ui dialog is open
-  - inline action font style normal
+  - inline action font style should be normal
   - remove schema names from worklog tables
 
 ## 5.2.2 (2022-01-18)
@@ -207,7 +422,7 @@ Features:
 ## 5.0.39 (2021-04-30)
 
 Features:
-  - add extra plugin interfaces for configure servies / background jobs
+  - add extra plugin interfaces for configure services / background jobs
   - handle bootstrap 4 nav tab markup
   - use dispose instead of destroy for bootstrap 4
   - added full namespaced class name for widgets

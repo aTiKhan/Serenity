@@ -1,11 +1,6 @@
-﻿using Serenity.ComponentModel;
-using System;
-using System.Globalization;
-using System.Reflection;
-
-namespace Serenity.Web
+﻿namespace Serenity.Web
 {
-    public class DataScript : DynamicScript, INamedDynamicScript
+    public class DataScript : DynamicScript, INamedDynamicScript, IGetScriptData
     {
         protected string key;
         protected Func<object> getData;
@@ -22,12 +17,16 @@ namespace Serenity.Web
 
         public string ScriptName => "RemoteData." + key;
 
+        public object GetScriptData()
+        {
+            return getData();
+        }
+
         public override string GetScript()
         {
             var data = getData();
             return string.Format(CultureInfo.CurrentCulture, "Q.ScriptData.set({0}, {1});", ScriptName.ToSingleQuoted(), data.ToJson());
         }
-      
     }
 
     public abstract class DataScript<TData> : DataScript

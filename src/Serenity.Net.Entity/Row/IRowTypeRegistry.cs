@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     /// <summary>
     /// Abstraction for row type registry.
@@ -16,10 +13,10 @@ namespace Serenity.Data
         /// </value>
         IEnumerable<Type> AllRowTypes { get; }
         /// <summary>
-        /// Bies the connection key.
+        /// Returns row types by the connection key.
         /// </summary>
         /// <param name="connectionKey">The connection key.</param>
-        /// <returns></returns>
+        /// <returns>Row types by the connection key</returns>
         IEnumerable<Type> ByConnectionKey(string connectionKey);
     }
 }

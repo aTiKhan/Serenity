@@ -1,7 +1,5 @@
 ﻿using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
 using System.IO;
 
 namespace Serenity.Web
@@ -47,7 +45,7 @@ namespace Serenity.Web
             return combined.ArchiveFile(path);
         }
 
-        public string CopyFrom(IUploadStorage sourceStorage, string sourcePath, string targetPath, bool autoRename)
+        public string CopyFrom(IUploadStorage sourceStorage, string sourcePath, string targetPath, bool? autoRename)
         {
             return combined.CopyFrom(sourceStorage, sourcePath, targetPath, autoRename);
         }
@@ -87,7 +85,7 @@ namespace Serenity.Web
             combined.PurgeTemporaryFiles();
         }
 
-        public string WriteFile(string path, Stream source, bool autoRename)
+        public string WriteFile(string path, Stream source, bool? autoRename)
         {
             return combined.WriteFile(path, source, autoRename);
         }

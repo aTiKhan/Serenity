@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Serenity.ComponentModel
+﻿namespace Serenity.ComponentModel
 {
     /// <summary>
     /// Indicates that the target property should use a "DistinctValues" editor
@@ -10,10 +8,15 @@ namespace Serenity.ComponentModel
     public partial class DistinctValuesEditorAttribute : LookupEditorBaseAttribute
     {
         /// <summary>
+        /// Editor type key
+        /// </summary>
+        public const string Key = "Lookup";
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="DistinctValuesEditorAttribute"/> class.
         /// </summary>
         public DistinctValuesEditorAttribute()
-            : base("Lookup")
+            : base(Key)
         {
         }
 
@@ -28,7 +31,7 @@ namespace Serenity.ComponentModel
         /// propertyName
         /// </exception>
         public DistinctValuesEditorAttribute(Type rowType, string propertyName)
-            : base("Lookup")
+            : base(Key)
         {
             RowType = rowType ?? throw new ArgumentNullException("rowType");
             PropertyName = propertyName ?? throw new ArgumentNullException("propertyName");

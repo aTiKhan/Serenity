@@ -1,13 +1,5 @@
-﻿using Serenity.Data;
-using Serenity.Data.Schema;
+﻿using Serenity.Data.Schema;
 using Spectre.Console;
-using System;
-using System.Collections.Generic;
-using System.Data.Common;
-using System.IO;
-using System.IO.Abstractions;
-using System.Linq;
-using System.Text.RegularExpressions;
 
 namespace Serenity.CodeGenerator
 {
@@ -15,17 +7,17 @@ namespace Serenity.CodeGenerator
     {
         private class Interactive
         {
-            public IFileSystem FileSystem { get; }
+            private readonly IGeneratorFileSystem fileSystem;
 
-            public Interactive(IFileSystem fileSystem)
+            public Interactive(IGeneratorFileSystem fileSystem)
             {
-                FileSystem = fileSystem ?? throw new System.ArgumentNullException(nameof(fileSystem));
+                this.fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
             }
 
             public ExitCodes Run()
             {
                 AnsiConsole.WriteLine();
-                AnsiConsole.Write(new Rule($"[bold springgreen3_1]Table Code Generation[/]")
+                AnsiConsole.Write(new Spectre.Console.Rule($"[bold springgreen3_1]Table Code Generation[/]")
                 {
                     Alignment = Justify.Left
                 });
@@ -34,34 +26,33 @@ namespace Serenity.CodeGenerator
                 if (csproj is null)
                     return ExitCodes.NoProjectFiles;
 
-                var projectDir = Path.GetDirectoryName(csproj);
-                var config = GeneratorConfig.LoadFromFile(Path.Combine(projectDir, "sergen.json"));
+                var projectDir = fileSystem.GetDirectoryName(csproj);
+                var config = GeneratorConfig.LoadFromFile(fileSystem, fileSystem.Combine(projectDir, "sergen.json"));
 
                 if (!string.IsNullOrEmpty(config.CustomTemplates))
-                    Templates.TemplatePath = Path.Combine(projectDir, config.CustomTemplates);
+                    Templates.TemplatePath = fileSystem.Combine(projectDir, config.CustomTemplates);
 
-                var connectionString = SelectConnectionString(config, projectDir);
+                var (connectionKey, sqlConnections) = SelectConnectionString(config, projectDir);
 
-                if (connectionString.connectionKey is null)
+                if (connectionKey is null)
                     return ExitCodes.NoConnectionString;
-                var confConnection = config.Connections.FirstOrDefault(x =>
-                    string.Compare(x.Key, connectionString.connectionKey, StringComparison.OrdinalIgnoreCase) == 0);
+                var confConnection = config.Connections?.FirstOrDefault(x =>
+                    string.Compare(x.Key, connectionKey, StringComparison.OrdinalIgnoreCase) == 0);
 
-                var tables = SelectedTables(connectionString.sqlConnections, connectionString.connectionKey);
+                var (selectedTables, tableNames) = SelectedTables(sqlConnections, connectionKey);
 
                 var module = string.Empty;
                 var permissionKey = "Administration:General";
 
                 var generateData = new Dictionary<string, (string module, string identifier, string permissionKey, TableName table)>();
 
-
-                foreach (var table in tables.selectedTables)
+                foreach (var table in selectedTables)
                 {
                     var confTable = confConnection?.Tables.FirstOrDefault(x => string.Compare(x.Tablename, table.Tablename, StringComparison.OrdinalIgnoreCase) == 0);
 
                     if (string.IsNullOrEmpty(module))
                         module = confTable?.Module?.TrimToNull() is null ?
-                            RowGenerator.ClassNameFromTableName(connectionString.connectionKey) : confTable.Module;
+                            RowGenerator.ClassNameFromTableName(connectionKey) : confTable.Module;
 
                     module = SelectModule(table.Tablename, module);
 
@@ -88,7 +79,7 @@ namespace Serenity.CodeGenerator
                     {
                         confConnection = new GeneratorConfig.Connection
                         {
-                            Key = connectionString.connectionKey
+                            Key = connectionKey
                         };
                         config.Connections.Add(confConnection);
                     }
@@ -112,45 +103,47 @@ namespace Serenity.CodeGenerator
                         confTable.PermissionKey = data.Value.permissionKey;
                     }
 
-                    File.WriteAllText(Path.Combine(projectDir, "sergen.json"), config.SaveToJson());
+                    fileSystem.WriteAllText(fileSystem.Combine(projectDir, "sergen.json"), config.SaveToJson());
 
-                    using var connection = connectionString.sqlConnections.NewByKey(connectionString.connectionKey);
+                    using var connection = sqlConnections.NewByKey(connectionKey);
                     connection.Open();
 
-                    var csprojContent = File.ReadAllText(csproj);
+                    var csprojContent = fileSystem.ReadAllText(csproj);
                     var net5Plus = !new Regex(@"\<TargetFramework\>.*netcoreapp.*\<\/TargetFramework\>", RegexOptions.Multiline | RegexOptions.Compiled)
                         .IsMatch(csprojContent);
 
                     var rowModel = RowGenerator.GenerateModel(connection, data.Value.table.Schema, data.Value.table.Table,
-                        data.Value.module, connectionString.connectionKey, data.Value.identifier, data.Value.permissionKey, config, net5Plus);
+                        data.Value.module, connectionKey, data.Value.identifier, data.Value.permissionKey, config, net5Plus);
 
                     rowModel.AspNetCore = true;
                     rowModel.NET5Plus = net5Plus;
 
                     var kdiff3Paths = new[]
                     {
-                    config.KDiff3Path
-                };
+                        config.KDiff3Path
+                    };
 
-                    CodeFileHelper.Kdiff3Path = kdiff3Paths.FirstOrDefault(File.Exists);
-                    CodeFileHelper.TSCPath = config.TSCPath ?? "tsc";
+                    var codeFileHelper = new CodeFileHelper(fileSystem)
+                    {
+                        Kdiff3Path = kdiff3Paths.FirstOrDefault(fileSystem.FileExists),
+                        TSCPath = config.TSCPath ?? "tsc"
+                    };
 
-                    new EntityCodeGenerator(rowModel, config, csproj).Run();
+                    new EntityCodeGenerator(fileSystem, codeFileHelper, rowModel, config, csproj).Run();
                 }
-
 
                 return ExitCodes.Success;
             }
 
-            private IEnumerable<string> SelectWhatToGenerate()
+            private static IEnumerable<string> SelectWhatToGenerate()
             {
                 var whatToGenerate = new List<string>
-            {
-                "Row",
-                "Repository & Service",
-                "User Interface",
-                "Custom"
-            };
+                {
+                    "Row",
+                    "Repository & Service",
+                    "User Interface",
+                    "Custom"
+                };
 
                 return AnsiConsole.Prompt(
                     new MultiSelectionPrompt<string>()
@@ -162,7 +155,7 @@ namespace Serenity.CodeGenerator
                         .AddChoiceGroup<string>("All", whatToGenerate));
             }
 
-            private string SelectPermissionKey(string table, string defaultPermissionKey)
+            private static string SelectPermissionKey(string table, string defaultPermissionKey)
             {
                 AnsiConsole.WriteLine();
                 return AnsiConsole.Prompt(
@@ -180,7 +173,7 @@ namespace Serenity.CodeGenerator
                         }));
             }
 
-            private string SelectIdentifier(string table, string defaultIdentifier)
+            private static string SelectIdentifier(string table, string defaultIdentifier)
             {
                 AnsiConsole.WriteLine();
                 return AnsiConsole.Prompt(
@@ -198,7 +191,7 @@ namespace Serenity.CodeGenerator
                         .DefaultValue(defaultIdentifier));
             }
 
-            private string SelectModule(string table, string defaultModule)
+            private static string SelectModule(string table, string defaultModule)
             {
                 AnsiConsole.WriteLine();
                 return AnsiConsole.Prompt(
@@ -216,7 +209,8 @@ namespace Serenity.CodeGenerator
                         .DefaultValue(defaultModule));
             }
 
-            private (IEnumerable<TableName> selectedTables, List<TableName> tableNames) SelectedTables(ISqlConnections sqlConnections, string connectionKey)
+            private static (IEnumerable<TableName> selectedTables, List<TableName> tableNames) SelectedTables(
+                ISqlConnections sqlConnections, string connectionKey)
             {
                 ISchemaProvider schemaProvider;
                 List<TableName> tableNames;
@@ -244,7 +238,7 @@ namespace Serenity.CodeGenerator
 
             private (string connectionKey, ISqlConnections sqlConnections) SelectConnectionString(GeneratorConfig config, string csproj)
             {
-                var projectDir = Path.GetDirectoryName(csproj);
+                var projectDir = fileSystem.GetDirectoryName(csproj);
                 var connectionStringOptions = new ConnectionStringOptions();
                 foreach (var x in config.Connections.Where(x => !x.ConnectionString.IsEmptyOrNull()))
                 {
@@ -258,20 +252,20 @@ namespace Serenity.CodeGenerator
 
                 foreach (var name in config.GetAppSettingsFiles())
                 {
-                    var path = Path.Combine(projectDir, name);
-                    if (File.Exists(name))
+                    var path = fileSystem.Combine(projectDir, name);
+                    if (fileSystem.FileExists(name))
                     {
-                        var appSettings = JSON.ParseTolerant<AppSettingsFormat>(File.ReadAllText(path).TrimToNull() ?? "{}");
+                        var appSettings = JSON.ParseTolerant<AppSettingsFormat>(fileSystem.ReadAllText(path).TrimToNull() ?? "{}");
                         if (appSettings.Data != null)
                             foreach (var data in appSettings.Data)
                             {
                                 // not so nice fix for relative paths, e.g. sqlite etc.
                                 if (data.Value.ConnectionString.Contains("../../..", StringComparison.Ordinal))
                                     data.Value.ConnectionString = data.Value
-                                        .ConnectionString.Replace("../../..", Path.GetDirectoryName(csproj), StringComparison.Ordinal);
+                                        .ConnectionString.Replace("../../..", fileSystem.GetDirectoryName(csproj), StringComparison.Ordinal);
                                 else if (data.Value.ConnectionString.Contains(@"..\..\..\", StringComparison.Ordinal))
                                     data.Value.ConnectionString = data.Value.ConnectionString.Replace(@"..\..\..\",
-                                        Path.GetDirectoryName(csproj), StringComparison.Ordinal);
+                                        fileSystem.GetDirectoryName(csproj), StringComparison.Ordinal);
 
                                 connectionStringOptions[data.Key] = data.Value;
                             }
@@ -287,18 +281,7 @@ namespace Serenity.CodeGenerator
 
                 var connectionKeys = connectionStringOptions.Keys.OrderBy(x => x).ToArray();
 
-                DbProviderFactories.RegisterFactory("Microsoft.Data.SqlClient",
-                    Microsoft.Data.SqlClient.SqlClientFactory.Instance);
-                DbProviderFactories.RegisterFactory("System.Data.SqlClient",
-                    Microsoft.Data.SqlClient.SqlClientFactory.Instance);
-                DbProviderFactories.RegisterFactory("Microsoft.Data.Sqlite",
-                    Microsoft.Data.Sqlite.SqliteFactory.Instance);
-                DbProviderFactories.RegisterFactory("Npgsql",
-                    Npgsql.NpgsqlFactory.Instance);
-                DbProviderFactories.RegisterFactory("FirebirdSql.Data.FirebirdClient",
-                    FirebirdSql.Data.FirebirdClient.FirebirdClientFactory.Instance);
-                DbProviderFactories.RegisterFactory("MySql.Data.MySqlClient",
-                    MySqlConnector.MySqlConnectorFactory.Instance);
+                RegisterSqlProviders();
 
                 var sqlConnections = new DefaultSqlConnections(
                     new DefaultConnectionStrings(connectionStringOptions));
@@ -315,7 +298,7 @@ namespace Serenity.CodeGenerator
 
             private string SelectCsProj()
             {
-                var csprojFiles = FileSystem.Directory.GetFiles(".", "*.csproj");
+                var csprojFiles = fileSystem.GetFiles(".", "*.csproj");
                 if (csprojFiles.Length == 1)
                     return csprojFiles.First();
 
@@ -329,7 +312,7 @@ namespace Serenity.CodeGenerator
                 }
 
                 AnsiConsole.WriteLine();
-                AnsiConsole.Write(new Rule($"[bold orange1]Please select an Asp.Net Core project file[/]")
+                AnsiConsole.Write(new Spectre.Console.Rule($"[bold orange1]Please select an Asp.Net Core project file[/]")
                 {
                     Alignment = Justify.Left
                 });
@@ -340,22 +323,6 @@ namespace Serenity.CodeGenerator
                         .AddChoices(csprojFiles);
 
                 return AnsiConsole.Prompt(selections);
-            }
-
-            private class AppSettingsFormat
-            {
-                public ConnectionStringOptions Data { get; }
-
-                public AppSettingsFormat()
-                {
-                    Data = new ConnectionStringOptions();
-                }
-
-                public class ConnectionInfo
-                {
-                    public string ConnectionString { get; set; }
-                    public string ProviderName { get; set; }
-                }
             }
         }
     }

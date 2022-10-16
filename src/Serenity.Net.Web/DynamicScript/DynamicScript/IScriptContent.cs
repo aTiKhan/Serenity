@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Serenity.Web
+﻿namespace Serenity.Web
 {
     public interface IScriptContent
     {
@@ -8,6 +6,7 @@ namespace Serenity.Web
         public DateTime Time { get; }
         public byte[] Content { get; }
         public bool CanCompress { get; }
+        public byte[] BrotliContent { get; }
         public byte[] CompressedContent { get; }
     }
 }

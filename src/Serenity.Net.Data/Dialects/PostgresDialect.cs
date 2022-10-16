@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     /// <summary>
     /// Postgres dialect
@@ -172,7 +170,7 @@ namespace Serenity.Data
         /// Gets the SCOPE IDENTITY expression.
         /// </summary>
         /// <value>
-        /// The SCOPE INDENTITY expression.
+        /// The SCOPE IDENTITY expression.
         /// </value>
         /// <exception cref="NotImplementedException"></exception>
         public virtual string ScopeIdentityExpression => throw new NotImplementedException();

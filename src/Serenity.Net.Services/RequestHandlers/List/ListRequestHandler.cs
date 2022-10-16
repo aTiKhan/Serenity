@@ -1,15 +1,4 @@
-﻿using Serenity.ComponentModel;
-using Serenity.Abstractions;
-using Serenity.Data;
-using Serenity.Data.Mapping;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Data;
-using System.Globalization;
-using System.Linq;
-using System.Reflection;
-using System.Security.Claims;
+﻿using System.Collections;
 
 namespace Serenity.Services
 {
@@ -25,6 +14,7 @@ namespace Serenity.Services
 
         protected HashSet<string> ignoredEqualityFilters;
         protected Lazy<IListBehavior[]> behaviors;
+        protected bool lookupAccessMode;
 
         public ListRequestHandler(IRequestContext context)
         {
@@ -60,6 +50,11 @@ namespace Serenity.Services
                 !Permissions.HasPermission(field.ReadPermission))
                 return false;
 
+            if (field.ReadPermission == null &&
+                lookupAccessMode &&
+                !field.IsLookup)
+                return false;
+
             return true;
         }
 
@@ -71,10 +66,6 @@ namespace Serenity.Services
             var mode = field.MinSelectLevel;
 
             if (mode == SelectLevel.Always)
-                return true;
-
-            bool isPrimaryKey = (field.Flags & FieldFlags.PrimaryKey) == FieldFlags.PrimaryKey;
-            if (isPrimaryKey && mode != SelectLevel.Explicit)
                 return true;
 
             if (mode == SelectLevel.Auto)
@@ -89,6 +80,8 @@ namespace Serenity.Services
                     // fields are explicitly included (e.g. related column is visible)
                     mode = SelectLevel.Explicit;
                 }
+                else if (field.IsLookup)
+                    mode = SelectLevel.Lookup;
                 else
                 {
                     // assume that non-foreign calculated and reflective fields should be selected in list mode
@@ -101,26 +94,27 @@ namespace Serenity.Services
                 (Request.ExcludeColumns.Contains(field.Name) ||
                     (field.PropertyName != null && Request.ExcludeColumns.Contains(field.PropertyName)));
 
+            if (explicitlyExcluded)
+                return false;
+
             bool explicitlyIncluded = !explicitlyExcluded && Request.IncludeColumns != null &&
                 (Request.IncludeColumns.Contains(field.Name) ||
                     (field.PropertyName != null && Request.IncludeColumns.Contains(field.PropertyName)));
-
-            if (isPrimaryKey)
-                return explicitlyIncluded;
-
-            if (explicitlyExcluded)
-                return false;
 
             if (explicitlyIncluded)
                 return true;
 
             var selection = Request.ColumnSelection;
-
             return selection switch
             {
                 ColumnSelection.List => mode <= SelectLevel.List,
+                ColumnSelection.KeyOnly => ReferenceEquals(field, Row.IdField) ||
+                    (field.Flags & FieldFlags.PrimaryKey) == FieldFlags.PrimaryKey,
                 ColumnSelection.Details => mode <= SelectLevel.Details,
-                _ => false,
+                ColumnSelection.None => false,
+                ColumnSelection.IdOnly => ReferenceEquals(field, Row.IdField),
+                ColumnSelection.Lookup => mode <= SelectLevel.Lookup,
+                _ => false
             };
         }
 
@@ -346,7 +340,7 @@ namespace Serenity.Services
 
         protected virtual BaseCriteria ReplaceFieldExpressions(BaseCriteria criteria)
         {
-            return new CriteriaFieldExpressionReplacer(Row, Permissions)
+            return new CriteriaFieldExpressionReplacer(Row, Permissions, lookupAccessMode)
                 .Process(criteria);
         }
 
@@ -442,7 +436,21 @@ namespace Serenity.Services
         {
             var readAttr = typeof(TRow).GetCustomAttribute<ReadPermissionAttribute>(true);
             if (readAttr != null)
-                Permissions.ValidatePermission(readAttr.Permission ?? "?", Localizer);
+            {
+                var permission = readAttr.Permission ?? "?";
+                if (!Permissions.HasPermission(permission))
+                {
+                    var lookupPermission = typeof(TRow).GetCustomAttribute<ServiceLookupPermissionAttribute>()?.Permission;
+                    if (!string.IsNullOrEmpty(lookupPermission) &&
+                        Permissions.HasPermission(lookupPermission))
+                    {
+                        lookupAccessMode = true;
+                        return;
+                    }
+
+                    Permissions.ValidatePermission(permission, Localizer);
+                }
+            }
         }
 
         protected virtual void ValidateRequest()
@@ -526,6 +534,8 @@ namespace Serenity.Services
         public TListResponse Process(IDbConnection connection, TListRequest request)
         {
             StateBag.Clear();
+            lookupAccessMode = false;
+            ignoredEqualityFilters = null;
             Connection = connection ?? throw new ArgumentNullException("connection");
             Request = request;
             ValidateRequest();

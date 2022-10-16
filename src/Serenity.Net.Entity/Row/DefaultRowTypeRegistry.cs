@@ -1,10 +1,4 @@
-﻿using Serenity.Abstractions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     /// <summary>
     /// Default row type registry
@@ -39,10 +33,10 @@ namespace Serenity.Data
         public IEnumerable<Type> AllRowTypes => rowTypes;
 
         /// <summary>
-        /// Bies the connection key.
+        /// Returns row types by the connection key.
         /// </summary>
         /// <param name="connectionKey">The connection key.</param>
-        /// <returns></returns>
+        /// <returns>Row types by the connection key</returns>
         public IEnumerable<Type> ByConnectionKey(string connectionKey)
         {
             return byConnectionKey[connectionKey];

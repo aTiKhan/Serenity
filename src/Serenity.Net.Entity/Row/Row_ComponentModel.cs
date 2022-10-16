@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     public abstract partial class Row<TFields>
     {
@@ -109,14 +105,14 @@ namespace Serenity.Data
         /// <summary>
         /// Pushes changes since the last <see cref="M:System.ComponentModel.IEditableObject.BeginEdit" /> or <see cref="M:System.ComponentModel.IBindingList.AddNew" /> call into the underlying object.
         /// </summary>
-        /// <exception cref="Exception">Lütfen satırdaki işaretli alanları düzeltiniz.</exception>
+        /// <exception cref="Exception">Please fix the marked fields on the row.</exception>
         public void EndEdit()
         {
             if (postHandler != null &&
                 originalValues != null)
             {
                 if (insidePostHandler > 0)
-                    return; // exception daha iyi olabilir mi?
+                    return;
 
                 insidePostHandler++;
                 try
@@ -124,7 +120,7 @@ namespace Serenity.Data
                     ClearValidationErrors();
                     postHandler(this);
                     if (HasErrors)
-                        throw new Exception("Lütfen satırdaki işaretli alanları düzeltiniz.");
+                        throw new Exception("Please fix the marked fields on the row.");
                     originalValues = null;
                 }
                 finally

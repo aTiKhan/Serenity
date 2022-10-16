@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections;
-using System.Globalization;
-using System.Text;
+﻿using System.Collections;
 
 namespace Serenity
 {
@@ -130,7 +127,7 @@ namespace Serenity
         /// <param name="str">
         ///   String.</param>
         /// <param name="maxLength">
-        ///   Maksimum length for the resulting string. If given as 0, or <paramref name="str"/> is shorter
+        ///   Maximum length for the resulting string. If given as 0, or <paramref name="str"/> is shorter
         ///   than this value, string returns as is. Otherwise <paramref name="str"/> 
         ///   it is trimmed to be under this limit in length including "the three dots".</param>
         /// <returns>
@@ -149,7 +146,7 @@ namespace Serenity
             else
                 return "...";
 
-            return str.Substring(0, maxLength) + "...";
+            return str[..maxLength] + "...";
         }
 
         /// <summary>
@@ -172,10 +169,26 @@ namespace Serenity
             if (string.IsNullOrEmpty(str))
                 return emptySingleQuote;
 
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
             QuoteString(str, sb, false);
             return sb.ToString();
         }
+
+        /// <summary>
+        /// Converts the string to its double quoted representation.
+        /// </summary>
+        /// <param name="str">The string.</param>
+        /// <returns>Double quoted string.</returns>
+        public static string ToDoubleQuoted(this string str)
+        {
+            if (string.IsNullOrEmpty(str))
+                return emptyDoubleQuote;
+
+            StringBuilder sb = new();
+            QuoteString(str, sb, true);
+            return sb.ToString();
+        }
+
 
         private const string emptySingleQuote = "''";
         private const string emptyDoubleQuote = "\"\"";
@@ -224,21 +237,18 @@ namespace Serenity
                         break;
                     case '\'':
                         if (!doubleQuote)
-                            sb.Append(@"\'"); // IE doesn't understand \' in double quoted strings!!!
+                            sb.Append(@"\'");
                         else
                             sb.Append(c);
                         break;
                     case '\"':
-                        if (doubleQuote) // IE doesn't understand \" in single quoted strings!!!
+                        if (doubleQuote)
                             sb.Append(@"\""");
                         else
                             sb.Append(c);
                         break;
                     case '\\':
                         sb.Append(@"\\");
-                        break;
-                    case '/':
-                        sb.Append(@"\/");
                         break;
                     default:
                         if (c < ' ')
@@ -388,6 +398,22 @@ namespace Serenity
                 return a ?? "";
 
             return a + separator + b;
+        }
+
+        /// <summary>
+        /// Joins strings conditionally, by putting separator between if both are non empty or null
+        /// </summary>
+        public static string JoinNonEmpty(string separator, params string[] values)
+        {
+            return string.Join(separator, values.Where(x => !string.IsNullOrEmpty(x)));
+        }
+
+        /// <summary>
+        /// Joins strings conditionally, by putting separator between if both are non empty or null
+        /// </summary>
+        public static string JoinNonEmpty(string separator, IEnumerable<string> values)
+        {
+            return string.Join(separator, values.Where(x => !string.IsNullOrEmpty(x)));
         }
     }
 }

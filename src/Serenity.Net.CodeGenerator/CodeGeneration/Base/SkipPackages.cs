@@ -1,17 +1,19 @@
-﻿using System;
-using System.Linq;
-
-namespace Serenity.CodeGeneration
+﻿namespace Serenity.CodeGeneration
 {
     public static class SkipPackages
     {
         private static readonly string[] NotReferencingSerenity = new[]
         {
+            "AspNetCore",
+            "Azure",
+            "AutoMapper",
             "Dapper",
+            "DevExpress",
             "EPPlus",
             "FastMember",
             "FluentMigrator",
             "FirebirdSql.",
+            "Lucene",
             "MailKit",
             "Mapster",
             "MySql",
@@ -20,9 +22,11 @@ namespace Serenity.CodeGeneration
             "NetStandard.",
             "Npgsql",
             "Nuglify.",
+            "Serilog.",
             "StackExchange.",
             "System.",
-            "X.PagedList"
+            "X.PagedList",
+            "Yaml"
         };
 
         public static bool ForRestore(string packageId)

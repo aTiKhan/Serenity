@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     public partial class SqlQuery
     {
@@ -30,7 +26,8 @@ namespace Serenity.Data
                 forXml = forXml,
                 forJson = forJson,
                 unionQuery = unionQuery,
-                unionType = unionType
+                unionType = unionType,
+                nextAutoParam = nextAutoParam
             };
 
             Column s;

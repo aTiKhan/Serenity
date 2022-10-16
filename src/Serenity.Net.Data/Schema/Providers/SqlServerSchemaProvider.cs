@@ -1,8 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Data;
-using System.Linq;
-
-namespace Serenity.Data.Schema
+﻿namespace Serenity.Data.Schema
 {
     /// <summary>
     /// SQL server metadata provider
@@ -126,6 +122,15 @@ namespace Serenity.Data.Schema
                 });
         }
 
+        private class TableNameSource
+        {
+#pragma warning disable IDE1006 // Naming Styles
+            public string TABLE_SCHEMA { get; set; }
+            public string TABLE_NAME { get; set; }
+            public string TABLE_TYPE { get; set; }
+#pragma warning restore IDE1006 // Naming Styles
+        }
+
         /// <summary>
         /// Gets the table names.
         /// </summary>
@@ -133,7 +138,7 @@ namespace Serenity.Data.Schema
         /// <returns></returns>
         public IEnumerable<TableName> GetTableNames(IDbConnection connection)
         {
-            return connection.Query(
+            return connection.Query<TableNameSource>(
                     "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES " +
                     "ORDER BY TABLE_SCHEMA, TABLE_NAME")
                 .Select(x => new TableName

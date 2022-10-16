@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     /// <summary>
     ///   Class to generate queries of the form <c>INSERT INTO tablename (field1, field2..fieldN) 
@@ -167,7 +163,7 @@ namespace Serenity.Data
         /// <summary>
         ///   Formats an INSERT query.</summary>
         /// <param name="tableName">
-        ///   Tablename (required).</param>
+        ///   Table name (required).</param>
         /// <param name="nameValuePairs">
         ///   Field names and values. Must be passed in the order of <c>[field1, value1, field2, 
         ///   value2, ...., fieldN, valueN]</c>. It must have even number of elements.</param>

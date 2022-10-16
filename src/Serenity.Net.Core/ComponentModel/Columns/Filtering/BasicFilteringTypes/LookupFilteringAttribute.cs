@@ -1,7 +1,4 @@
-﻿using System;
-using System.Reflection;
-
-namespace Serenity.ComponentModel
+﻿namespace Serenity.ComponentModel
 {
     /// <summary>
     /// Indicates that property should use lookup editor type of filtering
@@ -10,11 +7,16 @@ namespace Serenity.ComponentModel
     public partial class LookupFilteringAttribute : CustomFilteringAttribute
     {
         /// <summary>
+        /// Filtering type key
+        /// </summary>
+        public const string Key = "Lookup";
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="LookupFilteringAttribute"/> class.
         /// </summary>
         /// <param name="lookupKey">The lookup key.</param>
         public LookupFilteringAttribute(string lookupKey)
-            : base("Lookup")
+            : base(Key)
         {
             SetOption("lookupKey", lookupKey);
         }
@@ -26,7 +28,7 @@ namespace Serenity.ComponentModel
         /// a row with [LookupScript] attribute or a custom lookup script.</param>
         /// <exception cref="ArgumentOutOfRangeException">lookupType is null</exception>
         public LookupFilteringAttribute(Type lookupType)
-            : base("Lookup")
+            : base(Key)
         {
             var attr = lookupType.GetCustomAttribute<LookupScriptAttribute>(false);
             if (attr == null)

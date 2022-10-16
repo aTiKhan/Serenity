@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     /// <summary>
     /// SqlServer 2000 dialect.
@@ -190,7 +188,7 @@ namespace Serenity.Data
         /// Gets the SCOPE IDENTITY expression.
         /// </summary>
         /// <value>
-        /// The SCOPE INDENTITY expression.
+        /// The SCOPE IDENTITY expression.
         /// </value>
         public virtual string ScopeIdentityExpression => "SCOPE_IDENTITY()";
 

@@ -1,15 +1,8 @@
-﻿using Serenity.Abstractions;
-using Serenity.ComponentModel;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Reflection;
-
-namespace Serenity.Localization
+﻿namespace Serenity.Localization
 {
     /// <summary>
     /// Contains helper methods for registration of permission keys in nested static classes.
-    /// These classes contains string contants containing permission keys. 
+    /// These classes contains string constants containing permission keys.
     /// Display name for permission keys can be set by [DisplayName] attribute.
     /// Display name for groups can be set by [Description] attribute on classes themselves.
     /// For group display name to work, all constants in a class must start with same group prefix.

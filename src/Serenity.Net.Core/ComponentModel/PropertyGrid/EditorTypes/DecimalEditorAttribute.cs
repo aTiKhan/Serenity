@@ -1,7 +1,4 @@
-﻿using System;
-using System.Globalization;
-
-namespace Serenity.ComponentModel
+﻿namespace Serenity.ComponentModel
 {
     /// <summary>
     /// Indicates that the target property should use a "Decimal" editor.
@@ -10,10 +7,15 @@ namespace Serenity.ComponentModel
     public partial class DecimalEditorAttribute : CustomEditorAttribute
     {
         /// <summary>
+        /// Editor type key
+        /// </summary>
+        public const string Key = "Decimal";
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="DecimalEditorAttribute"/> class.
         /// </summary>
         public DecimalEditorAttribute()
-            : base("Decimal")
+            : base(Key)
         {
             if (AllowNegativesByDefault)
                 AllowNegatives = true;

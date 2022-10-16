@@ -1,7 +1,5 @@
 ﻿using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
-using Serenity.Abstractions;
-using System;
 
 namespace Serenity
 {
@@ -44,7 +42,6 @@ namespace Serenity
             GenerationRandomizer.NextBytes(buffer);
             var value = BitConverter.ToUInt64(buffer, 0);
 
-            // random değer 0 olmasın
             if (value == 0)
                 return ulong.MaxValue;
 
@@ -78,7 +75,7 @@ namespace Serenity
             where TItem : class
         {
             return GetInternal(cache, cacheKey, localExpiration, remoteExpiration,
-                groupKey, loader, localOnly: false);
+                groupKey, loader, localOnly: false, forceReload: false);
         }
 
         /// <summary>
@@ -106,7 +103,7 @@ namespace Serenity
             where TItem : class
         {
             return GetInternal(cache, cacheKey, expiration, expiration,
-                groupKey, loader, localOnly: false);
+                groupKey, loader, localOnly: false, forceReload: false);
         }
 
         /// <summary>
@@ -136,12 +133,12 @@ namespace Serenity
             where TItem : class
         {
             return GetInternal(cache, cacheKey, localExpiration, TimeSpan.FromSeconds(0),
-                groupKey, loader, localOnly: true);
+                groupKey, loader, localOnly: true, forceReload: false);
         }
 
         private static TItem GetInternal<TItem>(ITwoLevelCache cache, string cacheKey,
             TimeSpan localExpiration, TimeSpan remoteExpiration,
-            string groupKey, Func<TItem> loader, bool localOnly)
+            string groupKey, Func<TItem> loader, bool localOnly, bool forceReload)
             where TItem : class
         {
             ulong? groupGeneration = null;
@@ -190,48 +187,51 @@ namespace Serenity
                 return getGroupGenerationValue();
             }
 
-            // first check local cache, if item exists and not expired (group version = item version) return it
-            var cachedObj = localCache.Get<object>(cacheKey);
-            if (cachedObj != null)
+            if (!forceReload)
             {
-                // check local cache, if exists, compare version with group one
-                var itemGenerationCache = localCache.Get<object>(itemGenerationKey) as ulong?;
-                if (itemGenerationCache != null &&
-                    itemGenerationCache == getGroupGenerationCacheValue())
+                // first check local cache, if item exists and not expired (group version = item version) return it
+                var cachedObj = localCache.Get<object>(cacheKey);
+                if (cachedObj != null)
                 {
-                    // local cached item is not expired yet
+                    // check local cache, if exists, compare version with group one
+                    var itemGenerationCache = localCache.Get<object>(itemGenerationKey) as ulong?;
+                    if (itemGenerationCache != null &&
+                        itemGenerationCache == getGroupGenerationCacheValue())
+                    {
+                        // local cached item is not expired yet
 
-                    if (cachedObj == DBNull.Value)
-                        return null;
+                        if (cachedObj == DBNull.Value)
+                            return null;
 
-                    return (TItem)cachedObj;
+                        return (TItem)cachedObj;
+                    }
+
+                    // local cached item is expired, remove all information
+                    if (itemGenerationCache != null)
+                        localCache.Remove(itemGenerationKey);
+
+                    localCache.Remove(cacheKey);
                 }
 
-                // local cached item is expired, remove all information
-                if (itemGenerationCache != null)
-                    localCache.Remove(itemGenerationKey);
-
-                localCache.Remove(cacheKey);
-            }
-
-            if (!localOnly)
-            {
-                // no item in local cache or expired, now check distributed cache
-                var bytes = distributedCache.Get(itemGenerationKey);
-                var itemGeneration = (bytes == null || bytes.Length != 8) ? (ulong?)null : BitConverter.ToUInt64(bytes);
-
-                // if item has version number in distributed cache and this is equal to group version
-                if (itemGeneration != null &&
-                    itemGeneration.Value == getGroupGenerationValue())
+                if (!localOnly)
                 {
-                    // get item from distributed cache
-                    cachedObj = distributedCache.GetAutoJson<TItem>(cacheKey);
-                    // if item exists in distributed cache
-                    if (cachedObj != null)
+                    // no item in local cache or expired, now check distributed cache
+                    var bytes = distributedCache.Get(itemGenerationKey);
+                    var itemGeneration = (bytes == null || bytes.Length != 8) ? (ulong?)null : BitConverter.ToUInt64(bytes);
+
+                    // if item has version number in distributed cache and this is equal to group version
+                    if (itemGeneration != null &&
+                        itemGeneration.Value == getGroupGenerationValue())
                     {
-                        localCache.Add(cacheKey, cachedObj, localExpiration);
-                        localCache.Add(itemGenerationKey, getGroupGenerationValue(), localExpiration);
-                        return (TItem)cachedObj;
+                        // get item from distributed cache
+                        cachedObj = distributedCache.GetAutoJson<TItem>(cacheKey);
+                        // if item exists in distributed cache
+                        if (cachedObj != null)
+                        {
+                            localCache.Add(cacheKey, cachedObj, localExpiration);
+                            localCache.Add(itemGenerationKey, getGroupGenerationValue(), localExpiration);
+                            return (TItem)cachedObj;
+                        }
                     }
                 }
             }
@@ -294,6 +294,63 @@ namespace Serenity
             cache.Memory.Remove(itemGenerationKey);
             cache.Distributed.Remove(cacheKey);
             cache.Distributed.Remove(itemGenerationKey);
+        }
+
+        /// <summary>
+        /// Creates or overrides a specified entry in the local and distributed cache.
+        /// </summary>
+        /// <typeparam name="TItem">Data type</typeparam>
+        /// <param name="cache">Two level cache</param>
+        /// <param name="cacheKey">The item key for local and distributed cache</param>
+        /// <param name="localExpiration">Local expiration</param>
+        /// <param name="remoteExpiration">Distributed cache expiration (is usually same with local expiration)</param>
+        /// <param name="groupKey">Group key that will hold generation (version). Can be used to expire all items
+        /// that depend on it. This can be a table name. When a table changes, you change its version, and all
+        /// cached data that depends on that table is expired.</param>
+        /// <param name="value">Value to set.</param>
+        public static TItem Set<TItem>(this ITwoLevelCache cache, string cacheKey, TimeSpan localExpiration, TimeSpan remoteExpiration,
+            string groupKey, TItem value)
+            where TItem : class
+        {
+            return GetInternal(cache, cacheKey, localExpiration, remoteExpiration,
+                groupKey, () => value, localOnly: false, forceReload: true);
+        }
+
+        /// <summary>
+        /// Creates or overrides a specified entry in the local and distributed cache.
+        /// </summary>
+        /// <typeparam name="TItem">Data type</typeparam>
+        /// <param name="cache">Two level cache</param>
+        /// <param name="cacheKey">The item key for local and distributed cache</param>
+        /// <param name="expiration">Local and remote expiration</param>
+        /// <param name="groupKey">Group key that will hold generation (version). Can be used to expire all items
+        /// that depend on it. This can be a table name. When a table changes, you change its version, and all
+        /// cached data that depends on that table is expired.</param>
+        /// <param name="value">Value to set.</param>
+        public static TItem Set<TItem>(this ITwoLevelCache cache, string cacheKey, TimeSpan expiration, string groupKey, TItem value)
+            where TItem : class
+        {
+            return GetInternal(cache, cacheKey, expiration, expiration,
+                groupKey, () => value, localOnly: false, forceReload: true);
+        }
+
+        /// <summary>
+        /// Creates or overrides a specified entry in the local cache.
+        /// </summary>
+        /// <typeparam name="TItem">Data type</typeparam>
+        /// <param name="cache">Two level cache</param>
+        /// <param name="cacheKey">The item key for local and distributed cache</param>
+        /// <param name="localExpiration">Local expiration</param>
+        /// <param name="groupKey">Group key that will hold generation (version). Can be used to expire all items
+        /// that depend on it. This can be a table name. When a table changes, you change its version, and all
+        /// cached data that depends on that table is expired.</param>
+        /// <param name="value">Value to set.</param>
+        public static TItem SetLocalStoreOnly<TItem>(this ITwoLevelCache cache, string cacheKey, TimeSpan localExpiration,
+            string groupKey, TItem value)
+            where TItem : class
+        {
+            return GetInternal(cache, cacheKey, localExpiration, TimeSpan.FromSeconds(0),
+                groupKey, () => value, localOnly: true, forceReload: true);
         }
     }
 }

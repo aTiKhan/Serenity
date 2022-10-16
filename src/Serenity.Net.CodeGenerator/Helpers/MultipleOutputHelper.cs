@@ -1,59 +1,73 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-
-namespace Serenity.CodeGenerator
+﻿namespace Serenity.CodeGenerator
 {
     public class MultipleOutputHelper
     {
         private static readonly Encoding utf8 = new UTF8Encoding(true);
 
-        public static void WriteFiles(string outDir, SortedDictionary<string, string> codeByFilename, params string[] deleteExtraPattern)
+        public static void WriteFiles(IGeneratorFileSystem fileSystem,
+            string outDir, IEnumerable<(string Path, string Text)> filesToWrite,
+            string[] deleteExtraPattern,
+            string endOfLine)
         {
-            Directory.CreateDirectory(outDir);
+            if (fileSystem is null)
+                throw new ArgumentNullException(nameof(fileSystem));
+
+            outDir = fileSystem.GetFullPath(outDir);
+            fileSystem.CreateDirectory(outDir);
 
             var generated = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var pair in codeByFilename)
+            foreach (var file in filesToWrite)
             {
-                generated.Add(pair.Key);
+                generated.Add(PathHelper.ToUrl(file.Path));
 
-                var outFile = Path.Combine(outDir, pair.Key);
-                bool exists = File.Exists(outFile);
+                var outFile = fileSystem.Combine(outDir, file.Path);
+                bool exists = fileSystem.FileExists(outFile);
                 if (exists)
                 {
-                    var content = File.ReadAllText(outFile, utf8);
+                    var content = fileSystem.ReadAllText(outFile, utf8);
                     if (content.Trim().Replace("\r", "", StringComparison.Ordinal) ==
-                        pair.Value.Trim().Replace("\r", "", StringComparison.Ordinal))
+                        (file.Text ?? "").Trim().Replace("\r", "", StringComparison.Ordinal))
                         continue;
                 }
+                else if (!fileSystem.DirectoryExists(fileSystem.GetDirectoryName(outFile)))
+                    fileSystem.CreateDirectory(fileSystem.GetDirectoryName(outFile));
 
+#if !ISSOURCEGENERATOR
                 Console.ForegroundColor = exists ? ConsoleColor.Magenta : ConsoleColor.Green;
                 Console.Write(exists ? "Overwriting: " : "New File: ");
                 Console.ResetColor();
-                Console.WriteLine(Path.GetFileName(outFile));
+                Console.WriteLine(fileSystem.GetFileName(outFile));
+#endif
 
-                File.WriteAllText(outFile, pair.Value, utf8);
+                string text = file.Text ?? "";
+                if (string.Equals(endOfLine, "lf", StringComparison.OrdinalIgnoreCase))
+                    text = text.Replace("\r", "");
+                else if (string.Equals(endOfLine, "crlf", StringComparison.OrdinalIgnoreCase))
+                    text = text.Replace("\r", "").Replace("\n", "\r\n");
+
+                fileSystem.WriteAllText(outFile, text, utf8);
             }
 
-            if (deleteExtraPattern.Length == 0)
+            if (deleteExtraPattern?.Length is null or 0)
                 return;
 
             var filesToDelete = deleteExtraPattern.SelectMany(
-                    x => Directory.GetFiles(outDir, x))
+                    x => fileSystem.GetFiles(outDir, x, recursive: true))
                 .Distinct();
 
+            var outRoot = PathHelper.ToUrl(outDir).TrimEnd('/') + '/';
             foreach (var file in filesToDelete)
-                if (!generated.Contains(Path.GetFileName(file)))
+                if (PathHelper.ToUrl(file).StartsWith(outRoot) &&
+                    !generated.Contains(PathHelper.ToUrl(file)[outRoot.Length..]))
                 {
+#if !ISSOURCEGENERATOR
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.Write("Deleting: ");
                     Console.ResetColor();
-                    Console.WriteLine(Path.GetFileName(file));
-
-                    File.Delete(file);
+                    Console.WriteLine(fileSystem.GetFileName(file));
+#endif
+                    fileSystem.DeleteFile(file);
                 }
         }
     }

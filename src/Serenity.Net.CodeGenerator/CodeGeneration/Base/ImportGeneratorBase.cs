@@ -1,13 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace Serenity.CodeGeneration
+﻿namespace Serenity.CodeGeneration
 {
     public abstract class ImportGeneratorBase : CodeGeneratorBase
     {
-        protected Dictionary<string, ExternalType> ssByClassName;
-        protected Dictionary<string, ExternalType> ssByScriptName;
         protected Dictionary<string, ExternalType> tsTypes;
 
         public ImportGeneratorBase()
@@ -17,8 +11,6 @@ namespace Serenity.CodeGeneration
                 "Serenity"
             };
 
-            ssByClassName = new Dictionary<string, ExternalType>();
-            ssByScriptName = new Dictionary<string, ExternalType>();
             tsTypes = new Dictionary<string, ExternalType>();
         }
 
@@ -37,19 +29,13 @@ namespace Serenity.CodeGeneration
             if (tsTypes.TryGetValue(fullName, out ExternalType type))
                 return type;
 
-            if (ssByScriptName.TryGetValue(fullName, out type))
-                return type;
-
-            if (ssByClassName.TryGetValue(fullName, out type))
-                return type;
-
             return null;
         }
 
         protected static string[] SplitGenericArguments(ref string typeName)
         {
-            if (!typeName.Contains('<', StringComparison.Ordinal))
-                return System.Array.Empty<string>();
+            if (!typeName.Contains('<'))
+                return Array.Empty<string>();
 
             var pos = typeName.IndexOf("<", StringComparison.Ordinal);
             var last = typeName.LastIndexOf(">", StringComparison.Ordinal);
@@ -72,7 +58,7 @@ namespace Serenity.CodeGeneration
                 return new string(c).Split(new char[] { '€' });
             }
             else
-                return System.Array.Empty<string>();
+                return Array.Empty<string>();
         }
 
         protected string RemoveRootNamespace(string ns, string name)
@@ -91,20 +77,20 @@ namespace Serenity.CodeGeneration
 
         protected static string GetPropertyScriptName(ExternalProperty prop, bool preserveMemberCase)
         {
-            var scriptNameAttr = prop.Attributes.FirstOrDefault(x =>
+            var scriptNameAttr = prop.Attributes?.FirstOrDefault(x =>
                 x.Type == "System.Runtime.CompilerServices.ScriptNameAttribute");
 
             if (scriptNameAttr != null)
-                return scriptNameAttr.Arguments[0].Value as string;
-            else if (!preserveMemberCase && !prop.Attributes.Any(x =>
-                    x.Type == "System.Runtime.CompilerServices.PreserveCaseAttribute"))
+                return scriptNameAttr.Arguments?[0].Value as string;
+            else if (!preserveMemberCase && (prop.Attributes == null || !prop.Attributes.Any(x =>
+                    x.Type == "System.Runtime.CompilerServices.PreserveCaseAttribute")))
             {
                 var propField = prop.Name;
                 if (propField == "ID")
                     return "id";
                 else
                     return propField.Substring(0, 1).ToLowerInvariant()
-                        + propField[1..];
+                        + propField.Substring(1);
             }
             else
                 return prop.Name;
@@ -112,10 +98,11 @@ namespace Serenity.CodeGeneration
 
         protected static string GetBaseTypeName(ExternalType type)
         {
-            if (string.IsNullOrEmpty(type.BaseType))
+            var baseType = type.BaseType;
+
+            if (string.IsNullOrEmpty(baseType))
                 return null;
 
-            var baseType = type.BaseType;
             SplitGenericArguments(ref baseType);
             return baseType;
         }
@@ -135,7 +122,7 @@ namespace Serenity.CodeGeneration
             }
         }
 
-        protected bool HasBaseType(ExternalType type, string typeName)
+        protected bool HasBaseType(ExternalType type, params string[] typeNames)
         {
             int loop = 0;
 
@@ -145,32 +132,46 @@ namespace Serenity.CodeGeneration
                     break;
 
                 var baseTypeName = GetBaseTypeName(type);
-                if (baseTypeName == typeName)
+                if (typeNames.Contains(baseTypeName, StringComparer.Ordinal))
                     return true;
 
                 var ns = type.Namespace;
-                type = GetScriptType(baseTypeName);
-                if (type == null && ns != null)
+                var baseType = GetScriptType(baseTypeName);
+
+                if (baseType == null &&
+                    !string.IsNullOrEmpty(type.Module) &&
+                    baseTypeName?.IndexOf(':') < 0)
+                {
+                    var moduleBaseTypeName = type.Module + ":" + baseTypeName;
+                    if (typeNames.Contains(moduleBaseTypeName, StringComparer.Ordinal))
+                        return true;
+
+                    baseType = GetScriptType(moduleBaseTypeName);
+                }
+
+                if (baseType == null && ns != null)
                 {
                     var nsParts = ns.Split('.');
                     for (var i = nsParts.Length; i > 0; i--)
                     {
-                        var prefixed = string.Join('.', nsParts.Take(i)) + '.' + baseTypeName;
-                        if (prefixed == typeName)
+                        var prefixed = string.Join(".", nsParts.Take(i)) + '.' + baseTypeName;
+                        if (typeNames.Contains(prefixed, StringComparer.Ordinal))
                             return true;
-                        type = GetScriptType(prefixed);
-                        if (type != null)
+                        baseType = GetScriptType(prefixed);
+                        if (baseType != null)
                             break;
                     }
                 }
+
+                type = baseType;
             };
 
             return false;
         }
 
-        protected ExternalAttribute GetAttribute(ExternalType type, string attributeName, bool inherited)
+        protected ExternalAttribute GetAttribute(ExternalType type, bool inherited, params string[] attributeNames)
         {
-            var attr = type.Attributes.FirstOrDefault(x => x.Type == attributeName);
+            var attr = type.Attributes?.FirstOrDefault(x => attributeNames.Contains(x.Type, StringComparer.Ordinal));
             if (attr != null)
                 return attr;
 
@@ -180,7 +181,7 @@ namespace Serenity.CodeGeneration
             int loop = 0;
             while ((type = GetBaseType(type)) != null)
             {
-                attr = type.Attributes.FirstOrDefault(x => x.Type == attributeName);
+                attr = type.Attributes?.FirstOrDefault(x => attributeNames.Contains(x.Type, StringComparer.Ordinal));
                 if (attr != null)
                     return attr;
 

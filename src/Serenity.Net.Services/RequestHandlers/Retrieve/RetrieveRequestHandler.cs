@@ -1,14 +1,4 @@
-﻿using Serenity.Abstractions;
-using Serenity.Data;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Globalization;
-using System.Linq;
-using System.Reflection;
-using System.Security.Claims;
-
-namespace Serenity.Services
+﻿namespace Serenity.Services
 {
     public class RetrieveRequestHandler<TRow, TRetrieveRequest, TRetrieveResponse> : IRetrieveRequestProcessor,
         IRetrieveHandler<TRow, TRetrieveRequest, TRetrieveResponse>
@@ -56,10 +46,6 @@ namespace Serenity.Services
             if (mode == SelectLevel.Always)
                 return true;
 
-            bool isPrimaryKey = (field.Flags & FieldFlags.PrimaryKey) == FieldFlags.PrimaryKey;
-            if (isPrimaryKey && mode != SelectLevel.Explicit)
-                return true;
-
             if (mode == SelectLevel.Auto)
             {
                 bool notMapped = (field.Flags & FieldFlags.NotMapped) == FieldFlags.NotMapped;
@@ -72,6 +58,8 @@ namespace Serenity.Services
                     // mode (Details) without having to include such columns explicitly.
                     mode = SelectLevel.Details;
                 }
+                else if (field.IsLookup)
+                    mode = SelectLevel.Lookup;
                 else
                 {
                     // assume that non-foreign calculated and reflective fields should be selected in list mode
@@ -84,15 +72,12 @@ namespace Serenity.Services
                 (Request.ExcludeColumns.Contains(field.Name) ||
                     (field.PropertyName != null && Request.ExcludeColumns.Contains(field.PropertyName)));
 
+            if (explicitlyExcluded)
+                return false;
+
             bool explicitlyIncluded = !explicitlyExcluded && Request.IncludeColumns != null &&
                 (Request.IncludeColumns.Contains(field.Name) ||
                     (field.PropertyName != null && Request.IncludeColumns.Contains(field.PropertyName)));
-
-            if (isPrimaryKey)
-                return explicitlyIncluded;
-
-            if (explicitlyExcluded)
-                return false;
 
             if (explicitlyIncluded)
                 return true;
@@ -102,8 +87,13 @@ namespace Serenity.Services
             return selection switch
             {
                 RetrieveColumnSelection.List => mode <= SelectLevel.List,
+                RetrieveColumnSelection.KeyOnly => ReferenceEquals(field, Row.IdField) ||
+                    (field.Flags & FieldFlags.PrimaryKey) == FieldFlags.PrimaryKey,
                 RetrieveColumnSelection.Details => mode <= SelectLevel.Details,
-                _ => false,
+                RetrieveColumnSelection.None => false,
+                RetrieveColumnSelection.IdOnly => ReferenceEquals(field, Row.IdField),
+                RetrieveColumnSelection.Lookup => mode <= SelectLevel.Lookup,
+                _ => false
             };
         }
 

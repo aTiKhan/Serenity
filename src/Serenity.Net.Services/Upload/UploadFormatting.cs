@@ -1,5 +1,4 @@
 ﻿using Serenity.IO;
-using System;
 using Path = System.IO.Path;
 
 namespace Serenity.Web
@@ -29,6 +28,10 @@ namespace Serenity.Web
                 else
                     groupKey = s.SafeSubstring(0, 2);
             }
+
+            var originalName = options.OriginalName;
+            if (string.IsNullOrEmpty(options.OriginalName))
+                throw new ArgumentNullException(nameof(options.OriginalName));
 
             var formatted = string.Format(options.Format, identity, groupKey, 
                 TemporaryFileHelper.RandomFileCode(), DateTime.Now,

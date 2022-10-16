@@ -1,8 +1,4 @@
 using Serenity.CodeGenerator;
-using System;
-using System.Collections.Generic;
-using System.IO.Abstractions.TestingHelpers;
-using Xunit;
 
 namespace Serenity.Tests.CodeGenerator
 {
@@ -11,7 +7,7 @@ namespace Serenity.Tests.CodeGenerator
         [Fact]
         public void Throws_ArgumentNull_When_FileSystem_IsNull()
         {
-            var fileSystem = new MockFileSystem();
+            var fileSystem = new MockGeneratorFileSystem();
             var projectSystem = new MockBuildProjectSystem(fileSystem);
             Assert.Throws<ArgumentNullException>(() => new RestoreCommand(null, projectSystem));
         }
@@ -19,7 +15,7 @@ namespace Serenity.Tests.CodeGenerator
         [Fact]
         public void Throws_ArgumentNull_When_ProjectSystem_IsNull()
         {
-            var fileSystem = new MockFileSystem();
+            var fileSystem = new MockGeneratorFileSystem();
             var projectSystem = new MockBuildProjectSystem(fileSystem);
             Assert.Throws<ArgumentNullException>(() => new RestoreCommand(fileSystem, null));
         }
@@ -27,7 +23,7 @@ namespace Serenity.Tests.CodeGenerator
         [Fact]
         public void Throws_ArgumentNull_When_CsProj_IsNull()
         {
-            var fileSystem = new MockFileSystem();
+            var fileSystem = new MockGeneratorFileSystem();
             var projectSystem = new MockBuildProjectSystem(fileSystem);
             var command = new RestoreCommand(fileSystem, projectSystem);
             Assert.Throws<ArgumentNullException>(() => command.Run(null));
@@ -36,7 +32,7 @@ namespace Serenity.Tests.CodeGenerator
         [Fact]
         public void Returns_ProjectNotFound_ExitCode_When_CsProj_Not_Found()
         {
-            var fileSystem = new MockFileSystem();
+            var fileSystem = new MockGeneratorFileSystem();
             var projectSystem = new MockBuildProjectSystem(fileSystem);
             var command = new RestoreCommand(fileSystem, projectSystem);
             var exitCode = command.Run("nonexisting.csproj");
@@ -46,10 +42,8 @@ namespace Serenity.Tests.CodeGenerator
         [Fact]
         public void Returns_Cant_Determine_Packages_Dir_When_Nuget_Packages_Dir_Not_Found()
         {
-            var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>()
-            {
-                ["Test.csproj"] = "A"
-            });
+            var fileSystem = new MockGeneratorFileSystem();
+            fileSystem.WriteAllText("Test.csproj", "A");
 
             var projectSystem = new MockBuildProjectSystem(fileSystem);
             var command = new RestoreCommand(fileSystem, projectSystem);

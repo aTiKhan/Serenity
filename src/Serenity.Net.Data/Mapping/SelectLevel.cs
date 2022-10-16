@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     /// <summary>
     /// Select level enumeration
@@ -16,9 +14,10 @@ namespace Serenity.Data
         /// </summary>
         Always = 1,
         /// <summary>
-        /// Obsolete. Use [LookupInclude] attribute.
+        /// Select this field in ColumnSelection.Lookup, ColumnSelection.List or ColumnSelection.Details modes,
+        /// or if it's specified in IncludeColumns list (if not also in 
+        /// ExcludeColumns list)
         /// </summary>
-        [Obsolete("Use LookupInclude attribute for lookup fields")]
         Lookup = 2,
         /// <summary>
         /// Select this field in ColumnSelection.List or ColumnSelection.Details modes,

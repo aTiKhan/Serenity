@@ -1,12 +1,11 @@
-﻿using System.Collections.Generic;
-using System.IO;
+﻿using System.IO;
 
 namespace Serenity.Web
 {
     public interface IUploadStorage
     {
         string ArchiveFile(string path);
-        string CopyFrom(IUploadStorage sourceStorage, string sourcePath, string targetPath, bool autoRename);
+        string CopyFrom(IUploadStorage sourceStorage, string sourcePath, string targetPath, bool? autoRename);
         void DeleteFile(string path);
         bool FileExists(string path);
         string GetFileUrl(string path);
@@ -16,6 +15,7 @@ namespace Serenity.Web
         void SetFileMetadata(string path, IDictionary<string, string> metadata, bool overwriteAll);
         Stream OpenFile(string path);
         void PurgeTemporaryFiles();
-        string WriteFile(string path, Stream source, bool autoRename);
+        string WriteFile(string path, Stream source, bool? autoRename);
+
     }
 }

@@ -1,7 +1,4 @@
-﻿using System;
-using System.Reflection;
-
-namespace Serenity.ComponentModel
+﻿namespace Serenity.ComponentModel
 {
     /// <summary>
     /// Placed on rows / or custom lookup classes to denote
@@ -118,7 +115,7 @@ namespace Serenity.ComponentModel
 
         /// <summary>
         /// External lookup script type or base type that should be used for generating dynamic lookup script.
-        /// Only meaningfull for Row types with external lookup scripts. Can be a generic type of TRow or
+        /// Only meaningful for Row types with external lookup scripts. Can be a generic type of TRow or
         /// a simple lookup class.
         /// </summary>
         public Type LookupType { get; set; }

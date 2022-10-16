@@ -1,8 +1,4 @@
-﻿using Serenity.Data;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 
 namespace Serenity.IO
 {
@@ -30,7 +26,7 @@ namespace Serenity.IO
         /// <remarks>
         ///   If any errors occur during cleanup, this doesn't raise an exception
         ///   and ignored. Other errors might raise an exception. As errors are
-        ///   ignored, method can't gurantee that less than specified number of files
+        ///   ignored, method can't guarantee that less than specified number of files
         ///   will be in the folder after it ends.</remarks>
         public static void PurgeDirectoryDefault(string directoryToClean)
         {
@@ -54,7 +50,7 @@ namespace Serenity.IO
         /// <remarks>
         ///   If any errors occur during cleanup, this doesn't raise an exception
         ///   and ignored. Other errors might raise an exception. As errors are
-        ///   ignored, method can't gurantee that less than specified number of files
+        ///   ignored, method can't guarantee that less than specified number of files
         ///   will be in the folder after it ends.</remarks>
         public static void PurgeDirectory(string directoryToClean,
             TimeSpan autoExpireTime, int maxFilesInDirectory, string checkFileName)

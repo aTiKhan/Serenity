@@ -1,9 +1,5 @@
 ﻿using Scriban;
 using Scriban.Runtime;
-using System;
-using System.Collections.Concurrent;
-using System.IO;
-using System.Linq;
 
 namespace Serenity.CodeGenerator
 {
@@ -13,7 +9,7 @@ namespace Serenity.CodeGenerator
 
         private static readonly ConcurrentDictionary<string, Template> templateCache = new();
 
-        private static Template GetTemplate(string templateKey)
+        private static Template GetTemplate(IGeneratorFileSystem fileSystem, string templateKey)
         {
             if (templateCache.TryGetValue(templateKey, out Template t))
                 return t;
@@ -22,9 +18,9 @@ namespace Serenity.CodeGenerator
 
             if (!string.IsNullOrEmpty(TemplatePath))
             {
-                var overrideFile = Path.Combine(TemplatePath, templateKey + ".scriban");
-                if (File.Exists(overrideFile))
-                    template = File.ReadAllText(overrideFile);
+                var overrideFile = fileSystem.Combine(TemplatePath, templateKey + ".scriban");
+                if (fileSystem.FileExists(overrideFile))
+                    template = fileSystem.ReadAllText(overrideFile);
             }
 
             if (template == null)
@@ -35,7 +31,7 @@ namespace Serenity.CodeGenerator
                 if (stream == null)
                     throw new Exception("Can't find template resource with key: " + templateKey);
 
-                using var sr = new StreamReader(stream);
+                using var sr = new System.IO.StreamReader(stream);
                 template = sr.ReadToEnd();
             }
 
@@ -44,9 +40,11 @@ namespace Serenity.CodeGenerator
             return t;
         }
 
-        public static string Render(string templateKey, object model)
+
+
+        public static string Render(IGeneratorFileSystem fileSystem, string templateKey, object model)
         {
-            var template = GetTemplate(templateKey);
+            var template = GetTemplate(fileSystem, templateKey);
             try
             {
                 var context = new TemplateContext
@@ -58,7 +56,33 @@ namespace Serenity.CodeGenerator
                 context.CurrentGlobal.Import(model,
                     ScriptMemberImportFlags.Field | ScriptMemberImportFlags.Property,
                     null, x => x.Name);
-                return template.Render(context);
+
+                var cw = new CodeWriter
+                {
+                    AllowUsing = ns => ns == "Serenity" ||
+                      ns.StartsWith("Serenity.", StringComparison.Ordinal) ||
+                      ns == "Microsoft.AspNetCore.Mvc" ||
+                      ns == "System.Globalization" ||
+                      ns == "System.Data" ||
+                      ns == "System" ||
+                      ns == "System.IO" ||
+                      ns == "System.ComponentModel" ||
+                      ns == "System.Collections.Generic",
+                    IsCSharp = true
+
+                };
+
+                var modularTSImporter = new ModularTSImporter((model as EntityModel)?.Module);
+
+                context.PushGlobal(CSharpDynamicUsings.GetScriptObject(cw));
+                context.PushGlobal(ModularTSImporter.GetScriptObject(modularTSImporter));
+
+                cw.Append(template.Render(context).Trim());
+
+                cw.Insert(0, modularTSImporter.GetImports());
+
+                return cw.ToString();
+
             }
             catch (InvalidOperationException ex)
             {

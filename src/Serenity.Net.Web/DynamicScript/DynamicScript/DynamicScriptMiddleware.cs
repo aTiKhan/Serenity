@@ -1,10 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Net.Http.Headers;
-using Serenity.Services;
-using System;
-using System.Globalization;
-using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 
@@ -14,6 +10,7 @@ namespace Serenity.Web.Middleware
     {
         private readonly RequestDelegate next;
         const string dynJSPath = "/DynJS.axd/";
+        const string dynamicDataPath = "/DynamicData/";
 
         public DynamicScriptMiddleware(RequestDelegate next)
         {
@@ -22,31 +19,40 @@ namespace Serenity.Web.Middleware
 
         public Task Invoke(HttpContext context)
         {
-            if (!context.Request.Path.Value.StartsWith(dynJSPath, StringComparison.OrdinalIgnoreCase))
+            bool dynJS = context.Request.Path.Value.StartsWith(dynJSPath, StringComparison.OrdinalIgnoreCase);
+            bool dynamicData = !dynJS && context.Request.Path.Value.StartsWith(dynamicDataPath, StringComparison.OrdinalIgnoreCase);
+
+            if (!dynJS && !dynamicData)
                 return next.Invoke(context);
 
             var scriptKey = context.Request.Path.Value;
-            scriptKey = scriptKey[dynJSPath.Length..];
+            scriptKey = scriptKey[(dynJS ? dynJSPath.Length : dynamicDataPath.Length)..];
 
-            var contentType = "text/javascript";
-            if (scriptKey.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
-                scriptKey = scriptKey[0..^3];
-            else if (scriptKey.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+            string contentType;
+            if (dynJS)
             {
-                contentType = "text/css";
-                scriptKey = scriptKey[0..^4];
+                contentType = "text/javascript";
+                if (scriptKey.EndsWith(".js", StringComparison.OrdinalIgnoreCase))
+                    scriptKey = scriptKey[0..^3];
+                else if (scriptKey.EndsWith(".css", StringComparison.OrdinalIgnoreCase))
+                {
+                    contentType = "text/css";
+                    scriptKey = scriptKey[0..^4];
+                }
             }
+            else
+                contentType = "application/json";
 
-            return ReturnScript(context, scriptKey, contentType);
+            return ReturnScript(context, scriptKey, contentType, json: dynamicData);
         }
 
-        public async static Task ReturnScript(HttpContext context, string scriptKey, string contentType)
+        public async static Task ReturnScript(HttpContext context, string scriptKey, string contentType, bool json)
         {
             IScriptContent scriptContent;
             try
             {
                 scriptContent = context.RequestServices.GetRequiredService<IDynamicScriptManager>()
-                    .ReadScriptContent(scriptKey);
+                    .ReadScriptContent(scriptKey, json);
             }
             catch (ValidationError ve)
             {
@@ -68,7 +74,7 @@ namespace Serenity.Web.Middleware
 
             var mediaType = new MediaTypeHeaderValue(contentType)
             {
-                Encoding = System.Text.Encoding.UTF8
+                Encoding = Encoding.UTF8
             };
             context.Response.ContentType = mediaType.ToString();
 
@@ -88,11 +94,19 @@ namespace Serenity.Web.Middleware
             cacheControl.MustRevalidate = false;
             responseHeaders.CacheControl = cacheControl;
 
-            var supportsGzip = scriptContent.CanCompress && 
+            var supportsBrotli = scriptContent.CanCompress &&
+                context.Request.Headers["Accept-Encoding"].Any(x => x.Contains("br", StringComparison.Ordinal));
+
+            var supportsGzip = !supportsBrotli && scriptContent.CanCompress && 
                 context.Request.Headers["Accept-Encoding"].Any(x => x.Contains("gzip", StringComparison.Ordinal));
 
             byte[] contentBytes;
-            if (supportsGzip)
+            if (supportsBrotli)
+            {
+                context.Response.Headers["Content-Encoding"] = "br";
+                contentBytes = scriptContent.BrotliContent;
+            }
+            else if (supportsGzip)
             {
                 context.Response.Headers["Content-Encoding"] = "gzip";
                 contentBytes = scriptContent.CompressedContent;

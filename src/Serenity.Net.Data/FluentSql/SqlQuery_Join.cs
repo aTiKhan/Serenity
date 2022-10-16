@@ -1,7 +1,4 @@
-﻿using System;
-using System.Text;
-
-namespace Serenity.Data
+﻿namespace Serenity.Data
 {
     public partial class SqlQuery : QueryWithParams, IFilterableQuery, IGetExpressionByName
     {
@@ -11,7 +8,7 @@ namespace Serenity.Data
             sb.Append(' ');
             sb.Append(SqlSyntax.AutoBracketValid(join.Table));
 
-            // joinAlias belirtilmişse ekle
+            // append if joinAlias is defined
             if (!string.IsNullOrEmpty(join.Name))
             {
                 sb.Append(' ');
@@ -165,7 +162,7 @@ namespace Serenity.Data
         /// <summary>
         /// Adds a right join to the query.
         /// </summary>
-        /// <param name="alias">The alias with tablename/alias name.</param>
+        /// <param name="alias">The alias with table name/alias name.</param>
         /// <param name="onCriteria">The ON criteria.</param>
         /// <returns></returns>
         /// <exception cref="ArgumentNullException">

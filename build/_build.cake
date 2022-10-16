@@ -12,7 +12,7 @@ var nupkgDir = System.IO.Path.Combine(System.IO.Path.GetFullPath("."), ".nupkg")
 var root = System.IO.Path.GetFullPath(@"..");
 var src = System.IO.Path.Combine(root, "src");
 
-var msBuildPath = @"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Current\Bin\msbuild.exe";
+var msBuildPath = @"C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\msbuild.exe";
 if (!System.IO.File.Exists(msBuildPath))
     msBuildPath = null;
 
@@ -141,12 +141,6 @@ Task("Restore")
     var exitCode = StartProcess("dotnet", "restore " + dotnetSln);
     if (exitCode > 0)
         throw new Exception("Error while restoring " + dotnetSln);
-        
-    StartProcess("powershell", new ProcessSettings 
-    { 
-        Arguments = "npm install", 
-        WorkingDirectory = System.IO.Path.Combine(src, "Serenity.Scripts") 
-    });
 });
 
 Task("Compile")
@@ -156,8 +150,8 @@ Task("Compile")
 
     StartProcess("powershell", new ProcessSettings 
     { 
-        Arguments = @"npx tsc -p ..\Serenity.Net.CodeGenerator\Resource\tsconfig.json", 
-        WorkingDirectory = System.IO.Path.Combine(src, "Serenity.Scripts") 
+        Arguments = @"npx tsc -p ..\..\Serenity.Net.CodeGenerator\Resource\tsconfig.json", 
+        WorkingDirectory = System.IO.Path.Combine(src, "Serenity.Scripts", "corelib") 
     });
                
     writeHeader("Building Serenity.Net.sln");
@@ -187,7 +181,7 @@ Task("Test")
         StartProcess("powershell", new ProcessSettings 
         { 
             Arguments = "npx jest", 
-            WorkingDirectory = System.IO.Path.Combine(src, "Serenity.Scripts") 
+            WorkingDirectory = System.IO.Path.Combine(src, "Serenity.Scripts", "corelib") 
         });
 
 });
@@ -221,6 +215,7 @@ Task("Pack")
     myPack("Serenity.Net.Web", null, null);
     myPack("Serenity.Scripts", null, null);
     myPack("Serenity.Net.CodeGenerator", "sergen", null);
+    myPack("Serenity.Assets", null, null);
     
     fixNugetCache();
 });
@@ -232,19 +227,4 @@ Task("Push")
         myPush();
     });
  
-Task("Assets-Pack")
-    .IsDependentOn("Clean")
-    .Does(() =>
-    {
-        myPack("Serenity.Assets", null, null);
-        fixNugetCache();
-    });
-
-Task("Assets-Push")
-    .IsDependentOn("Assets-Pack")
-    .Does(() =>
-    {
-        myPush();
-    });
-
 RunTarget(target);

@@ -1,8 +1,4 @@
 ﻿using Serenity.CodeGenerator;
-using System;
-using System.Collections.Generic;
-using System.IO.Abstractions;
-using System.Linq;
 using System.Xml.Linq;
 
 namespace Serenity.Tests
@@ -11,7 +7,7 @@ namespace Serenity.Tests
     {
         private readonly XElement project;
 
-        public MockBuildProject(IFileSystem fileSystem, string path)
+        public MockBuildProject(IGeneratorFileSystem fileSystem, string path)
         {
             if (fileSystem == null)
                 throw new ArgumentNullException(nameof(fileSystem));
@@ -19,7 +15,7 @@ namespace Serenity.Tests
             if (path == null)
                 throw new ArgumentNullException(nameof(path));
 
-            project = XElement.Load(fileSystem.File.ReadAllText(path));
+            project = XElement.Load(fileSystem.ReadAllText(path));
         }
 
         public IEnumerable<IBuildProjectItem> AllEvaluatedItems =>

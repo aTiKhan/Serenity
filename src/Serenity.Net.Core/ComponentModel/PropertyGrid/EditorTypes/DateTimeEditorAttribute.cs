@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Serenity.ComponentModel
+﻿namespace Serenity.ComponentModel
 {
     /// <summary>
     /// Indicates that the target property should use a "DateTime" editor.
@@ -9,10 +7,15 @@ namespace Serenity.ComponentModel
     public partial class DateTimeEditorAttribute : CustomEditorAttribute
     {
         /// <summary>
+        /// Editor type key
+        /// </summary>
+        public const string Key = "DateTime";
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="DateTimeEditorAttribute"/> class.
         /// </summary>
         public DateTimeEditorAttribute()
-            : base("DateTime")
+            : base(Key)
         {
         }
 
@@ -77,7 +80,7 @@ namespace Serenity.ComponentModel
         }
 
         /// <summary>
-        /// Gets or sets the interval minutes, default is 5 mins.
+        /// Gets or sets the interval minutes, default is 5 minutes.
         /// </summary>
         /// <value>
         /// The interval minutes.

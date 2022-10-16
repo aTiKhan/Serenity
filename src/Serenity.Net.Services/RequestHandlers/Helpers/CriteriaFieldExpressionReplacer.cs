@@ -1,20 +1,17 @@
-﻿using Serenity.Abstractions;
-using Serenity.Services;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Globalization;
+﻿using System.Collections;
 
 namespace Serenity.Data
 {
     public class CriteriaFieldExpressionReplacer : SafeCriteriaValidator
     {
         private readonly IPermissionService permissions;
+        private readonly bool lookupAccessMode;
 
-        public CriteriaFieldExpressionReplacer(IRow row, IPermissionService permissions)
+        public CriteriaFieldExpressionReplacer(IRow row, IPermissionService permissions, bool lookupAccessMode = false)
         {
             Row = row;
             this.permissions = permissions ?? throw new ArgumentNullException(nameof(permissions));
+            this.lookupAccessMode = lookupAccessMode;
         }
 
         protected IRow Row { get; private set; }
@@ -35,6 +32,11 @@ namespace Serenity.Data
 
             if (field.ReadPermission != null &&
                 !permissions.HasPermission(field.ReadPermission))
+                return false;
+
+            if (field.ReadPermission == null &&
+                lookupAccessMode &&
+                !field.IsLookup)
                 return false;
 
             return true;
