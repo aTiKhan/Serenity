@@ -18,7 +18,7 @@ Slick._ = (() => {
   };
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // node_modules/@serenity-is/sleekgrid/src/layouts/frozenlayout.ts
+  // src/layouts/frozenlayout.ts
   var frozenlayout_exports = {};
   __export(frozenlayout_exports, {
     FrozenLayout: () => FrozenLayout
@@ -27,7 +27,7 @@ Slick._ = (() => {
   // global-externals:_
   var { disableSelection, H, parsePx, spacerDiv } = Slick;
 
-  // node_modules/@serenity-is/sleekgrid/src/layouts/frozenlayout.ts
+  // src/layouts/frozenlayout.ts
   var FrozenLayout = function() {
     var canvasWidth;
     var canvasWidthL;
@@ -157,7 +157,7 @@ Slick._ = (() => {
     function getFooterRowCols() {
       return [footerRowColsL, footerRowColsR];
     }
-    const getCanvasNodeFor = (row, cell) => {
+    const getCanvasNodeFor = (cell, row) => {
       if (row == null && cell == null)
         return canvasTopL;
       var rightSide = cell >= frozenCols;
@@ -177,7 +177,7 @@ Slick._ = (() => {
     function getScrollContainerY() {
       return scrollContainerY;
     }
-    function getViewportNodeFor(row, cell) {
+    function getViewportNodeFor(cell, row) {
       if (row == null && cell == null)
         return canvasTopL;
       var rightSide = cell >= frozenCols;
@@ -395,15 +395,35 @@ Slick._ = (() => {
       }
     };
     const applyColumnWidths = () => {
-      var x = 0, w, rule, cols = host.getColumns(), rtl = host.getOptions().rtl, s = rtl ? "right" : "left", e = rtl ? "left" : "right";
-      for (var i = 0; i < cols.length; i++) {
-        if (frozenCols == i)
-          x = 0;
-        w = cols[i].width;
-        rule = host.getColumnCssRules(i);
-        rule[s].style[s] = x + "px";
-        rule[e].style[e] = (frozenCols > 0 && i >= frozenCols ? canvasWidthR : canvasWidthL) - x - w + "px";
-        x += w;
+      var x = 0, w, rule, cols = host.getColumns(), opts = host.getOptions(), rtl = opts.rtl, s = rtl ? "right" : "left", e = rtl ? "left" : "right";
+      if (opts.useCssVars) {
+        var styles = host.getContainerNode().style;
+        for (var i = 0; i < cols.length; i++) {
+          if (frozenCols == i)
+            x = 0;
+          w = cols[i].width;
+          var prop = "--l" + i;
+          var oldVal = styles.getPropertyValue(prop);
+          var newVal = x + "px";
+          if (oldVal !== newVal)
+            styles.setProperty(prop, newVal);
+          prop = "--r" + i;
+          oldVal = styles.getPropertyValue(prop);
+          newVal = (frozenCols > 0 && i >= frozenCols ? canvasWidthR : canvasWidthL) - x - w + "px";
+          if (oldVal !== newVal)
+            styles.setProperty(prop, newVal);
+          x += w;
+        }
+      } else {
+        for (var i = 0; i < cols.length; i++) {
+          if (frozenCols == i)
+            x = 0;
+          w = cols[i].width;
+          rule = host.getColumnCssRules(i);
+          rule[s].style[s] = x + "px";
+          rule[e].style[e] = (frozenCols > 0 && i >= frozenCols ? canvasWidthR : canvasWidthL) - x - w + "px";
+          x += w;
+        }
       }
     };
     const getTopPanelFor = (cell) => {
@@ -644,4 +664,4 @@ Slick._ = (() => {
   };
   return __toCommonJS(frozenlayout_exports);
 })();
-["Editors", "Formatters", "Plugins"].forEach(ns => Slick._[ns] && (Slick[ns] = Object.assign(Slick[ns] || {}, Slick._[ns])) && delete Slick._[ns]); Object.assign(Slick, Slick._); delete Slick._;
+["Data", "Editors", "Formatters", "Plugins"].forEach(ns => Slick._[ns] && (Slick[ns] = Object.assign(Slick[ns] || {}, Slick._[ns])) && delete Slick._[ns]); Object.assign(Slick, Slick._); delete Slick._;

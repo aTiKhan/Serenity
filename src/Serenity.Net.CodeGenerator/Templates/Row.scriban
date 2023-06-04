@@ -1,69 +1,74 @@
-﻿{{USING "Serenity.ComponentModel" }}
-{{USING "Serenity.Data" }}
-{{USING "Serenity.Data.Mapping" }}
-{{USING "System.ComponentModel" }}
+﻿{{~f = NET5Plus ? "f" : "F"~}}
+{{USING "Serenity.ComponentModel"}}
+{{USING "Serenity.Data"}}
+{{USING "Serenity.Data.Mapping"}}
+{{USING "System.ComponentModel"}}
 
-{{NAMESPACE RootNamespaceDotModule}}
-{
-    [ConnectionKey("{{ConnectionKey}}"){{if Module}}, Module("{{Module}}"){{end}}, TableName("{{SchemaAndTable}}")]
-    [DisplayName("{{Title}}"), InstanceName("{{Title}}")]
-    [ReadPermission("{{Permission}}")]
-    [ModifyPermission("{{Permission}}")]
-    public sealed class {{RowClassName}} : {{TYPEREFLIST RowBaseClassAndInterfaceList}}
-    {
-{{-for x in Fields}}
+{{NAMESPACE ModuleNamespace}}{{capture block~}}
+[ConnectionKey("{{ConnectionKey}}"){{if Module}}, Module("{{Module}}"){{end}}, TableName("{{SchemaAndTable}}")]
+[DisplayName("{{Title}}"), InstanceName("{{Title}}")]
+[ReadPermission("{{Permission}}")]
+[ModifyPermission("{{Permission}}")]
+public sealed{{if EnableRowTemplates}} partial{{end}} class {{RowClassName}} : {{TYPEREFLIST RowBaseClassAndInterfaceList}}
+{   {{~if DeclareJoinConstants && !Joins.empty?~}}
+
+    {{~for j in Joins~}}
+    const string {{j.Alias}} = nameof({{j.Alias}});
+    {{~end~}}
+    {{~end~}}
+    {{~if EnableRowTemplates~}}
+
+    class RowTemplate
+    {   {{~for x in AllFields~}}
+
         [{{ATTRREF x.AttributeList}}]
-        public {{TYPEREF x.PropertyType}} {{x.Ident}}
-        {
-            get => {{if NET5Plus}}fields{{else}}Fields{{end}}.{{x.Ident}}[this];
-            set => {{if NET5Plus}}fields{{else}}Fields{{end}}.{{x.Ident}}[this] = value;
-        }
-{{end}}
-{{-for j in Joins}}
-{{-for k in j.Fields}}
-        [{{ATTRREF k.AttributeList}}]
-        public {{TYPEREF k.PropertyType}} {{k.Ident}}
-        {
-            get => {{if NET5Plus}}fields{{else}}Fields{{end}}.{{k.Ident}}[this];
-            set => {{if NET5Plus}}fields{{else}}Fields{{end}}.{{k.Ident}}[this] = value;
-        }
-{{end}}
-{{-end}}
-{{-if NET5Plus}}
-        public {{RowClassName}}()
-            : base()
-        {
-        }
-
-        public {{RowClassName}}(RowFields fields)
-            : base(fields)
-        {
-        }
-{{-else}}
-{{-if Identity}}
-        IIdField IIdRow.IdField => Fields.{{Identity}};
-{{end-}}
-{{-if NameField}}
-        StringField INameRow.NameField => Fields.{{NameField}};
-{{end}}
-        public static readonly RowFields Fields = new RowFields().Init();
-
-        public {{RowClassName}}()
-            : base(Fields)
-        {
-        }
-{{end}}
-
-        public class RowFields : {{TYPEREF FieldsBaseClass}}
-        {
-{{-for x in Fields}}
-            public {{x.FieldType}}Field {{x.Ident}};
-{{-end}}
-{{-for j in Joins}}
-{{for k in j.Fields}}
-            public {{k.FieldType}}Field {{k.Ident}};
-{{-end}}
-{{-end}}
-        }
+        public {{TYPEREF x.PropertyType}} {{x.PropertyName}} { get; set; }
+        {{~end~}}
     }
+    {{~if FieldsBaseClass != "Serenity.Data.RowFieldsBase"~}}
+
+    public partial class RowFields : {{TYPEREF FieldsBaseClass}}
+    {
+    }
+    {{~end~}}
+    {{~else~}}
+    {{~for x in AllFields~}}
+
+    [{{ATTRREF x.AttributeList}}]
+    public {{TYPEREF x.PropertyType}} {{x.PropertyName}}
+    {
+        get => {{f}}ields.{{x.PropertyName}}[this];
+        set => {{f}}ields.{{x.PropertyName}}[this] = value;
+    }
+    {{~end~}}
+{{~if !NET5Plus~}}
+    {{~if Identity~}}
+
+    IIdField IIdRow.IdField => Fields.{{Identity}};
+    {{~end~}}
+    {{~if NameField~}}
+
+    StringField INameRow.NameField => Fields.{{NameField}};
+    {{~end~}}
+
+    public static readonly RowFields Fields = new RowFields().Init();
+
+    public {{RowClassName}}()
+        : base(Fields)
+    {
+    }
+{{~end~}}
+
+    public class RowFields : {{TYPEREF FieldsBaseClass}}
+    {
+        {{~for x in Fields~}}
+        public {{x.FieldType}}Field {{x.PropertyName}};
+        {{~end~}}
+
+        {{~for x in JoinFields~}}
+        public {{x.FieldType}}Field {{x.PropertyName}};
+        {{~end~}}
+    }
+    {{~end~}}
 }
+{{~end}}{{NAMESPACEBLOCK block~}}

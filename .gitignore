@@ -1,7 +1,7 @@
 **/bin/Debug/*
 **/bin/Release/*
+.swc/
 obj/
-packages/*/*
 *.bak
 *.orig
 *.pdb
@@ -11,7 +11,6 @@ packages/*/*
 Thumbs.db
 ErrorLog.db
 StyleCop.Cache
-Documentation/Samples/packages/*/*
 TestResults/
 .nupkg/
 .vs/
@@ -21,6 +20,4 @@ node_modules/
 /src/Serenity.Scripts/wwwroot/**/*.js
 /src/Serenity.Scripts/wwwroot/**/*.map
 /src/Serenity.Net.CodeGenerator/bin/
-/src/Serenity.Scripts/corelib/out/
-/src/Serenity.Scripts/corelib/dist/**/*.js
-/src/Serenity.Scripts/corelib/dist/**/*.map
+package-lock.json

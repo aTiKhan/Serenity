@@ -1,13 +1,29 @@
-﻿namespace Serenity.Data
-{
-    public class CaptureLogAttribute : Attribute
-    {
-        public CaptureLogAttribute(Type logRow)
-        {
-            LogRow = logRow ?? throw new ArgumentNullException(nameof(logRow));
-        }
+﻿namespace Serenity.Data;
 
-        public Type LogRow { get; private set; }
-        public string MappedIdField { get; set; }
+/// <summary>
+/// Enables capture logging for a row type
+/// </summary>
+public class CaptureLogAttribute : Attribute
+{
+    /// <summary>
+    /// Creates an instance of the attribute
+    /// </summary>
+    /// <param name="logRow">The log row type used for
+    /// this row type the attribute is placed on.</param>
+    /// <exception cref="ArgumentNullException"></exception>
+    public CaptureLogAttribute(Type logRow)
+    {
+        LogRow = logRow ?? throw new ArgumentNullException(nameof(logRow));
     }
+
+    /// <summary>
+    /// Log row type
+    /// </summary>
+    public Type LogRow { get; private set; }
+
+    /// <summary>
+    /// Gets / sets mapped ID field. It is tried to be
+    /// automatically determined if not specified.
+    /// </summary>
+    public string MappedIdField { get; set; }
 }

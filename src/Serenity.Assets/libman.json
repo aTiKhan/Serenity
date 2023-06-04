@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "defaultProvider": "cdnjs",
+  "libraries": [
+    {
+      "library": "bootstrap@5.2.3",
+      "destination": "wwwroot/bootstrap/",
+      "files": [
+        "js/bootstrap.bundle.js",
+        "js/bootstrap.bundle.js.map",
+        "js/bootstrap.bundle.min.js",
+        "js/bootstrap.bundle.min.js.map",
+        "css/bootstrap.css",
+        "css/bootstrap.min.css",
+        "css/bootstrap.rtl.css",
+        "css/bootstrap.rtl.min.css"
+      ]
+    },
+    {
+      "library": "bootstrap-icons@1.10.5",
+      "destination": "wwwroot/bootstrap-icons/",
+      "files": [
+        "font/bootstrap-icons.css",
+        "font/bootstrap-icons.min.css",
+        "font/fonts/bootstrap-icons.woff",
+        "font/fonts/bootstrap-icons.woff2"
+      ]
+    },
+    {
+      "library": "jquery@3.6.1",
+      "destination": "wwwroot/jquery",
+      "files": [
+        "jquery.js",
+        "jquery.min.js",
+        "jquery.slim.js",
+        "jquery.slim.min.js"
+      ]
+    },
+    {
+      "library": "mousetrap@1.6.5",
+      "destination": "wwwroot/mousetrap",
+      "files": [
+        "mousetrap.js",
+        "mousetrap.min.js"
+      ]
+    },
+    {
+      "library": "toastr.js@2.1.4",
+      "destination": "wwwroot/toastr",
+      "files": [
+        "toastr.css",
+        "toastr.min.js",
+        "toastr.js.map",
+        "toastr.min.css"
+      ]
+    }
+  ]
+}

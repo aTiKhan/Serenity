@@ -1,28 +1,66 @@
-﻿namespace Serenity.PropertyGrid
+using Serenity.Localization;
+
+namespace Serenity.PropertyGrid;
+
+public partial class BasicPropertyProcessor : PropertyProcessor
 {
-    public partial class BasicPropertyProcessor : PropertyProcessor
+    private string propertyItemsTextPrefix;
+
+    private string GetLocalizableTextValue<TAttribute>(IPropertySource source, string text,
+        Func<string> getSuffix, bool ignoreField = false)
+        where TAttribute : Attribute
     {
-        private void SetTitle(IPropertySource source, PropertyItem item)
+        if (PropertyItemsLocalTextRegistration.IsLocalTextKeyCandidate(text))
+            return text;
+
+        if (string.IsNullOrEmpty(text))
+            return text;
+
+        bool fromField = !ignoreField && 
+            source.BasedOnField is not null &&
+            source.Property?.GetAttribute<TAttribute>(false) is null &&
+            source.BasedOnField.GetAttribute<TAttribute>() is not null;
+
+        if (!fromField)
         {
-            if (source.Property != null)
+            if (propertyItemsTextPrefix is null)
             {
-                var attr = source.Property.GetCustomAttribute<DisplayNameAttribute>(false);
-                if (attr != null)
-                    item.Title = attr.DisplayName;
+                if (source.Property?.ReflectedType is not Type type)
+                    return null;
+
+                propertyItemsTextPrefix = PropertyItemsLocalTextRegistration
+                    .GetPropertyItemsTextPrefix(type) ?? "";
             }
 
-            if (item.Title == null)
-            {
-                var basedOnField = source.BasedOnField;
+            if (string.IsNullOrEmpty(propertyItemsTextPrefix))
+                return text;
+        }
 
-                if (basedOnField is object)
-                {
-                    item.Title = basedOnField.Caption is object ?
-                        basedOnField.Caption.Key : basedOnField.AutoTextKey;
-                }
-                else
-                    item.Title = item.Name;
-            }
+        if (getSuffix() is not string suffix)
+            return text;
+
+        return (fromField ? ("Db." + source.BasedOnField.Fields.LocalTextPrefix + ".") :
+            propertyItemsTextPrefix) + suffix;
+    }
+
+    private void SetTitle(IPropertySource source, PropertyItem item)
+    {
+        var attr = source.Property?.GetCustomAttribute<DisplayNameAttribute>(false);
+        if (attr != null)
+        {
+            item.Title = GetLocalizableTextValue<DisplayNameAttribute>(source, attr.DisplayName,
+                () => source.Property?.Name, ignoreField: true);
+            return;
+        }
+
+        if (item.Title == null)
+        {
+            var basedOnField = source.BasedOnField;
+
+            if (basedOnField is not null)
+                item.Title = basedOnField.Caption?.Key ?? basedOnField.AutoTextKey;
+            else
+                item.Title = source.Property?.Name;
         }
     }
 }

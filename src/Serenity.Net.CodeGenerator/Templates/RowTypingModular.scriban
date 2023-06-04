@@ -1,14 +1,14 @@
 ﻿
 export interface {{RowClassName}} {%{{}%}{{for f in Fields}}
-    {{f.Ident}}?: {{f.TSType}};{{end}}{{for j in Joins}}{{for k in j.Fields}}
-    {{k.Ident}}?: {{k.TSType}};{{end}}{{end}}
+    {{f.PropertyName}}?: {{f.TSType}};{{end}}{{for j in Joins}}{{for k in j.Fields}}
+    {{k.PropertyName}}?: {{k.TSType}};{{end}}{{end}}
 }
 
 export abstract class {{RowClassName}} {%{{}%}{{if Identity}}
     static readonly idProperty = '{{Identity}}';{{end}}{{if NameField}}
     static readonly nameProperty = '{{NameField}}';{{end}}
     static readonly localTextPrefix = '{{ModuleDot}}{{ClassName}}';
-	
+
     static readonly deletePermission = '{{Permission}}';
     static readonly insertPermission = '{{Permission}}';
     static readonly readPermission = '{{Permission}}';

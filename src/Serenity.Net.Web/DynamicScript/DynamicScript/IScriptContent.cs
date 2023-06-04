@@ -1,12 +1,37 @@
-﻿namespace Serenity.Web
+﻿namespace Serenity.Web;
+
+/// <summary>
+/// Cached dynamic script content
+/// </summary>
+public interface IScriptContent
 {
-    public interface IScriptContent
-    {
-        public string Hash { get; }
-        public DateTime Time { get; }
-        public byte[] Content { get; }
-        public bool CanCompress { get; }
-        public byte[] BrotliContent { get; }
-        public byte[] CompressedContent { get; }
-    }
+    /// <summary>
+    /// Hash of the cached content
+    /// </summary>
+    public string Hash { get; }
+
+    /// <summary>
+    /// Time the cached content is generated at
+    /// </summary>
+    public DateTime Time { get; }
+
+    /// <summary>
+    /// Uncompressed content
+    /// </summary>
+    public byte[] Content { get; }
+
+    /// <summary>
+    /// Returns true if the content can be compressed
+    /// </summary>
+    public bool CanCompress { get; }
+
+    /// <summary>
+    /// Compressed Brotli content
+    /// </summary>
+    public byte[] BrotliContent { get; }
+
+    /// <summary>
+    /// Compressed Gzip content
+    /// </summary>
+    public byte[] CompressedContent { get; }
 }

@@ -18,13 +18,13 @@ Slick._ = (() => {
   };
   var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-  // node_modules/@serenity-is/sleekgrid/src/core/index.ts
+  // src/core/index.ts
   var core_exports = {};
   __export(core_exports, {
     EditorLock: () => EditorLock,
-    Event: () => Event,
     EventData: () => EventData,
-    EventHandler: () => EventHandler,
+    EventEmitter: () => EventEmitter,
+    EventSubscriber: () => EventSubscriber,
     GlobalEditorLock: () => GlobalEditorLock,
     Group: () => Group,
     GroupTotals: () => GroupTotals,
@@ -48,16 +48,15 @@ Slick._ = (() => {
     titleize: () => titleize
   });
 
-  // node_modules/@serenity-is/sleekgrid/src/core/base.ts
+  // src/core/base.ts
   var NonDataRow = class {
     constructor() {
       this.__nonDataRow = true;
     }
   };
   var preClickClassName = "slick-edit-preclick";
-  typeof window !== "undefined" && window.Slick && (window.Slick.Map = Map);
 
-  // node_modules/@serenity-is/sleekgrid/src/core/column.ts
+  // src/core/column.ts
   var columnDefaults = {
     nameIsHtml: false,
     resizable: true,
@@ -69,7 +68,7 @@ Slick._ = (() => {
     selectable: true
   };
   function initializeColumns(columns, defaults) {
-    var _a, _b;
+    var _a;
     var usedIds = {};
     for (var i = 0; i < columns.length; i++) {
       var m = columns[i];
@@ -91,46 +90,69 @@ Slick._ = (() => {
       }
       usedIds[m.id] = true;
       if (m.name === void 0) {
-        m.name = titleize((_b = (_a = m.field) != null ? _a : m.id) != null ? _b : "");
+        m.name = titleize((_a = m.field) != null ? _a : m.id);
         delete m.nameIsHtml;
       }
     }
   }
-  function underscore(str) {
-    return (str != null ? str : "").replace(/([A-Z]+)([A-Z][a-z])/, "$1_$2").replace(/([a-z\d])([A-Z])/, "$1_$2").replace(/[-\s]/, "_").toLowerCase();
-  }
   function titleize(str) {
     if (!str)
       return str;
-    return underscore(str).replace(/\s/, "_").split("_").filter((x) => x.length).map((x) => x.charAt(0).toUpperCase() + x.substring(1).toLowerCase()).join(" ");
+    str = ("" + str).replace(/([A-Z]+)([A-Z][a-z])/, "$1_$2").replace(/([a-z\d])([A-Z])/, "$1_$2").replace(/[-\s]/, "_").toLowerCase();
+    return str.replace(/\s/, "_").split("_").filter((x) => x.length).map((x) => x.charAt(0).toUpperCase() + x.substring(1).toLowerCase()).join(" ");
   }
 
-  // node_modules/@serenity-is/sleekgrid/src/core/event.ts
+  // src/core/event.ts
   var EventData = class {
     constructor() {
       this._isPropagationStopped = false;
       this._isImmediatePropagationStopped = false;
     }
+    /***
+     * Stops event from propagating up the DOM tree.
+     * @method stopPropagation
+     */
     stopPropagation() {
       this._isPropagationStopped = true;
     }
+    /***
+     * Returns whether stopPropagation was called on this event object.
+     */
     isPropagationStopped() {
       return this._isPropagationStopped;
     }
+    /***
+     * Prevents the rest of the handlers from being executed.
+     */
     stopImmediatePropagation() {
       this._isImmediatePropagationStopped = true;
     }
+    /***
+     * Returns whether stopImmediatePropagation was called on this event object.\
+     */
     isImmediatePropagationStopped() {
       return this._isImmediatePropagationStopped;
     }
   };
-  var Event = class {
+  var EventEmitter = class {
     constructor() {
       this._handlers = [];
     }
+    /***
+     * Adds an event handler to be called when the event is fired.
+     * <p>Event handler will receive two arguments - an <code>EventData</code> and the <code>data</code>
+     * object the event was fired with.<p>
+     * @method subscribe
+     * @param fn {Function} Event handler.
+     */
     subscribe(fn) {
       this._handlers.push(fn);
     }
+    /***
+     * Removes an event handler added with <code>subscribe(fn)</code>.
+     * @method unsubscribe
+     * @param fn {Function} Event handler to be removed.
+     */
     unsubscribe(fn) {
       for (var i = this._handlers.length - 1; i >= 0; i--) {
         if (this._handlers[i] === fn) {
@@ -138,6 +160,18 @@ Slick._ = (() => {
         }
       }
     }
+    /***
+     * Fires an event notifying all subscribers.
+     * @param args {Object} Additional data object to be passed to all handlers.
+     * @param e {EventData}
+     *      Optional.
+     *      An <code>EventData</code> object to be passed to all handlers.
+     *      For DOM events, an existing W3C/jQuery event object can be passed in.
+     * @param scope {Object}
+     *      Optional.
+     *      The scope ("this") within which the handler will be executed.
+     *      If not specified, the scope will be set to the <code>Event</code> instance.
+     */
     notify(args, e, scope) {
       e = patchEvent(e) || new EventData();
       scope = scope || this;
@@ -151,7 +185,7 @@ Slick._ = (() => {
       this._handlers = [];
     }
   };
-  var EventHandler = class {
+  var EventSubscriber = class {
     constructor() {
       this._handlers = [];
     }
@@ -169,7 +203,7 @@ Slick._ = (() => {
         if (this._handlers[i].event === event && this._handlers[i].handler === handler) {
           this._handlers.splice(i, 1);
           event.unsubscribe(handler);
-          return;
+          return this;
         }
       }
       return this;
@@ -230,11 +264,24 @@ Slick._ = (() => {
     return e;
   }
 
-  // node_modules/@serenity-is/sleekgrid/src/core/editing.ts
+  // src/core/editing.ts
   var EditorLock = class {
+    /***
+     * Returns true if a specified edit controller is active (has the edit lock).
+     * If the parameter is not specified, returns true if any edit controller is active.
+     * @method isActive
+     * @param editController {EditController}
+     * @return {Boolean}
+     */
     isActive(editController) {
       return editController ? this.activeEditController === editController : this.activeEditController != null;
     }
+    /***
+     * Sets the specified edit controller as the active edit controller (acquire edit lock).
+     * If another edit controller is already active, and exception will be thrown.
+     * @method activate
+     * @param editController {EditController} edit controller acquiring the lock
+     */
     activate(editController) {
       if (editController === this.activeEditController) {
         return;
@@ -250,22 +297,43 @@ Slick._ = (() => {
       }
       this.activeEditController = editController;
     }
+    /***
+     * Unsets the specified edit controller as the active edit controller (release edit lock).
+     * If the specified edit controller is not the active one, an exception will be thrown.
+     * @method deactivate
+     * @param editController {EditController} edit controller releasing the lock
+     */
     deactivate(editController) {
       if (this.activeEditController !== editController) {
         throw "SleekGrid.EditorLock.deactivate: specified editController is not the currently active one";
       }
       this.activeEditController = null;
     }
+    /***
+     * Attempts to commit the current edit by calling "commitCurrentEdit" method on the active edit
+     * controller and returns whether the commit attempt was successful (commit may fail due to validation
+     * errors, etc.).  Edit controller's "commitCurrentEdit" must return true if the commit has succeeded
+     * and false otherwise.  If no edit controller is active, returns true.
+     * @method commitCurrentEdit
+     * @return {Boolean}
+     */
     commitCurrentEdit() {
       return this.activeEditController ? this.activeEditController.commitCurrentEdit() : true;
     }
+    /***
+     * Attempts to cancel the current edit by calling "cancelCurrentEdit" method on the active edit
+     * controller and returns whether the edit was successfully cancelled.  If no edit controller is
+     * active, returns true.
+     * @method cancelCurrentEdit
+     * @return {Boolean}
+     */
     cancelCurrentEdit() {
       return this.activeEditController ? this.activeEditController.cancelCurrentEdit() : true;
     }
   };
   var GlobalEditorLock = new EditorLock();
 
-  // node_modules/@serenity-is/sleekgrid/src/core/util.ts
+  // src/core/util.ts
   function addClass(el, cls) {
     if (cls == null || !cls.length)
       return;
@@ -323,7 +391,7 @@ Slick._ = (() => {
             v(el);
             continue;
           }
-          var key = k === "cssClass" ? "class" : k;
+          var key = k === "className" ? "class" : k;
           el.setAttribute(key, v === true ? "" : v);
         }
       }
@@ -342,7 +410,7 @@ Slick._ = (() => {
     return value;
   }
 
-  // node_modules/@serenity-is/sleekgrid/src/core/formatting.ts
+  // src/core/formatting.ts
   function defaultColumnFormat(ctx) {
     return escape(ctx.value);
   }
@@ -360,17 +428,17 @@ Slick._ = (() => {
     };
   }
   function applyFormatterResultToCellNode(ctx, html, node) {
-    var _a, _b, _c, _d;
-    var oldFmtAtt = (_a = node.dataset) == null ? void 0 : _a.fmtatt;
+    var _a, _b;
+    var oldFmtAtt = node.dataset.fmtatt;
     if ((oldFmtAtt == null ? void 0 : oldFmtAtt.length) > 0) {
       for (var k of oldFmtAtt.split(","))
         node.removeAttribute(k);
       delete node.dataset.fmtatt;
     }
-    var oldFmtCls = (_b = node.dataset) == null ? void 0 : _b.fmtcls;
+    var oldFmtCls = node.dataset.fmtcls;
     if ((oldFmtCls == null ? void 0 : oldFmtCls.length) && ctx.addClass != oldFmtCls) {
       removeClass(node, oldFmtCls);
-      if (!((_c = ctx.addClass) == null ? void 0 : _c.length))
+      if (!((_a = ctx.addClass) == null ? void 0 : _a.length))
         delete node.dataset.fmtcls;
     }
     var oldTooltip = node.getAttribute("tooltip");
@@ -391,22 +459,48 @@ Slick._ = (() => {
         node.dataset.fmtatt = keys.join(",");
       }
     }
-    if ((_d = ctx.addClass) == null ? void 0 : _d.length) {
+    if ((_b = ctx.addClass) == null ? void 0 : _b.length) {
       addClass(node, ctx.addClass);
       node.dataset.fmtcls = ctx.addClass;
     }
   }
 
-  // node_modules/@serenity-is/sleekgrid/src/core/group.ts
+  // src/core/group.ts
   var Group = class extends NonDataRow {
     constructor() {
       super(...arguments);
       this.__group = true;
+      /**
+       * Grouping level, starting with 0.
+       * @property level
+       * @type {Number}
+       */
       this.level = 0;
+      /***
+       * Number of rows in the group.
+       * @property count
+       * @type {Number}
+       */
       this.count = 0;
+      /***
+       * Whether a group is collapsed.
+       * @property collapsed
+       * @type {Boolean}
+       */
       this.collapsed = false;
+      /**
+       * Rows that are part of the group.
+       * @property rows
+       * @type {Array}
+       */
       this.rows = [];
     }
+    /***
+     * Compares two Group instances.
+     * @method equals
+     * @return {Boolean}
+     * @param group {Group} Group instance to compare to.
+     */
     equals(group) {
       return this.value === group.value && this.count === group.count && this.collapsed === group.collapsed && this.title === group.title;
     }
@@ -415,11 +509,17 @@ Slick._ = (() => {
     constructor() {
       super(...arguments);
       this.__groupTotals = true;
+      /***
+       * Whether the totals have been fully initialized / calculated.
+       * Will be set to false for lazy-calculated group totals.
+       * @param initialized
+       * @type {Boolean}
+       */
       this.initialized = false;
     }
   };
 
-  // node_modules/@serenity-is/sleekgrid/src/core/range.ts
+  // src/core/range.ts
   var Range = class {
     constructor(fromRow, fromCell, toRow, toCell) {
       if (toRow === void 0 && toCell === void 0) {
@@ -431,15 +531,27 @@ Slick._ = (() => {
       this.toRow = Math.max(fromRow, toRow);
       this.toCell = Math.max(fromCell, toCell);
     }
+    /***
+     * Returns whether a range represents a single row.
+     */
     isSingleRow() {
       return this.fromRow == this.toRow;
     }
+    /***
+     * Returns whether a range represents a single cell.
+     */
     isSingleCell() {
       return this.fromRow == this.toRow && this.fromCell == this.toCell;
     }
+    /***
+     * Returns whether a range contains a given cell.
+     */
     contains(row, cell) {
       return row >= this.fromRow && row <= this.toRow && cell >= this.fromCell && cell <= this.toCell;
     }
+    /***
+     * Returns a readable representation of a range.
+     */
     toString() {
       if (this.isSingleCell()) {
         return "(" + this.fromRow + ":" + this.fromCell + ")";
@@ -450,4 +562,4 @@ Slick._ = (() => {
   };
   return __toCommonJS(core_exports);
 })();
-["Editors", "Formatters", "Plugins"].forEach(ns => Slick._[ns] && (Slick[ns] = Object.assign(Slick[ns] || {}, Slick._[ns])) && delete Slick._[ns]); Object.assign(Slick, Slick._); delete Slick._;
+["Data", "Editors", "Formatters", "Plugins"].forEach(ns => Slick._[ns] && (Slick[ns] = Object.assign(Slick[ns] || {}, Slick._[ns])) && delete Slick._[ns]); Object.assign(Slick, Slick._); delete Slick._; Slick.Event = Slick.EventEmitter; Slick.EventHandler = Slick.EventSubscriber; typeof Map !== 'undefined' && (Slick.Map = Map);

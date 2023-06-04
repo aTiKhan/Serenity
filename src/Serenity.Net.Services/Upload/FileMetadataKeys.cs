@@ -1,7 +1,12 @@
-﻿namespace Serenity.Web
+﻿namespace Serenity.Web;
+
+/// <summary>
+/// Contains file metadata key constants
+/// </summary>
+public static class FileMetadataKeys
 {
-    public static class FileMetadataKeys
-    {
-        public const string OriginalName = "OriginalName";
-    }
+    /// <summary>
+    /// Original name of the file
+    /// </summary>
+    public const string OriginalName = "OriginalName";
 }

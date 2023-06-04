@@ -1,8 +1,13 @@
 ﻿
-namespace Serenity.Services
+namespace Serenity.Services;
+
+/// <summary>
+/// The request model for an undelete service
+/// </summary>
+public class UndeleteRequest : ServiceRequest
 {
-    public class UndeleteRequest : ServiceRequest
-    {
-        public object EntityId;
-    }
+    /// <summary>
+    /// The entity ID to undelete
+    /// </summary>
+    public object EntityId;
 }

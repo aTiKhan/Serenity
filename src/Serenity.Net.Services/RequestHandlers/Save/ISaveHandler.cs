@@ -1,16 +1,15 @@
-﻿namespace Serenity.Services
-{
-    public interface ISaveHandler<TRow, TSaveRequest, TSaveResponse>
-        : ICreateHandler<TRow, TSaveRequest, TSaveResponse>, IUpdateHandler<TRow, TSaveRequest, TSaveResponse>
-        where TRow : class, IRow, IIdRow, new()
-        where TSaveRequest : SaveRequest<TRow>, new()
-        where TSaveResponse : SaveResponse, new()
-    {
-    }
+﻿namespace Serenity.Services;
 
-    public interface ISaveHandler<TRow> : ISaveHandler<TRow, SaveRequest<TRow>, SaveResponse>,
-        ICreateHandler<TRow>, IUpdateHandler<TRow>
-        where TRow : class, IRow, IIdRow, new()
-    {
-    }
+/// <summary>
+/// Interface for save request handlers with custom request / response types.
+/// </summary>
+/// <typeparam name="TRow">Row type</typeparam>
+/// <typeparam name="TSaveRequest">Save request type</typeparam>
+/// <typeparam name="TSaveResponse">Save response type</typeparam>
+public interface ISaveHandler<TRow, TSaveRequest, TSaveResponse>
+    : ICreateHandler<TRow, TSaveRequest, TSaveResponse>, IUpdateHandler<TRow, TSaveRequest, TSaveResponse>
+    where TRow : class, IRow, IIdRow, new()
+    where TSaveRequest : SaveRequest<TRow>, new()
+    where TSaveResponse : SaveResponse, new()
+{
 }

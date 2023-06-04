@@ -1,3 +1,500 @@
+## 6.7.6 (2023-05-24)
+
+Features:
+  - Abstracted script and css minifier dependencies, so that another minifier can be used instead of NUglify for bundling
+  - Added experimental `esbuild` based minifier [StartSharp]
+  - Updated preact in Serenity.Assets to 10.14.1
+  - Added `/** jsxImportSource jsx-dom */` to files where jsx-dom are used, so that it can understood which library is used without relying on the default in tsconfig.json
+  - Rewrote EmailClient with ES modules and preact, removed Serenity.Pro.UI package as it was only ever used by EmailClient. [StartSharp]
+  - Improve look and feel of e-mail client [StartSharp]
+  - Added a mock IMAP server implementation to EmailClient for demo purposes
+  - [BREAKING CHANGE] `Serenity.Pro.UI` package is now obsoleted as it was only used by the old email client. It will not get any new versions and you should remove its reference from your project file.
+  - Changed default jsxImportSource back to `preact` in tsconfig.json [StartSharp]
+  - `<environmentVariable name="ASPNETCORE_ENVIRONMENT" value="Development" />` line which was in `web.config` for development purposes is removed. If you deploy to IIS and did not remove that line in your production site after publishing, you should.
+
+Bugfixes:
+  - Resolve issue with enum / select editors causing display text to be saved instead of value in dropdown editors [StartSharp]
+
+## 6.7.5 (2023-05-21)
+
+Features:
+  - added ExtensionBlacklistInclude, ExtensionBlacklistExclude, ExtensionWhitelistInclude and ExtensionWhitelistExclude that allows including, excluding extensions from defaults without having to write all the extensions again
+  - update bootstrap icons to 1.10.5
+  - trigger panelopening, panelopened, panelclosing, panelclosed events on window while a panel is closing / opening
+
+Bugfixes:
+  - email client now working due to preact not included in appsettings.bundles.json [StartSharp]
+  - enable System.Drawing.Common 6.0 in linux by adding runtimeconfig.template.json file [StartSharp]
+  - fix failing source gen tests caused by line endings [StartSharp]
+  
+## 6.7.2 (2023-05-13)
+
+Features:
+  - Generated API documentation for `@serenity-is/corelib` and `@serenity-is/sleekgrid` packages via `TypeDoc` and made them available at `https://serenity.is/docs` under `Api Reference (TypeScript)` section.
+  - Added `jsx-dom` integration which is a library similar to React. but which directly creates HTML elements instead of using a `VDOM`. It offers better compatibility with existing Serenity `Widget` structure that use `jQuery` and contains code that modify `DOM` directly. It will mostly be used in `renderContents()` method instead of the `getTemplate()` so that events can be bound at widget creation, and references to elements can be acquired. There is currently no dependency to `jsx-dom` in `@serenity-is/corelib` itself but it exposes a `jsxDomWidget` method than can be used to create a `jsx-dom` compatible functional component from a widget type, like `var StringEditor_ = jsxDomWidget(StringEditor); <StringEditor_ readonly={true} maxlength={50} />`.
+  - Switched to JSX automatic runtime (https://www.typescriptlang.org/tsconfig#jsxImportSource) in `StartSharp` by setting `"jsx": "react-jsx"` and `"jsxImportSource": "jsx-dom"` in `tsconfig.json`. If you need to use `React` or `Preact` etc. in one your `.tsx` files, you may switch the runtime by adding a pragma comment on top of the file like `/** @jsxImportSource react */`.
+  - `**/*Page.tsx` files are also considered as ESM entry points for `esbuild` in `tsbuild` and `sergen`.
+  - Adapted membership page codes in StartSharp to use `jsx-dom` by renaming them first from `XYZPage.ts` to `XYZPage.tsx` and using `renderContents` instead of `getTemplate`.
+  - Added `useIdPrefix()` and `Widget.useIdPrefix()` methods to make it easier to generate unique ID's based on the Widget's idPrefix in `jsx-dom` based code similar to `~_` prefix in classic templates.
+  - `findElementWithId` method can optionally accept a context parameter that controls where the search is performed. This is useful for detached elements (e.g. not added to document yet) created by `jsx-dom` to locate cascading etc. elements.
+  - Replaced `toastr` with an embedded version rewritten in TypeScript adapted from `https://raw.githubusercontent.com/JPeer264/toastr2/master/src/Toastr.ts`. This will make it possible to show notifications which failed when `toastr.js` is not loaded in the page. You may remove `toastr.js` from `appsettings.bundles.json` but leave `toastr.css` for now as it is still required.
+  - CardViewMixin can accept `jsx-dom` based card templates in addition to React ones.
+  - Moved `corelib` and `tsbuild` to root `packages/` folder from `src/Serenity.Scripts/` in Serenity repository.
+  - Improved `globalExternals` optimization in `tsbuild` so that it generates less number of chunks on build.
+  - Increased test coverage for `@serenity-is/corelib/q` methods and refactored test files (`.spec.ts`) to be next to the files (`.ts`) they have tests for.
+  - Added async versions of Authorization script methods like `Q.Authorization.userDefinitionAsync` which should be preffered over sync counterparts where possible.
+  - IExceptionLogger interface is obsolete! Please log exceptions directly via .NET's ILogger interface and its LogError method. StartSharp users should replace `app.UseExceptional()` line with `app.UseExceptionLogger()` in Startup.cs, which also enables implicit logging to `StackExchange.Exceptional` via `InformationalException` type.
+  - Added InformationalException type that will be used to log via ILogger interface to Exceptional
+  - Updated `@serenity-is/sleekgrid` to 1.6.0.
+  - [Breaking Change] parseDate and parseISODateTime functions returns an Invalid Date instance (e.g. its `.valueOf()` method returns `NaN`) instead of "false" or "null" as they used to be, which was a wrong decision at time. It was causing invalid dates to be considered equal to empty dates sometimes. Javascript `Date` constructor also returns a Date instance with `NaN` value for invalid dates.
+  - Round calculated width when scale / delta parameters are specified in DataGrid, which is true for latest theme.
+  - Normalized all the line endings to LF in Serenity, common-features and StartSharp repository via a `.gitattributes` file.
+  - Made DefaultRowTypeRegistry use typeSource on every call to the AllRowTypes (#6776) so that if the ITypeSource implementation returns a dynamic list of types, it can pick them.
+  - Introduced new `UI Elements` sample pages containing Bootstrap components, Icon classes etc. [StartSharp]
+  - Removed RuntimeCompilation as Hot Reload does the same thing [StartSharp]
+
+Bugfixes:
+  - Referencing generic types in generated form type short name assignments which caused problems with `Widget<any>` in TypeScript
+  - AutoValidateAntiforgeryIgnoreBearerFilter were logging another message when antiforgery validation failed
+  - Fix lazy android check in jquery.maskedinput.js introduced a few versions back.
+
+## 6.7.1 (2023-04-07)
+
+Features:
+  - Added IUploadFileResponder interface, whose default implementation will only send text/plain, application/pdf, and ones whose mime type starting with image/ as inline, and rest as application/octet-stream with content-disposition attachment for security purposes. Please use it in your FilePage.cs Read method. See the latest `FilePage.cs` in StartSharp/Serene repository.
+  - [BREAKING CHANGE] moving ExtensionBlacklist to UploadSettings from IUploadOptions. Added an ExtensionWhitelist that only allows usual extensions by default (.3gp;.7z;.ai;.avi;.bmp;.csv;.doc;.docx;.eps;.jpg;.jpeg;.json;.gif;.gz;.ico;.mpg;.mpeg;.mp3;.mp4;.mkv;.pdf;.png;.ppt;.pptx;.psd;.rar;.rtf;.svg;.tif;.tiff;.txt;.wav;.webm;.webp;.xls;.xlsx;.xml;.xps;.zip;). You'll need to override them in appsettings.json if you need more extensions (UploadSettings:ExtensionWhitelist, UploadSettings:ExtensionBlacklist)
+  - updated missing translations in Serene/StartSharp/Serenity
+  - use ASP.NET Core's FileExtensionContentTypeProvider instead of manually listing known mime types
+
+## 6.7.0 (2023-04-06)
+
+Features:
+
+  - **[WARNING!]** This release focuses on addressing potential security issues that were recently discovered by Fabian Densborn from SEC Consult. Serene/StartSharp users must either create a new project from the 6.7.0+ template or manually apply the relevant changes from this commit to their existing applications after updating Serenity packages to 6.7.0+: https://github.com/serenity-is/serene/commit/6dce8162f4382badd429a9f0f1470acb64e8c4fd
+    
+  - Serenity.is would like to express gratitude to Fabian Densborn for his discovery, analysis, and coordination, as well as the SEC Consult Vulnerability Lab (https://www.sec-consult.com) for responsibly reporting the identified issues and collaborating with us as we addressed them.
+    
+  - Added the option to use ClamAV (https://www.clamav.net/) as an antivirus scanner for temporary uploads. To enable it, add `services.ConfigureSection<Serenity.Extensions.ClamAVSettings>(Configuration);` and `services.AddSingleton<IUploadAVScanner, Serenity.Extensions.ClamAVUploadScanner>();` to your Startup.cs after upgrading to Serenity/Serenity.Extensions 6.7.0+. Consult ClamAV documentation on how to install it on your platform. This feature will be enabled by default once these changes have been made in Startup.cs. If you want to disable it for development purposes, set ClamAV:Enabled to false in your appsettings.Development.json (not recommended for production!).
+    
+  - Added extensionless and `.htm`/`.html` to the upload file extensions blacklist by default. An attacker can include malicious scripts in such an HTML file, send an administrative user a link to that file via email, and if the administrative user is already logged in to the site while clicking the link, the script can call services, perform actions, etc. on behalf of the user as the cookies are sent by the browser.
+    
+  - Ensured that the Forgot password page does not reveal information to identify whether a user with the entered email exists.
+    
+  - Ensured that reset password tokens can only be used once. They already expired in 3 hours, but if an attacker could see the link within that time frame (e.g., by eavesdropping), they could use it to change the password again.
+
+## 6.6.6 (2023-04-04)
+
+Bugfixes:
+  - Fix empty text can't be used as DisplayName in forms/columns
+
+## 6.6.5 (2023-04-04)
+
+Bugfixes:
+  - [BREAKING CHANGE] removing legacy AsyncLookupEditor from corelib as it is getting mixed up with AsyncLookupEditorAttribute in server side which is just a LookupEditor with Async = true
+  
+## 6.6.4 (2023-04-03)
+
+Features:
+  - Added default support for new languages including Arabic, Bangla, Czech, French, Hindi, Indonesian, Japanese, Korean, Dutch, Romanian, Swedish, Chinese Traditional. Used machine translation for all these languages in addition to the existing languages. As these may not always be the best possible translations, any pull requests with improved texts are welcome.
+  - Used embedded resources under texts/resources folder for JSON translation files instead of static web assets under wwwroot/texts as these files are not meant to be directly accessed via web. This will also reduce number of published files, and simplify deployment.
+  - Introduced quick filter option in Translations page to show/hide user translated and text that has any translation in the target language. There are also buttons to export translated values / original values to make translation easier. Each translation resource folder also contains a template JSON file in English language that can be used as source.
+  - ITypeSource may return its assemblies if available via the new IGetAssemblies interface
+  - Introduce LanguageIdKeyPair to use as dictionary key in LocalTextRegistry.
+  - Added IGetAllTexts interface to LocalTextRegistry to return all registered texts
+  - Added ILanguageFallbacks interface for LocalTextRegistry to get/set language fallbacks.
+  - Added initialization support to LocalText directly, so that readonly localtexts can be used in nested text classes without having analyzer warnings
+  - PropertyItemsLocalTextRegistration to register texts defined implicitly via DisplayName, Tab, Category, Hint, Placeholder attributes in Forms/Columns so that they can be seen/translated in Translations page
+  - Also handle Hint, Placeholder, Category, Tab attributes for Row/Entity local text registration
+  - NavigationLocalTextRegistration to register texts for navigation items from attributes
+  - Moved NavigationItemAttribute down to Serenity.Core from Serenity.Web
+  - Site local text package has a default regex that will be included in addition to anything you define in appsettings.bundles.json, so you may remove LocalTextPackages section from your appsettings.json unless you included some additional texts there.
+
+Bugfixes:
+  - Fix fields without displayname attributes are shown with their local text keys in grids/forms. Use the propertyname as implicit display name.
+  - Crash in Arabic culture in the constructor of ScriptCulture
+
+## 6.6.3 (2023-03-24)
+
+Features:
+  - Adjust brotli and gzip compression levels based on content length, caching duration and bundle type etc. as brotli with its default level is too slow, sometimes 100 times slower than gzip default level
+  - Add getRowDefinition() method to return row type and read idProperty etc. from there.
+
+Bugfixes:
+  - Inline editing required fields that does not have NotNull/Required flag.
+
+## 6.6.2 (2023-03-23)
+
+Bugfixes:
+  - Generated navigation link referred to the old page class name ending with Controller
+
+## 6.6.1 (2023-03-18)
+
+Bugfixes:
+  - Criteria parser with params failed in some cases, especially with IN statements like 'a in @values'. Note that you can't use parens there, e.g. `a in (@values)` is invalid unlike SQL.
+
+## 6.6.0 (2023-03-14)
+
+Features:
+  - Added a new Criteria builder functionality, so that criteria can be defined easier without having to remember the JSON array structure. E.g. instead of `[['SomeField'], Criteria.Operator.in, [[1, 2, 3]]]` you can write `Criteria('SomeField').in([1, 2, 3])`, or instead of `[Criteria.Operator.isNull, ['SomeField']]` you can write `Criteria('SomeField').isNull()` with intellisense support.
+  - Introduced ability to parse criteria from an SQL like expression at client side, e.g. `request.Criteria = Criteria.and(request.Criteria, Criteria.parse('A = 'b' and B > 5 and (C in (1, 2, 3) or D like 'x%'))`
+  - It can also parse parameterized expressions similar to Dapper: `Criteria.parse("xyz = @p1 and abc like @p2", { p1: 5, p2: 'test%' })`
+  - There is also a third recommended option using tagged string literals: `` Criteria.parse`xyz = ${15} and abc like ${'b%'}` ``
+  - Converted all basic samples pages (Serenity.Demo.BasicSamples) to fully modular code, e.g. ESM
+  - Converted all advanced samples pages (Serenity.Demo.AdvancedSamples) to fully modular code, e.g. ESM [StartSharp]
+  - Renamed all page controllers so that they use Page.cs suffix instead of Controller suffix. This made it more consistent, as their file names ended with Page.cs while the type they contained was named Controller.
+  - Renamed all service endpoint controllers so that they use Endpoint.cs suffix
+  - ServiceEndpoint now derives from ControllerBase instead of Controller as services should not normally return views. If you returned view from a service endpoint for any reason, you'll need to move it to a controller. The endpoints generated by Sergen will have Endpoint suffix instead of Controller suffix. Similarly, pages will have Page suffix.  
+  - Updated sergen and Pro.Coder so that it works fine with controllers without Controller suffix, e.g. XYZPage or XYZEndpoint
+  - There is now a new source generator in `Serenity.Pro.Coder` that generates full paths to ESM modules, just like MVC does it for view paths. This will allow referencing ESM module scripts with compile time check and intelli-sense [StartSharp].
+  - Sergen now has a `ForeignFieldSelection` option that defaults to `All`. When it is `NameOnly` it will bring only the name field from foreign rows instead of all fields, so that your entities will be smaller and will cause less issues when a joined row's fields are renamed / removed. When it is `None` no foreign view fields will be generated.
+  - There is now a `IncludeForeignFields` option in sergen.json that allows including more fields by their field names, when the `ForeignFieldSelection` is `None` or `Name`.
+  - Added `FileScopedNamespaces` option to sergen.json so that the generated code can use the file scoped namespace feature in C# 10.
+  - Added `DeclareJoinConstants` option to sergen.json. When true generated rows will have join constants like `const string jCustomer = nameof(Customer)` and it will be used in expressions. This will make it easier to rename a join alias and use Origin etc. attributes.
+  - Added `EnableRowTemplates` option to sergen.json so that the generated row will define the `RowTemplate` class supported by `Serenity.Pro.Coder` [StartSharp]
+  - Added `OmitDefaultSchema` option to sergen.json. When it is true, the default schema name, e.g. "dbo" for SQL Server won't be emitted in generated field expressions in Row.cs
+  - Added `SaveGeneratedTables` option to sergen.json. When set to false, sergen will not save connection settings and table options like Identifier, Module etc. back to sergen.json after code generation.
+  - Added TSBuild -> EntryPoints setting to sergen.json. This is a list of globs for ESM entry points which defaults to `**/*Page.ts` and `**/*ScriptInit.ts`. This globs if specified are read by `tsbuild` script and the new ESM module paths source generator.
+  - There is a new JSON schema for sergen.json that will be picked up by Visual Studio automatically so that you can have intellisense support and descriptions while editing sergen.json files.
+  - It is now possible to use "Extends" function in sergen.json similar to tsconfig.json to extend the settings from a base file.
+  - A special type of extends value can be used to extend from defaults. E.g. when you set `"Extends": "defaults@6.6.0"` your settings will be extended from the defaults we set for 6.6.0 version of Sergen. The values for `defaults6.6.0` are: `DeclareJoinConstants: true, EndOfLine: LF, FileScopedNamespaces: true, ForeignFieldSelection: NameOnly, OmitDefaultSchema: true, SaveGeneratedTables: false, Restore: Exclude Files/Typings, ServerTypings -> LocalTexts: true`. This way you can use modern recommended defaults, while keeping backward compatibility for those who still want to use old defaults.
+  - Simplified scriban templates in Sergen
+  - [Breaking Change] CKEditorBasePath default is changed to "~/Serenity.Assets/Scripts/ckeditor/" instead of the obsolete one "~/Scripts/ckeditor/".
+- Added more hooks and injection points in `GridEditController` so that it is now possible to dynamically set editor parameters, use a different editor type in a column for different rows, implement cascaded dropdowns etc. [StartSharp]
+  - Moved GridPage related extensions and types to Serenity.Extensions so that it can be used in feature projects
+  - It is now recommended to remove GridPageModel, GridPage.cshtml from your Serene/StartSharp and use the one in Serenity.Extensions instead
+  - The module for GridPage, e.g. SomePage.ts should have a default export function pageInit() instead of a jQuery ready script so that it can be passed options from controller/model and tested properly. jQuery ready is also generally not necessary for ES modules.
+  - There is now a PanelPage extension that creates a PanelDiv instead of a GridDiv.
+  - GridPage and PanelPage uses ModelPage extension which accepts a ModulePageModel that includes additional parameters like HtmlMarkup, Options to pass to the default export in page module, Layout, PageId etc. parameters.
+  - Obsoleted EnvironmentSettings.IsPublicDemo and used preprocessor directives instead
+  - Introduced s-site-logo-img class which allows specifiying the site logo for a img via its content property, so that the site logo for all pages like login, sidebar etc. can be changed from one location by overriding css rule like .s-site-logo-img { content: url(.../mylogo.png); } etc.
+  - There is also a s-form-title-logo class that adjusts the look of logo in the forms, e.g. rounded with sidebar band background. It might be used to adjust logo styling by overriding its css rules.
+  - Removed all the .cshtml files for membership related pages like Login, Signup, Reset etc. and moved their script code into Page.ts files so that it can be checked at compile time.
+  - [BREAKING CHANGE] There is no longer a globally defined Q.Lookup interface while using ES modules. If you referenced it in some modular code, you should `import { Lookup } from "serenity-is/corelib/q"` and replace `Q.Lookup` with `Lookup` in your project.
+  - IEditDialog.load methods fail argument made optional. It was normally optional but did not seem so in the typing.
+  - Arrange method in dialog type made public instead of protected
+  - Sergen prefers importing from `@serenity-is/corelib/q` instead of `@serenity-is/corelib` for types that are exported from both modules, like ServiceResponse, PropertyItem etc. This helps with `dts-generator` tool as it has problems with types with same names that are imported from multiple modules.
+  - Introduced DefaultSectionKeyAttribute so that settings can be configured by their default section key via the new ConfigureSection extension
+
+Bugfixes:
+  - Fixed styling for EntityGridDialog panel
+  - jQuery UI datepicker was showing under the dialog when using it in a inline editing grid inside a dialog [StartSharp]
+  - Remove loading class from parent element as select2 will only remove the class from the input
+  - fix error when trying to to use Q.formatDate outside of 10:00 and 19:59 with format 'dd.mm.yyyy hh:mm' (#6723)
+
+## 6.5.4 (2023-02-28)
+
+Features:
+  - Implemented OpenID Authorization Code Flow, e.g. logging via the web site instead of with user/password in mobile / desktop apps `[StartSharp]`.
+  - [BREAKING CHANGE] The services required for OpenIdAuthorizationControllerBase is changed, so you should get latest version of `OpenIdAuthorizationController.cs` from the StartSharp repository if you have that in your project.
+
+Bugfixes:
+  - Handle the case where select2 is destroyed before the request is completed or timer fires
+  - Fixed icon for FileDownloadFormatter
+  - SelectEditor with async source should not update/clear its items when cascade value change etc.
+  - Resolve issue with group by in oracle due to alias starting with underscore
+
+## 6.5.3 (2023-02-27)
+
+Features:
+  - Add virtual methods / protected members to DefaultSqlConnections / DefaultConnectionStrings for better extensibility
+  - Changed update button text in german to Aktualisieren instead of Bearbeitung which was reported to be incorrect (#6689)
+  
+Bugfixes:
+  - Fix field size not set to the correct variable, possibly affecting precision/scale
+  - BasePermissionAttribute should accept null values for compatibility
+
+## 6.5.2 (2023-02-21)
+
+Features:
+  - Added SqlNow, SqlUtcNow, SqlDateTimeOffset, Case, CaseSwitch, Coalesce dynamic expression attributes
+  - Added ability to use another type of expression attribute as arguments to the dynamic expression attributes, e.g. use SqlNow etc. in a DateDiff attribute like: `[DateDiff(DateParts.Day, typeof(SqlNowAttribute), "t0.ReleaseDate")]`
+  - Add ability to get/set the groupitemmetadataprovider in RemoteView
+  - DraggableGroupingMixin will try to create and auto register GroupItemMetadataProvider itself if it is not already registered and pass it to the view
+  - Make SqlConnections available to use for the derived classes of RowLookupScripts
+  - Added `ISiteAbsoluteUrl` abstraction to access web site's internal (local) and external (public) url's and `EnviromentSettings:InternalSiteUrl` setting that takes precedence over request's base URI, and SiteExternalUrl for report callbacks.  
+  - Refactored HTML to PDF conversion process via new `IHtmlToPdfConverter`, `IHtmlReportPdfRenderer`, `IHtmlReportRenderUrlBuilder` abstractions
+  - [BREAKING CHANGE] To register the default implementations for `IHtmlToPdfConverter`, `IHtmlReportPdfRenderer` etc. services.AddReporting should be called instead of services.AddExcelExporter in Startup.cs.
+  - Added new `HtmlToPdfOptions` class that implements `IHtmlToPdfOptions` like the converters.
+  - Completely redesigned and refactored reporting system and abstractions via new `IReportFactory`, `IReportRenderer`, `IReportRetrieveHandler`, `IReportTreeFactory` interfaces. Make sure to call `services.AddReporting()` in Startup.cs.
+  - Added Puppeteer based HTML to PDF converter implementation with Chrome and experimental Firefox option [StartSharp]. `services.AddPuppeteerHtmlToPdf` should be called before `services.AddReporting` line to use Puppeteer instead of WKHtmlToPdf. To make some old reports keep using old WKHtmlToPdf based converter, add `[UseWKHtmlToPdf(true)]` attribute on the report classes.
+  - `TemplateHelper.RenderViewToString` can access the current request/action context if available
+  - Added experimental `HtmlReportFileUrlBuilder` that can use a temporary folder, instead of a callback for HTML report rendering.
+
+Bugfixes:
+  - MultipleUploadEditor should selecting multiple files in upload dialog
+  - Fix Criteria.Exist for sqlite as it does not like double parenthesis (#6687)
+  - Group summaries was not displayed in some cases like when the group item metadata provider is not passed to the view options
+  - File watcher should not try to create watcher if the directory does not exist
+  - Add section.content for proper layout when opening panels if the navigation is hidden e.g. hideNav=1
+
+## 6.5.1 (2023-02-03)
+
+Features:
+ - Introduced new BaseExpressionAttribute which allows inherited expression attributes to perform translation based on target dialect. Also the dialect itself can customize the translation by implementing the new ISqlExpressionTranslator interface.
+ - New ConcatAttribute, DatePartAttribute and DateDiffAttribute dynamic SQL expression types that generates expression based on server type.
+ - Optional Format for expression attribute types
+ - Allow overriding field size via attribute
+ - Allow specifying join alias in OriginAttribute indirectly via propery name of a property with LeftJoinAttribute
+ - New useCssVars option in SleekGrid that allows using inline css variables at grid container element to position columns instead of a CSS stylesheet appended to the head
+ - Don't swallow exception in source generators so that issues can be identified if any [StartSharp]
+ 
+Bugfixes:
+  - LookupScriptRegistration should not try to run for abstract classes.
+  - Fix typo in Sum aggregator name and aggregator display texts
+
+## 6.5.0 (2023-01-26)
+
+Features:
+ - [BREAKING CHANGE] Updating Microsoft.Data.SqlClient to 5.1.0. As Encrypt=true became the default in 4.x+ (https://techcommunity.microsoft.com/t5/sql-server-blog/released-general-availability-of-microsoft-data-sqlclient-4-0/ba-p/2983346) it may cause connections to fail. Please see the linked doc, and either install a trusted certificate in your SQL server (recommended!), or set TrustServerCertificate=true or Encrypt=false in your connection strings both in development and deployment/production!
+ - Updated packages including Newtonsoft.json to 13.0.2, SixLabors.ImageSharp to 2.1.3, NUglify to 1.20.4, Microsoft.Build to 17.3.2, Spectre.Console to 0.46.0, Npgsql to 7.01, MySqlConnector to 2.2.5, Microsoft.Data.Sqlite to 7.0.2, FirebirdSql.Data.FirebirdClient to 9.11, Scriban to 5.5.2
+ - Html encode jquery validator messages in showLabel function
+ - Updated SleekGrid to 1.5.3 which includes useCssVars option to use css vars for cell positioning instead of dynamic stylesheet (up to 50 columns). This should reduce amount of css reflows on page load etc. It is not enabled by default yet.
+
+## 6.4.10 (2023-01-24)
+
+Bugfixes:
+ - propertygrid should htmlEncode field captions
+ - draggabble grouping mixin should htmlEncode grouped column captions
+
+## 6.4.9 (2023-01-21)
+
+Bugfixes:
+  - [WARNING!] If htmlEncode is not called when using local texts in ascript method (e.g. `<div>{ text("SomeKey") }</div>` instead of `<div>{htmlEncode(text("SomeKey")) }</div>`, like getTemplate etc. an attackermay use the translations screen to inject javascript. This affected partsof our demo as everyone can login as admin and can use the translationscreen. The translations are reset every 30 mins in our demo so it was nota big issue. But you are strongly recommended to check your own code inaddition to standard screens like login, reset password etc. See ourlatest commits in Serene/StartSharp/Common Features, etc. repositories forfixes we applied. Even if no one other than the admin can entertranslations screen, it is still a good idea to mitigate the risk as youshould not trust translators, even the admin himself. We can't change the"text" or "tryGetText" functions to htmlEncode by default, as they may beused by others in contexts other than HTML like functions which expectsraw text like notify messages, dialog titles, column titles etc., whichwould result in double HTML encoding. Prefer localText() function insteadof obsolete text() function for better discoverability (but it does notencode as well)
+
+  - [BREAKING CHANGE] htmlEncode now also encodes single and double quotes just like attrEncode. This is done to avoid cases where a developer might use htmlEncode in an attribute instead of attrEncode by mistake.
+
+## 6.4.8 (2023-01-18)
+
+Bugfixes:
+  - set Widget.idPrefix to the value passed from property grid options, https://github.com/serenity-is/common-features/issues/21, so that the invalid examples in common-features like OtherFormInTab etc. work
+  
+## 6.4.7 (2023-01-16)
+
+Bugfixes:
+  - fix sleekgrid groupitemmetadataprovider group header totals
+
+## 6.4.6 (2023-01-16)
+
+Bugfixes:
+  - fix sleekgrid groupitemmetadataprovider colspan calculation
+
+## 6.4.4 (2023-01-08)
+
+Bugfixes:
+  - Removed corelib/coverage folder from Serenity.Scripts nuget contents
+  
+
+## 6.4.3 (2023-01-07)
+
+> Release Notes: https://serenity.is/docs/release-notes/6.4.3
+
+Features:
+  - Flutter based mobile applications for Android/iOS [StartSharp Enterprise]
+  - OpenIddict integration and JWT authentication options [StartSharp]
+  - Introduced AutoValidateAntiforgeryIgnoreBearerFilter attribute which can be used in place of AutoValidateAntiforgeryAttribute and will skip anti-forgery validation when the request contains an `Authentication: Bearer` header and there are no cookie headers.
+  - New Glassy Light theme [StartSharp]
+  - Improved handling for type registries like `EnumTypeRegistry`, `EditorTypeRegistry`, and `FormatterTypeRegistry`. Improved error messages that are displayed when a type cannot be found. They can now discover types that are registered after the type initialization process is completed. Use a common base type registry for all type registries to make it consistent.
+  - [BREAKING CHANGE] `Q.getTypeName` is renamed to `Q.getTypeShortName`. Got rid of some static type properties like __typeName$, __metadata$ etc. that is no longer necessary. Used defineproperty for system related props like __typeName etc. to make them non enumerable
+  - [BREAKING CHANGE] toastr notification functions like `Q.notifyError` and `Q.notifyInfo` will escape HTML by default. This is to avoid possible script injection attacks. Pass `escapeHtml: false` if you need the old behavior.
+  - Removed jQuery ScrollIntoView hard-coded dependency and use it only if it is available. You may remove `jquery.scrollintoview.js` from `appsettings.bundles.json`.
+  - Removed `jquery.iframe-transport.js` dependency. You may remove it from your `appsettings.bundles.json` as it is only used by jquery.upload plugin for very old browsers like IE9 etc.
+  - Serenity.Pro.UI.js dependency as it is only used for legacy `EmailClient` sample.
+  - Removed TemplateBundle from `appsettings.bundles.json`, introduced ColumnAndFormBundle that combines `ColumnsBundle` and `FormBundle`.
+  - Rewrote Dashboard with ES Modules [StartSharp]
+  - GroupItemMetadataProvider SleekGrid plugin is ported to ES Modules. Slick.Data.GroupItemMetadataProvider is now obsolete, use GroupItemMetadataProvider from "@serenity-is/sleekgrid" or Slick.GroupItemMetadataProvider
+  - Q.alert, Q.confirm, etc. methods are suffixed with `Dialog` to avoid mixing up with the browser methods, e.g. `Q.alertDialog`, `Q.confirmDialog`. Old methods are still available but obsolete.
+  - TsBuild trigger argument is now obsolete. You should change `prepare` script in `package.json` file with `dotnet build -target:RestoreTypings`
+  - [BREAKING CHANGE] Some row properties are only available via IRow or IEditableRow interface. Introduced IEditableRow and instead of making desktop UI editing (e.g. WPF INotifyPropertyChanged, IsAnyFieldChanged, IsEditing) etc. related properties / methods of row instances only accessible via this interface. They were confusing and polluting the row interface in web applications where they were almost never used. Cast the row instance like ((IEditableRow)row).BeginEdit() etc to access them if ever used. Similary, "IdField, IgnoreConstraints, NameField, Table, TrackAssignments, TrackWithChecks, GetDictionaryData, GetDictionaryDataKeys, SetDictionaryData" properties and fields can only be accessed via IRow interface. This is done to avoid polluting intellisense list as they are very rarely used, and as a preparation to fix swagger / apiexplorer integration
+  - [BREAKING CHANGE] rename MethodChainingExtensions to ChainableExtensions and only support single action overload as that is the only one which is used anywhere so far
+  - [BREAKING CHANGE] make rarely used ValidateEnum and ValidateDateRange methods non-extension methods so they don't come up in the intellisense for rows. Not a breaking change unless you used them as extension methods.
+  - improved binding convention of IDbConnection and IUnitOfWork and ServiceRequest types in ServiceEndpoints so that api browsers like swagger etc. can analyse it better and not crash
+  - [BREAKING CHANGE] `Slick.Event` is renamed to `Slick.EventEmitter`, and `Slick.EventHandler` is renamed to `Slick.EventSubscriber`, `Slick.Handler` is renamed to `Slick.EventListener` to avoid mixing up with browser types with same names.
+  - Introduced TransactionSettingsAttribute and added a TransactionSettings which can be configured via options pattern. ServiceEndpoint will check the attribute or transaction settings like IsolationLevel. The attribute, settings and the UnitOfWork object has a DeferStart option that defers starting the transaction until the Connection is opened. This flag might have undesired side effects, so use it at your own risk if you know what you are doing.
+  - Added the TransactionlessUnitOfWork which is an implementation of IUnitOfWork that does not actually start any transaction. Should only be used in edge cases to call methods that expect a IUnitOfWork instance, but you are sure that the whole operation will be readonly, or you don't really need a transaction. If using with save handlers etc it might be risky. Make sure there are no service behaviors that run behind the scenes which may write or require a transaction.
+  - Improved `TSTypeLister` performance by making it not dive into huge directories like `node_modules` if not needed.
+  
+Bugfixes:
+  - use Object.prototype.hasOwnProperty and fix field proxy detected as class
+  - fix handling for dynamic property, https://github.com/serenity-is/Serenity/issues/6624
+
+## 6.4.2 (2022-12-09)
+
+> Release Notes: https://serenity.is/docs/release-notes/6.4.2
+
+Bugfixes:
+  - fix script null reference issue with MultipleFileUploadEditors
+  - include source maps for some pro nuget packages in static web assets which were missing them (StartSharp)
+  - the key sent to IFilenameFormatSanitizer contained "|" chars
+
+## 6.4.1 (2022-12-09)
+
+Features:
+  - added AutoValidateAntiforgeryIgnoreBearerAttribute which can be used instead of AutoValidateAntiforgeryTokenAttribute to skip AntiForgery validation when cookie header is not present and Authorization header is Bearer (e.g. JWT etc). use it in place of AutoValidateAntiforgeryTokenAttribute in Startup.cs to try.
+  - implemented OpenIddict integration for OpenID / JWT authentication schemes in Serenity.Pro.OpenIddict (StartSharp)
+  - added LocalTextDataScript to access local text as a JSON object from mobile apps etc. by specifying package name with "pack" and language ID with "lang" query string parameters via DynJS.axd/RemoteData.LocalText or DynamicData/RemoteData.LocalText
+  - introduced IFilenameFormatSanitizer interface which can be used in place of default sanitizing logic in upload filename formatting by implementing it in a custom upload editor attribute by deriving from default ones or
+  injecting the implementation via DI.
+  - added StringHelper.SanitizeFilePath and made StringHelper.SanitizeFilename handle more invalid filename chars returned from Path.GetInvalidFilenameChars.
+  - serenity demo is moved to https://demo.serenity.is, old https://serenity.is/demo urls are redirected so it is not expected to cause a problem
+  - StartSharp repository is moved to https://github.com/serenity-premium/startsharp
+
+Bugfixes:
+  - AllowNonImage in UploadOptions should be true, as it is mainly used for temporary uploads
+
+## 6.4.0 (2022-12-05)
+
+Features:
+  - switch to pnpm for Serenity and feature projects (Serene / StartSharp still use npm)
+  - also use state store for script type registry
+  - allow mocking Q.debounce function in corelib for testing purposes
+  - use jquery event bindings in SleekGrid where possible for better compatibility with legacy plugins
+  - make sure interface checks via Q.isAssignableFrom etc. succeed by checking via __typeName even if the same interface is bundled into multiple scripts
+  - abstracted SixLabors.ImageSharp dependency via new IImageProcessor interface, that might allow replacing that library with another in the future
+  - ThumbnailGenerator class is now obsolete, use it via DI by IImageProcessor interface
+  - abstracted upload processor via IUploadProcessor interface
+  - UploadProcessor is now obsolete, inject and use IUploadProcessor interface via DI
+  - abstracted upload file and image validation with new IUploadValidator interface.
+  - introduced IUploadOptions interface and UploadOptions class for keeping default upload options and using in FilePage
+  - reorganized upload editor attributes through new abstract class BaseUploadEditorAttribute
+  - image validation is now only performed for the extensions specified in ImageExtensions which is ".gif;.jpg;.jpeg;.png;" by default
+  - default extension black list can now be modified via ExtensionBlackList property of upload editor attributes
+  - added UploadIntent property to upload editor attributes, which is a string that is passed to the upload editors and as a query string back to FilePage during temporary upload. This can be used to customize default thumbnail size, validations etc. in upload method based on intent.
+  - [BREAKING CHANGE] IUploadStorage.CopyFrom and IUploadStorage.WriteFile methods accept OverwriteOption enum instead of bool? autoRename flag which was confusing
+  - introduced full set of undelete handler related types and behaviors
+  - completed XML documentation for Serenity.Services and Serenity.Web
+  - switched to typescript modules also in Serene
+  - update bootstrap, bootstrap-icons and jquery. 
+  - updated sleekgrid to 1.4.4
+  - jquery is now at Serenity.Assets/jquery/jquery.js instead of Serenity.Assets/Scripts/jquery-3.5.1.js, you should update your includes in appsettings.bundles.json
+  - updated movie tutorial for typescript modules
+  - updated serenity docs like introduction, di, configuration, authentication, localization, caching for latest serenity version
+  - updated serenity docs api reference to include descriptions for all serenity libs
+
+Bugfixes:
+  - fix row selection mixin select all button state not updated for some cases
+  - corelib/slick had an embedded corelib/q copy because of esbuild configuration issue
+  - initially generated modular ServiceTyping by sergen contained invalid method URLs with Administration/User
+  - sleekgrid: auto column hints plugin were not working properly because of jquery event binding difference
+  - sleekgrid: fix rtl mode scroll column rendering
+  - sleekgrid: old column filter row headers are not deleted before creating new ones
+
+## 6.3.6 (2022-11-15)
+
+Bugfixes:
+  - null for ImportClause in TSTypeLister
+
+## 6.3.5 (2022-11-15)
+
+Bugfixes:
+  - better detection for formatters type in clienttypes transformation
+
+## 6.3.4 (2022-11-15)
+
+Features:
+  - add option to disable module re-exports (or indexes) for servertypings transform in sergen.json under ServerTypings/ModuleReExports
+
+## 6.3.3 (2022-11-14)
+
+Features:
+  - change TOptions generic argument for Widget to default to any
+
+## 6.3.2 (2022-11-14)
+
+Bugfixes:
+  - fix group totals is not displayed
+
+## 6.3.1 (2022-11-08)
+
+Bugfixes:
+  - possible null reference exception in sergen when combination types used as interfaces
+
+## 6.3.0 (2022-11-06)
+
+> Release Notes: https://serenity.is/docs/release-notes/6.3.0
+
+Features:
+  - ported all common features projects to ES modules, including Serenity.Extensions, Serenity.Demo.BasicSamples, Serenity.Demo.Northwind
+  - ported all pro features projects to ES modules, including Serenity.Pro.Extensions, Serenity.Demo.AdvancedSamples, Serenity.Pro.Meeting etc. [StartSharp]
+  - moved CSHTML views for feature packages to `/Areas/ProjectName` and code files to `/Modules` instead of `/ProjectName/`
+  - added simplified IFileSystem base interface which removes dependency to System.IO.Abstractions, but it can still be used in tests
+  - upload behavior refinements, remove hard coded dependency to editor attributes and use interfaces instead
+  - allow upload attributes other than ImageUploadEditor / MultipleImageUploadEditor to be also handled by upload behaviors by implementing some interfaces
+  - renamed MultipleImageUploadEditor to MultipleFileUploadEditor, ImageUploadBehavior to FileUploadBehavior
+  - testable disk upload storage via IDiskUploadFileSystem abstraction. it can also be used to create a custom disk upload storage.
+  - ported several tests including local texts, globalfilter written in .NET framework for Serenity.Core
+  - use LookupEditorBaseAttribute / ServiceLookupEditorBaseAttribute for editors defined in modules as well
+  - replace const enums with normal enums to comply with isolatedModules option
+  - export Formatter interface from @serenity-is/corelib in additional to @serenity-is/corelib/slick
+  - enable tsbuild clear plugin by default only when splitting is true. it is still possible to enable it by specifying clean: true
+  - delete only .js / .js.map files when clean plugin is enabled for tsbuild
+  - don't use const enum for es modules service method exports, but use const object instead
+  - better handling for enum types in es modules 
+  - better handling for Razor SDK projects that use ProjectName dir instead of Modules folder
+  - improve imports for external module types in code / source generators
+  - moved ui overrides to serenity corelib from pro.extensions
+  - create new buttons-inner divs when a toolbar has separator, instead of creating a separator div
+  - specify full names for more classes including QuickSearchInput, TemplatedDialog etc.
+  - Areas/ProjectName is also scanned by MVC generator for views / strip view parts
+  - set buttontext as icon font only for < jquery ui 1.12.1 as 1.13x does not allow html in button text
+  - reuse editor type finding for external libs as long as their namespace match with project name. this improves type discovery for modules, as typescript does not preserve decorators in .d.ts files. make sure your namespaces match the project name, e.g. an editor with key 'MyLib.MySome.MyEditor' should be exported from a 'MyLib.MySome' project (mylib.mysome npm package) with 'MyEditor' classname.
+  - extends support for tsconfig.json in source / code generator
+  - better determination of module name in TSModuleResolver for node_modules packages
+  - also restore dist/index.js for project references to node_modules in addition to dist/index.ts
+  - auto fake import enums in form.ts / columns.ts if possible, to avoid errors when such types are in a different module
+  - add ResolveWithHash to HtmlScriptExtensions so it can be used to avoid caching issues while importing module page scripts under esm/..
+  - instead of removing a property from the form.ts when the editor type can't be discovered, assume it as a widget so it can be understood something is wrong and "as any" etc can be used to reference the form field in such cases
+  - adapt email client css for BS5 theme [StartSharp]
+
+Bugfixes:
+  - output directory for Razor SDK projects should use ProjectName dir instead of Modules
+  - fix RowSelectionModel plugin export
+  - fix executeOnceWhenVisible alias in corelib typings
+  - fix GlobFilter regex based matching for `Modules/**/*` style patterns
+  - fix TSFileLister does not work exactly like tsconfig for patterns, as TypeScript considers all patterns to start at root unlike gitignore patterns
+  - fix deepClone does not work properly with Date and several other types of objects (used https://github.com/angus-c/just)
+  - also check for "None" in addition to "none" or other cases for module / namespace detection
+  - fix email client script error [StartSharp]
+
+## 6.2.9 (2022-10-22)
+
+Features:
+  - add tests for es module editor option generation
+  - don't generate row type if it has ScriptSkip attribute, even if it is referenced by something else. 
+  - don't generate row / other type members if it has scriptskip or ignore attribute
+  - use export for nested permission key namespaces
+
+## 6.2.8 (2022-10-22)
+
+Bugfixes:
+  - fix options for editors defined in es modules not generated in client types
+
+## 6.2.7 (2022-10-22)
+
+Features:
+  - try to import formatter types used by columns to Columns.ts so that modular formatters can be registered from the grids that they are used from
+  - add option to disable particular transform in source generator with sergen.json MVC/SourceGenerator and ClientTypes/SourceGenerator settings by using false.
+  - go back to non-incremental source generator for clienttypes as it breaks syntax highlighting when referencing .ts files as AdditionalTexts, and there is no single output .Web.js for modules [StartSharp]
+  - disable source generator when SourceGeneratorTransform is false in project file [StartSharp]
+  - read MVC/StripViewPaths from sergen.json in ViewPathsSourceGenerator if available [StartSharp]
+
+## 6.2.6 (2022-10-17)
+
+Features:
+  - published @serenity-is/tsbuild npm package which will be used from tsbuild.js
+  - added NodeScriptRunner for running tsbuild in watch mode (imported from .NET SpaServices)
+  - added startnodescripts settings in appsettings.Development to npm run tsbuild:watch in development at startup (StartSharp)
+  - try to import dialog types used by inplace add editors to Form.ts so that modular dialogs can be registered from the dialogs that these editors are used from
+  - include full name of class in registerClass calls for code generated by sergen 
+  - removed maximizable dialog from sergen scriban templates as it is not a part of core and not used anymore
+  - send an empty source map with 202 status, instead of 403, to avoid seeing warnings when SourceMapSecurityMiddleware is enabled
+  - handling for root namespace in client types source generator (StartSharp)
+  - made add button functional in dashboard task list (StartSharp)
+  - reverted back to Microsoft.Data.SqlClient to 3.1.1 from 4.1.0 in sergen, as Encrypt=true became the default in 4.x+ (https://techcommunity.microsoft.com/t5/sql-server-blog/released-general-availability-of-microsoft-data-sqlclient-4-0/ba-p/2983346) which is a [BREAKING CHANGE] causing connections to fail. As Serenity.Data used 2.1.0 of Microsoft.Data.SqlClient, only sergen was affected by this issue, not StartSharp or Serene apps. Please see the linked doc, and either install a trusted certificate in your SQL server, or set TrustServerCertificate=true or Encrypt=false in your connection string, as we'll be updating Microsoft.Data.SqlClient to newer versions in the future, that may bring back this error.
+
+Bugfixes:
+  - fix invalid relative module paths generated in source generator
+  - fix cache is reset for previously reset groups after update, even if they are not reset in current transaction
+
 ## 6.2.5 (2022-10-15)
 
 Features:
@@ -1330,7 +1827,7 @@ Bugfixes:
 ## 3.3.4 (2017-10-14)
 
 Features:
-  - easy to configure cdn support (experimental, in use at serenity.is/demo)
+  - easy to configure cdn support (experimental, in use at demo.serenity.is)
   - allow cdns to cache dynamic scripts for anonymous access
   - check bundled script rights also when checkRights() on concatenated script is called
   - increase scriban template loop limits as some users has tables with many columns (300+)

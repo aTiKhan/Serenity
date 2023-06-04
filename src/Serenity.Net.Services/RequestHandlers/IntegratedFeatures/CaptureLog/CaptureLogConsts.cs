@@ -1,7 +1,12 @@
-﻿namespace Serenity.Services
+﻿namespace Serenity.Services;
+
+/// <summary>
+/// Contains constants related to the capture logging
+/// </summary>
+public class CaptureLogConsts
 {
-    public class CaptureLogConsts
-    {
-        public static readonly DateTime UntilMax = new DateTime(9999, 1, 1);
-    }
+    /// <summary>
+    /// The maximum value for ValidUntil column
+    /// </summary>
+    public static readonly DateTime UntilMax = new(9999, 1, 1);
 }

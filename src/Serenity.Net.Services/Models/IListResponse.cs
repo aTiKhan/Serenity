@@ -1,12 +1,33 @@
 ﻿using System.Collections;
 
-namespace Serenity.Services
+namespace Serenity.Services;
+
+/// <summary>
+/// The interface for list response. This is used to easily access 
+/// list response members as the <see cref="ListResponse{T}"/>
+/// class itself is generic.
+/// </summary>
+public interface IListResponse
 {
-    public interface IListResponse
-    {
-        IList Entities { get; }
-        int TotalCount { get; }
-        int Skip { get; }
-        int Take { get; }
-    }
+    /// <summary>
+    /// List of entities
+    /// </summary>
+    IList Entities { get; }
+
+    /// <summary>
+    /// Total count of the records. This may be different
+    /// than the number of returned records when paging is active, 
+    /// e.g. when Skip/Take parameters are assigned.
+    /// </summary>
+    int TotalCount { get; }
+
+    /// <summary>
+    /// Number of records skipped, passed from the ListRequest
+    /// </summary>
+    int Skip { get; }
+
+    /// <summary>
+    /// Number of records taken, passed from the ListRequest
+    /// </summary>
+    int Take { get; }
 }

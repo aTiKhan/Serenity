@@ -1,2 +1,6 @@
-Serenity.Web/Tooling/* linguist-vendored
-Serenity.Web/Assets/* linguist-vendored
+* text=auto eol=lf
+*.cmd -text
+*.sln -text
+*.d.ts -text
+**/wwwroot/**/* -text
+**/dist/**/* -text

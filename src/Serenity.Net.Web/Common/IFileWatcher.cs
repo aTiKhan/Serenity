@@ -1,10 +1,28 @@
-﻿namespace Serenity.Web
+﻿namespace Serenity.Web;
+
+/// <summary>
+/// File system watcher abstraction
+/// </summary>
+public interface IFileWatcher
 {
-    public interface IFileWatcher
-    {
-        event Action<string> Changed;
-        void RaiseChanged(string name);
-        public string Path { get; }
-        public string Filter { get; }
-    }
+    /// <summary>
+    /// Event that is raised when a file changed
+    /// </summary>
+    event Action<string> Changed;
+
+    /// <summary>
+    /// Raises the change even
+    /// </summary>
+    /// <param name="name">File name</param>
+    void RaiseChanged(string name);
+
+    /// <summary>
+    /// Watch path
+    /// </summary>
+    public string Path { get; }
+
+    /// <summary>
+    /// Watch filter
+    /// </summary>
+    public string Filter { get; }
 }

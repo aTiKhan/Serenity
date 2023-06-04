@@ -1,12 +1,14 @@
-﻿namespace Serenity.PropertyGrid
+namespace Serenity.PropertyGrid;
+
+public partial class BasicPropertyProcessor : PropertyProcessor
 {
-    public partial class BasicPropertyProcessor : PropertyProcessor
+    private void SetPlaceholder(IPropertySource source, PropertyItem item)
     {
-        private void SetPlaceholder(IPropertySource source, PropertyItem item)
+        var attr = source.GetAttribute<PlaceholderAttribute>();
+        if (attr != null)
         {
-            var attr = source.GetAttribute<PlaceholderAttribute>();
-            if (attr != null)
-                item.Placeholder = attr.Value;
+            item.Placeholder = GetLocalizableTextValue<PlaceholderAttribute>(source, attr.Value,
+                () => source.Property?.Name + "_Placeholder");
         }
     }
 }

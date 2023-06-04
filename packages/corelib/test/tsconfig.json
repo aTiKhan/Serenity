@@ -1,0 +1,45 @@
+﻿{
+  "extends": "../tsconfig.json",
+  "compileOnSave": false,
+  "compilerOptions": {
+    "noEmit": true,
+    "emitDeclarationOnly": false,
+    "sourceMap": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "skipLibCheck": true,
+    "types": [
+      "jquery",
+      "jquery.validation",
+      "jqueryui",
+      "jest"
+    ],
+    "rootDir": "../",
+    "outDir": "../out/test",
+    "paths": {
+      "@/*": [ "../src/*" ],
+      "@serenity-is/corelib/q": ["../src/q"],
+      "@serenity-is/corelib/slick": ["../src/slick"],
+      "@optionaldeps/*": ["./testutil/*-testmodule"]
+    },
+    "noImplicitAny": false,
+    "lib": [
+      "ES5",
+      "ES2015",
+      "DOM"
+    ],
+    "noEmitHelpers": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "jsx-dom"
+  },
+  "include": [
+    "../src/globals/jquery-globals.ts",
+    "../src/globals/jquery.validation-globals.ts",
+    "../src/globals/select2-globals.ts",
+    "../src/ui/widgets/jquerywidgetfn.ts",
+    "./testutil/*.ts",
+    "./**/*.spec.ts",
+    "./**/*.spec.tsx"
+  ],
+  "exclude": []
+}

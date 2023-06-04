@@ -1,61 +1,78 @@
 ﻿using System.Data.Common;
-using System.Threading.Tasks;
 
-namespace Serenity.Tests
+namespace Serenity.Tests;
+
+public class MockDbCommand : IDbCommand
 {
-    public class MockDbCommand : DbCommand
+    public string CommandText { get; set; }
+    public int CommandTimeout { get; set; }
+    public CommandType CommandType { get; set; }
+    public IDbConnection Connection { get; set; }
+    public IDataParameterCollection Parameters { get; init; } = new MockDbParameterCollection();
+    public IDbTransaction Transaction { get; set; }
+    public UpdateRowSource UpdatedRowSource { get; set; }
+
+    public MockDbCommand(IDbConnection connection = null)
     {
-        public override string CommandText { get; set; }
-        public override int CommandTimeout { get; set; }
-        public override CommandType CommandType { get; set; }
-        protected override DbConnection DbConnection { get; set; }
-        protected override DbParameterCollection DbParameterCollection { get; } = new MockDbParameterCollection();
-        protected override DbTransaction DbTransaction { get; set; }
-        public override UpdateRowSource UpdatedRowSource { get; set; }
-        public override bool DesignTimeVisible { get; set; }
+        Connection = connection;
+    }
 
-        public override void Cancel()
-        {
-        }
+    public void Cancel()
+    {
+    }
 
-        protected override DbParameter CreateDbParameter()
-        {
-            return new MockDbParameter();
-        }
+    public IDbDataParameter CreateParameter()
+    {
+        return new MockDbParameter();
+    }
 
-        public override ValueTask DisposeAsync()
-        {
-            return ValueTask.CompletedTask;
-        }
+    public void Dispose()
+    {
+    }
 
-        public MockDbCommand OnExecuteReader(Func<DbDataReader> func)
-        {
-            onExecuteReader = func;
-            return this;
-        }
+    public MockDbCommand OnExecuteNonQuery(Func<MockDbCommand, int> func)
+    {
+        onExecuteNonQuery = func;
+        return this;
+    }
 
-        protected Func<DbDataReader> onExecuteReader;
+    protected Func<MockDbCommand, int> onExecuteNonQuery;
 
-        protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
-        {
-            if (onExecuteReader != null)
-                return onExecuteReader();
+    public int ExecuteNonQuery()
+    {
+        if (onExecuteNonQuery != null)
+            return onExecuteNonQuery(this);
 
-            return new MockDataReader();
-        }
+        return 1;
+    }
 
-        public override int ExecuteNonQuery()
-        {
-            throw new NotImplementedException();
-        }
+    public MockDbCommand OnExecuteReader(Func<DbDataReader> func)
+    {
+        onExecuteReader = func;
+        return this;
+    }
 
-        public override object ExecuteScalar()
-        {
-            throw new NotImplementedException();
-        }
+    protected Func<DbDataReader> onExecuteReader;
 
-        public override void Prepare()
-        {
-        }
+    public IDataReader ExecuteReader()
+    {
+        if (onExecuteReader != null)
+            return onExecuteReader();
+
+        return new MockDbDataReader();
+    }
+
+    public IDataReader ExecuteReader(CommandBehavior behavior)
+    {
+        return ExecuteReader();
+    }
+
+    public object ExecuteScalar()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void Prepare()
+    {
     }
 }

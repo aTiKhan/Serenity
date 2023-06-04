@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -8,24 +8,22 @@
     <Title>Serenity Platform - Scripts</Title>
     <Description>Contains Serenity scripts and CSS file</Description>
     <StaticWebAssetBasePath>/Serenity.Scripts</StaticWebAssetBasePath>
-    <EnableGlobalUsings>false</EnableGlobalUsings>
+    <DefaultItemExcludes>**\node_modules\**;**\coverage\**;$(DefaultItemExcludes);</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
+    <Using Remove="*" />
     <None Remove="*\tsconfig.json;style\*.css;" />
-    <Content Update="*.json;**\tsconfig.json;**\package.json;**\package-lock.json">
-      <CopyToOutputDirectory>false</CopyToOutputDirectory>
-      <Pack>false</Pack>
-    </Content>
+    <Content Update="*.json;**\tsconfig.json;**\package.json;**\package-lock.json;tslint.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" Pack="false" />
     <None Include="style\*.css">
       <Pack>true</Pack>
       <PackagePath>content\Content\serenity\</PackagePath>
     </None>
-    <Content Include="corelib\out\Serenity.CoreLib.js;corelib\out\Serenity.CoreLib.js.map;corelib\out\Serenity.CoreLib.min.js">
+    <Content Include="..\..\packages\corelib\out\Serenity.CoreLib.js;..\..\packages\corelib\out\Serenity.CoreLib.js.map;..\..\packages\corelib\out\Serenity.CoreLib.min.js">
       <Pack>true</Pack>
       <PackagePath>content\Scripts\serenity\</PackagePath>
     </Content>
-    <Content Include="corelib\out\Serenity.CoreLib.d.ts">
+    <Content Include="..\..\packages\corelib\out\Serenity.CoreLib.d.ts">
       <Pack>true</Pack>
       <PackagePath>content\Scripts\serenity\;content\Scripts\typings\serenity\;typings\serenity.corelib\index.d.ts</PackagePath>
     </Content>
@@ -34,19 +32,19 @@
     <None Remove="node_modules\**" />
     <Compile Remove="node_modules\**" />
     <EmbeddedResource Remove="node_modules\**" />
-    <TypeScriptCompile Remove="corelib\out\**;node_modules\**;test\**;wwwroot\Serenity.CoreLib.d.ts" />
+    <TypeScriptCompile Remove="**\node_modules\**;*\out\**;*\dist\**;test\**;wwwroot\Serenity.CoreLib.d.ts" />
     <None Include="wwwroot\Serenity.CoreLib.d.ts" />
-    <ToCompileCoreLib Include="corelib\src\**\*.ts;corelib\src\tsconfig.json;corelib\build\build.js;corelib\node_modules\@serenity-is\*\*.d.ts;corelib\rollup.config.js;corelib\package.json"></ToCompileCoreLib>
-    <NpmPackageFile Include="corelib\package.json" />
+    <ToCompileCoreLib Include="..\..\packages\corelib\src\**\*.ts;..\..\packages\corelib\src\tsconfig.json;..\..\packages\corelib\build\build.js;..\..\packages\corelib\node_modules\@serenity-is\*\*.d.ts;..\..\packages\corelib\rollup.config.js;..\..\packages\corelib\package.json"></ToCompileCoreLib>
+    <NpmPackageFile Include="..\..\packages\corelib\package.json" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.TypeScript.MSBuild" Version="4.6.2">
+    <PackageReference Include="Microsoft.TypeScript.MSBuild" Version="4.9.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
   </ItemGroup>
-  <Target Name="CompileCoreLib" AfterTargets="AfterBuild" Inputs="@(ToCompileCoreLib)" DependsOnTargets="NpmInstall" 
+  <Target Name="CompileCoreLib" Condition="'$(SkipNodeScripts)' != 'true'" AfterTargets="AfterBuild" Inputs="@(ToCompileCoreLib)" DependsOnTargets="NpmInstall" 
           Outputs="wwwroot\Serenity.CoreLib.js;wwwroot\Serenity.CoreLib.min.js;wwwroot\Serenity.CoreLib.min.js.map;wwwroot\Serenity.CoreLib.js.map;wwwroot\Serenity.CoreLib.d.ts;..\Serenity.Assets\wwwroot\Scripts\SlickGrid\slick.grid.js;..\Serenity.Assets\wwwroot\Scripts\SlickGrid\slick.core.js">
-    <Exec Command="npm run build" WorkingDirectory=".\corelib" />
+    <Exec Command="pnpm run build" WorkingDirectory="..\..\packages\corelib" />
   </Target>
 </Project>

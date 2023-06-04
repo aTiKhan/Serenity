@@ -1,6 +1,4 @@
 /// <reference types="jquery" />
-/// <reference types="jqueryui" />
-/// <reference types="toastr" />
 /// <reference types="jquery.validation" />
 
 /******************************************************************************
@@ -404,86 +402,252 @@ declare function __createBinding(object: object, target: object, key: PropertyKe
 
 
 declare namespace Q {
-    type Grouping<TItem> = {
-        [key: string]: TItem[];
-    };
     /**
-     * Tests if any of array elements matches given predicate
+     * Tests if any of array elements matches given predicate. Prefer Array.some() over this function (e.g. `[1, 2, 3].some(predicate)`).
+     * @param array Array to test.
+     * @param predicate Predicate to test elements.
+     * @returns True if any element matches.
      */
     function any<TItem>(array: TItem[], predicate: (x: TItem) => boolean): boolean;
     /**
-     * Counts number of array elements that matches a given predicate
+     * Counts number of array elements that matches a given predicate.
+     * @param array Array to test.
+     * @param predicate Predicate to test elements.
      */
     function count<TItem>(array: TItem[], predicate: (x: TItem) => boolean): number;
     /**
-     * Gets first element in an array that matches given predicate.
+     * Gets first element in an array that matches given predicate similar to LINQ's First.
      * Throws an error if no match is found.
+     * @param array Array to test.
+     * @param predicate Predicate to test elements.
+     * @returns First element that matches.
      */
     function first<TItem>(array: TItem[], predicate: (x: TItem) => boolean): TItem;
     /**
-     * Gets index of first element in an array that matches given predicate
+     * A group item returned by `groupBy()`.
      */
-    function indexOf<TItem>(array: TItem[], predicate: (x: TItem) => boolean): number;
-    /**
-     * Inserts an item to the array at specified index
-     */
-    function insert(obj: any, index: number, item: any): void;
-    /**
-     * Determines if the object is an array
-     */
-    function isArray(obj: any): boolean;
-    /**
-    * Gets first element in an array that matches given predicate.
-    * Throws an error if no matches is found, or there are multiple matches.
-    */
-    function single<TItem>(array: TItem[], predicate: (x: TItem) => boolean): TItem;
-    /**
-     * Maps an array into a dictionary with keys determined by specified getKey() callback,
-     * and values that are arrays containing elements for a particular key.
-     */
-    function toGrouping<TItem>(items: TItem[], getKey: (x: TItem) => any): Grouping<TItem>;
-    type Group<TItem> = {
+    type GroupByElement<TItem> = {
+        /** index of the item in `inOrder` array */
         order: number;
+        /** key of the group */
         key: string;
+        /** the items in the group */
         items: TItem[];
+        /** index of the first item of this group in the original array */
         start: number;
     };
-    type Groups<TItem> = {
+    /**
+     * Return type of the `groupBy` function.
+     */
+    type GroupByResult<TItem> = {
         byKey: {
-            [key: string]: Group<TItem>;
+            [key: string]: GroupByElement<TItem>;
         };
-        inOrder: Group<TItem>[];
+        inOrder: GroupByElement<TItem>[];
     };
     /**
      * Groups an array with keys determined by specified getKey() callback.
      * Resulting object contains group objects in order and a dictionary to access by key.
+     * This is similar to LINQ's ToLookup function with some additional details like start index.
+     * @param items Array to group.
+     * @param getKey Function that returns key for each item.
+     * @returns GroupByResult object.
      */
-    function groupBy<TItem>(items: TItem[], getKey: (x: TItem) => any): Groups<TItem>;
+    function groupBy<TItem>(items: TItem[], getKey: (x: TItem) => any): GroupByResult<TItem>;
     /**
-     * Gets first element in an array that matches given predicate.
+     * Gets index of first element in an array that matches given predicate.
+     * @param array Array to test.
+     * @param predicate Predicate to test elements.
+     */
+    function indexOf<TItem>(array: TItem[], predicate: (x: TItem) => boolean): number;
+    /**
+     * Inserts an item to the array at specified index. Prefer Array.splice unless
+     * you need to support IE.
+     * @param obj Array or array like object to insert to.
+     * @param index Index to insert at.
+     * @param item Item to insert.
+     * @throws Error if object does not support insert.
+     * @example
+     * insert([1, 2, 3], 1, 4); // [1, 4, 2, 3]
+     * insert({ insert: (index, item) => { this.splice(index, 0, item); } }
+     */
+    function insert(obj: any, index: number, item: any): void;
+    /**
+     * Determines if the object is an array. Prefer Array.isArray over this function (e.g. `Array.isArray(obj)`).
+     * @param obj Object to test.
+     * @returns True if the object is an array.
+     * @example
+     * isArray([1, 2, 3]); // true
+     * isArray({}); // false
+     */
+    const isArray: (arg: any) => arg is any[];
+    /**
+    * Gets first element in an array that matches given predicate.
+    * Throws an error if no matches is found, or there are multiple matches.
+    * @param array Array to test.
+    * @param predicate Predicate to test elements.
+    * @returns First element that matches.
+    * @example
+    * first([1, 2, 3], x => x == 2); // 2
+    * first([1, 2, 3], x => x == 4); // throws error.
+    */
+    function single<TItem>(array: TItem[], predicate: (x: TItem) => boolean): TItem;
+    type Grouping<TItem> = {
+        [key: string]: TItem[];
+    };
+    /**
+     * Maps an array into a dictionary with keys determined by specified getKey() callback,
+     * and values that are arrays containing elements for a particular key.
+     * @param items Array to map.
+     * @param getKey Function that returns key for each item.
+     * @returns Grouping object.
+     * @example
+     * toGrouping([1, 2, 3], x => x % 2 == 0 ? "even" : "odd"); // { odd: [1, 3], even: [2] }
+     */
+    function toGrouping<TItem>(items: TItem[], getKey: (x: TItem) => any): Grouping<TItem>;
+    /**
+     * Gets first element in an array that matches given predicate (similar to LINQ's FirstOrDefault).
      * Returns null if no match is found.
+     * @param array Array to test.
+     * @param predicate Predicate to test elements.
+     * @returns First element that matches.
+     * @example
+     * tryFirst([1, 2, 3], x => x == 2); // 2
+     * tryFirst([1, 2, 3], x => x == 4); // null
      */
     function tryFirst<TItem>(array: TItem[], predicate: (x: TItem) => boolean): TItem;
 
     interface UserDefinition {
+        /**
+         * Username of the logged user
+         */
         Username?: string;
+        /**
+         * Display name of the logged user
+         */
         DisplayName?: string;
+        /**
+         * This indicates that the user is a super "admin", e.g. assumed to have all the permissions available.
+         * It does not mean a member of Administrators, who might not have some of the permissions */
         IsAdmin?: boolean;
+        /**
+         * A hashset of permission keys that the current user have, explicitly assigned or via its
+         * roles. Note that client side permission checks should only be used for UI enable/disable etc.
+         * You should not rely on client side permission checks and always re-check permissions server side.
+         */
         Permissions?: {
             [key: string]: boolean;
         };
     }
 
+    /**
+     * Contains permission related functions.
+     *
+     * ## Note
+     * We use a namespace here both for compatibility and for allowing users to override
+     * these functions easily in ES modules environment, which is normally hard to do.
+     */
     namespace Authorization {
+        /**
+         * Checks if the current user has the permission specified.
+         * This should only be used for UI purposes and it is strongly recommended to check permissions server side.
+         *
+         * > Please prefer the `hasPermissionAsync` variant as this may block the UI thread if the `UserData` script is not already loaded.
+         * @param permission Permission key. It may contain logical operators like A&B|C.
+         * @returns `false` for "null or undefined", true for "*", `IsLoggedIn` for "?". For other permissions,
+         * if the user has the permission or if the user has the `IsAdmin` flag (super admin) `true`, otherwise `false`.
+         */
         function hasPermission(permission: string): boolean;
+        /**
+         * Checks if the current user has the permission specified.
+         * This should only be used for UI purposes and it is strongly recommended to check permissions server side.
+         *
+         * @param permission Permission key. It may contain logical operators like A&B|C.
+         * @returns `false` for "null or undefined", true for "*", `IsLoggedIn` for "?". For other permissions,
+         * if the user has the permission or if the user has the `IsAdmin` flag (super admin) `true`, otherwise `false`.
+         */
+        function hasPermissionAsync(permission: string): Promise<boolean>;
+        /**
+         * Checks if the hashset contains the specified permission, also handling logical "|" and "&" operators
+         * @param permissionSet Set of permissions
+         * @param permission Permission key or a permission expression containing & | operators
+         * @returns true if set contains permission
+         */
+        function isPermissionInSet(permissionSet: {
+            [key: string]: boolean;
+        }, permission: string): boolean;
+        /**
+         * Throws an error if the current user does not have the specified permission.
+         * Prefer `await validatePermissionAsync()` as this one might block the UI if the `UserData`
+         * is not already loaded.
+         * @param permission Permission key. It may contain logical operators like A&B|C.
+         */
         function validatePermission(permission: string): void;
+        /**
+        * Throws an error if the current user does not have the specified permission.
+        * @param permission Permission key. It may contain logical operators like A&B|C.
+        * @example
+        * await Authorization.validatePermissionAsync("A&B|C");
+        */
+        function validatePermissionAsync(permission: string): Promise<void>;
     }
     namespace Authorization {
+        /**
+         * Checks if the current user is logged in. Prefer `isLoggedInAsync` as this one might block the UI if the `UserData`
+         * is not already loaded.
+         * @returns `true` if the user is logged in, `false` otherwise.
+         * @example
+         * if (Authorization.isLoggedIn) {
+         *     // do something
+         * }
+         */
         let isLoggedIn: boolean;
+        /**
+         * Checks if the current user is logged in.
+         * @returns `true` if the user is logged in, `false` otherwise.
+         * @example
+         * if (await Authorization.isLoggedInAsync) {
+         *     // do something
+         * }
+         */
+        let isLoggedInAsync: Promise<boolean>;
+        /** Returns the username for currently logged user. Prefer `usernameAsync` as this one might block the UI if the `UserData`
+         * is not already loaded.
+         * @returns Username for currently logged user.
+         * @example
+         * if (Authorization.username) {
+         *     // do something
+         * }
+         */
         let username: string;
+        /** Returns the username for currently logged user.
+         * @returns Username for currently logged user.
+         * @example
+         * if (await Authorization.usernameAsync) {
+         *     // do something
+         * }
+         */
+        let usernameAsync: Promise<string>;
+        /** Returns the user data for currently logged user. Prefer `userDefinitionAsync` as this one might block the UI if the `UserData`
+         * is not already loaded.
+         * @returns User data for currently logged user.
+         * @example
+         * if (Authorization.userDefinition.IsAdmin) {
+         *     // do something
+         * }
+         */
         let userDefinition: UserDefinition;
+        /** Returns the user data for currently logged user.
+         * @returns User data for currently logged user.
+         * @example
+         * if ((await Authorization.userDefinitionAsync).IsAdmin) {
+         *     // do something
+         * }
+         */
+        let userDefinitionAsync: Promise<UserDefinition>;
     }
 
+    /** Options for the BlockUI plugin. */
     interface JQBlockUIOptions {
         useTimeout?: boolean;
     }
@@ -496,6 +660,9 @@ declare namespace Q {
      * div is 2000, so a higher z-order shouldn't be used in page.
      */
     function blockUI(options: JQBlockUIOptions): void;
+    /**
+     * Unblocks the page.
+     */
     function blockUndo(): void;
 
     var Config: {
@@ -533,65 +700,207 @@ declare namespace Q {
         notLoggedInHandler: Function;
     };
 
+    interface DebouncedFunction<T extends (...args: any[]) => any> {
+        /**
+         * Call the original function, but applying the debounce rules.
+         *
+         * If the debounced function can be run immediately, this calls it and returns its return
+         * value.
+         *
+         * Otherwise, it returns the return value of the last invocation, or undefined if the debounced
+         * function was not invoked yet.
+         */
+        (...args: Parameters<T>): ReturnType<T> | undefined;
+        /**
+         * Throw away any pending invocation of the debounced function.
+         */
+        clear(): void;
+        /**
+         * If there is a pending invocation of the debounced function, invoke it immediately and return
+         * its return value.
+         *
+         * Otherwise, return the value from the last invocation, or undefined if the debounced function
+         * was never invoked.
+         */
+        flush(): ReturnType<T> | undefined;
+    }
     /**
      * Returns a function, that, as long as it continues to be invoked, will not
-     * be triggered. The function will be called after it stops being called for
-     * N milliseconds. If `immediate` is passed, trigger the function on the
-     * leading edge, instead of the trailing. The function also has a property 'clear'
-     * that is a function which will clear the timer to prevent previously scheduled executions.
+     * be triggered. The function also has a property 'clear' that can be used
+     * to clear the timer to prevent previously scheduled executions, and flush method
+     * to invoke scheduled executions now if any.
+     * @param wait The function will be called after it stops being called for
+     * N milliseconds.
+     * @param immediate If passed, trigger the function on the leading edge, instead of the trailing.
      *
      * @source underscore.js
      */
-    function debounce(func: Function, wait?: number, immediate?: boolean): () => any;
+    function debounce<T extends (...args: any) => any>(func: T, wait?: number, immediate?: boolean): DebouncedFunction<T>;
 
+    /**
+     * Options for a message dialog button
+     */
     interface DialogButton {
+        /** Button text */
         text?: string;
+        /** Button hint */
         hint?: string;
+        /** Button icon */
         icon?: string;
-        click?: (e: JQueryEventObject) => void;
+        /** Click handler */
+        click?: (e: MouseEvent) => void;
+        /** CSS class for button */
         cssClass?: string;
+        /** HTML encode button text. Default is true. */
         htmlEncode?: boolean;
+        /** The code that is returned from message dialog function when this button is clicked */
         result?: string;
     }
+    /**
+     * Options that apply to all message dialog types
+     */
     interface CommonDialogOptions {
+        /** Event handler that is called when dialog is opened */
         onOpen?: () => void;
+        /** Event handler that is called when dialog is closed */
         onClose?: (result: string) => void;
+        /** Dialog title */
         title?: string;
+        /** HTML encode the message, default is true */
         htmlEncode?: boolean;
+        /** Wrap the message in a `<pre>` element, so that line endings are preserved, default is true */
         preWrap?: boolean;
+        /** Dialog css class. Default is based on the message dialog type */
         dialogClass?: string;
+        /** List of buttons to show on the dialog */
         buttons?: DialogButton[];
+        /** Class to use for the modal element for Bootstrap dialogs */
         modalClass?: string;
+        /** True to use Bootstrap dialogs even when jQuery UI  present, default is based on `Q.Config.bootstrapMessages */
         bootstrap?: boolean;
+        /** The result code of the button used to close the dialog is returned via this variable in the options object */
         result?: string;
     }
+    /** Returns true if Bootstrap 3 is loaded */
+    function isBS3(): boolean;
+    /** Returns true if Bootstrap 5+ is loaded */
+    function isBS5Plus(): boolean;
+    /**
+     * Builds HTML DIV element for a Bootstrap modal dialog
+     * @param title Modal title
+     * @param body Modal body, it will not be HTML encoded, so make sure it is encoded
+     * @param modalClass Optional class to add to the modal element
+     * @param escapeHtml True to html encode body, default is true
+     * @returns
+     */
+    function bsModalMarkup(title: string, body: string, modalClass?: string, escapeHtml?: boolean): HTMLDivElement;
+    function dialogButtonToBS(x: DialogButton): HTMLButtonElement;
+    function dialogButtonToUI(x: DialogButton): any;
+    /**
+     * Additional options for Alert dialogs
+     */
     interface AlertOptions extends CommonDialogOptions {
+        /** The title of OK button, or false to hide the OK button */
         okButton?: string | boolean;
+        /** CSS class for OK button */
         okButtonClass?: string;
     }
-    function isBS3(): boolean;
-    function isBS5Plus(): boolean;
-    function bsModalMarkup(title: string, body: string, modalClass?: string): string;
-    function dialogButtonToBS(x: DialogButton): string;
-    function dialogButtonToUI(x: DialogButton): JQueryUI.DialogButtonOptions;
-    function alert(message: string, options?: AlertOptions): void;
+    /**
+     * Displays an alert dialog
+     * @param message The message to display
+     * @param options Additional options.
+     * @see AlertOptions
+     * @example
+     * alertDialog("An error occured!"); }
+     */
+    function alertDialog(message: string, options?: AlertOptions): void;
+    /** @obsolete use alertDialog */
+    const alert: typeof alertDialog;
+    /** Additional options for confirm dialog */
     interface ConfirmOptions extends CommonDialogOptions {
+        /** Title of the Yes button, or false to hide the Yes button. Default is value of local text: "Dialogs.YesButton" */
         yesButton?: string | boolean;
+        /** CSS class for the Yes button. */
         yesButtonClass?: string;
+        /** Title of the NO button, or false to hide the No button. Default is value of local text: "Dialogs.NoButton" */
         noButton?: string | boolean;
+        /** Title of the CANCEL button, or false to hide the Cancel button. Default is value of local text: "Dialogs.NoButton" */
         cancelButton?: string | boolean;
+        /** Event handler for cancel button click */
         onCancel?: () => void;
+        /** Event handler for no button click */
         onNo?: () => void;
     }
-    function confirm(message: string, onYes: () => void, options?: ConfirmOptions): void;
+    /**
+     * Display a confirmation dialog
+     * @param message The message to display
+     * @param onYes Callback for Yes button click
+     * @param options Additional options.
+     * @see ConfirmOptions
+     * @example
+     * confirmDialog("Are you sure you want to delete?", () => {
+     *     // do something when yes is clicked
+     * }
+     */
+    function confirmDialog(message: string, onYes: () => void, options?: ConfirmOptions): void;
+    /** @obsolete use confirmDialog */
+    const confirm: typeof confirmDialog;
+    /** Options for `iframeDialog` **/
     interface IFrameDialogOptions {
         html?: string;
     }
+    /**
+     * Display a dialog that shows an HTML block in an IFRAME, which is usually returned from server callbacks
+     * @param options The options
+     */
     function iframeDialog(options: IFrameDialogOptions): void;
-    function information(message: string, onOk: () => void, options?: ConfirmOptions): void;
-    function success(message: string, onOk: () => void, options?: ConfirmOptions): void;
-    function warning(message: string, options?: AlertOptions): void;
-    function closePanel(element: JQuery, e?: JQueryEventObject): void;
+    /**
+     * Display an information dialog
+     * @param message The message to display
+     * @param onOk Callback for OK button click
+     * @param options Additional options.
+     * @see ConfirmOptions
+     * @example
+     * informationDialog("Operation complete", () => {
+     *     // do something when OK is clicked
+     * }
+     */
+    function informationDialog(message: string, onOk?: () => void, options?: ConfirmOptions): void;
+    /** @obsolete use informationDialog */
+    const information: typeof informationDialog;
+    /**
+     * Display a success dialog
+     * @param message The message to display
+     * @param onOk Callback for OK button click
+     * @param options Additional options.
+     * @see ConfirmOptions
+     * @example
+     * successDialog("Operation complete", () => {
+     *     // do something when OK is clicked
+     * }
+     */
+    function successDialog(message: string, onOk?: () => void, options?: ConfirmOptions): void;
+    /** @obsolete use successDialog */
+    const success: typeof successDialog;
+    /**
+     * Display a warning dialog
+     * @param message The message to display
+     * @param options Additional options.
+     * @see AlertOptions
+     * @example
+     * warningDialog("Something is odd!");
+     */
+    function warningDialog(message: string, options?: AlertOptions): void;
+    /** @obsolete use warningDialog */
+    const warning: typeof warningDialog;
+    /**
+     * Closes a panel, triggering panelbeforeclose and panelclose events.
+     * If the panelbeforeclose prevents the default, the operation is cancelled.
+     * @param element The panel element
+     * @param e  The event triggering the close
+     */
+    function closePanel(element: JQuery | HTMLElement, e?: Event): void;
+    function openPanel(element: JQuery | HTMLElement, uniqueName?: string): void;
 
     interface ServiceError {
         Code?: string;
@@ -696,48 +1005,144 @@ declare namespace Q {
     }
 
     namespace ErrorHandling {
+        /**
+         * Shows a service error as an alert dialog. If the error
+         * is null, has no message or code, it shows "??ERROR??".
+         */
         function showServiceError(error: ServiceError): void;
+        /**
+         * Runtime error handler that shows a runtime error as a notification
+         * by default only in development mode (@see isDevelopmentMode)
+         * This function is assigned as window.onerror handler in
+         * ScriptInit.ts for Serenity applications so that developers
+         * can notice an error without having to check the browser console.
+         */
         function runtimeErrorHandler(message: string, filename?: string, lineno?: number, colno?: number, error?: Error): void;
+        /**
+         * Determines if the current environment is development mode.
+         * The runtimeErrorHandler (window.onerror) shows error notifications only
+         * when this function returns true. The default implementation considers
+         * the environment as development mode if the host is localhost, 127.0.0.1, ::1,
+         * or a domain name that ends with .local/.localhost.
+         * @returns true if the current environment is development mode, false otherwise.
+         */
+        function isDevelopmentMode(): boolean;
     }
 
+    /**
+     * Interface for number formatting, similar to .NET's NumberFormatInfo
+     */
     interface NumberFormat {
+        /** Decimal separator */
         decimalSeparator: string;
+        /** Group separator */
         groupSeparator?: string;
+        /** Number of digits after decimal separator */
         decimalDigits?: number;
+        /** Positive sign */
         positiveSign?: string;
+        /** Negative sign */
         negativeSign?: string;
+        /** Zero symbol */
         nanSymbol?: string;
+        /** Percentage symbol */
         percentSymbol?: string;
+        /** Currency symbol */
         currencySymbol?: string;
     }
+    /** Interface for date formatting, similar to .NET's DateFormatInfo */
     interface DateFormat {
+        /** Date separator */
         dateSeparator?: string;
+        /** Default date format string */
         dateFormat?: string;
+        /** Date order, like dmy, or ymd */
         dateOrder?: string;
+        /** Default date time format string */
         dateTimeFormat?: string;
+        /** AM designator */
         amDesignator?: string;
+        /** PM designator */
         pmDesignator?: string;
+        /** Time separator */
         timeSeparator?: string;
+        /** First day of week, 0 = Sunday, 1 = Monday */
         firstDayOfWeek?: number;
+        /** Array of day names */
         dayNames?: string[];
+        /** Array of short day names */
         shortDayNames?: string[];
+        /** Array of two letter day names */
         minimizedDayNames?: string[];
+        /** Array of month names */
         monthNames?: string[];
+        /** Array of short month names */
         shortMonthNames?: string[];
     }
+    /** Interface for a locale, similar to .NET's CultureInfo */
     interface Locale extends NumberFormat, DateFormat {
+        /** Locale string comparison function, similar to .NET's StringComparer */
         stringCompare?: (a: string, b: string) => number;
+        /** Locale string to upper case function */
         toUpper?: (a: string) => string;
     }
+    /** Invariant locale (e.g. CultureInfo.InvariantCulture) */
     let Invariant: Locale;
+    /**
+     * Factory for a function that compares two strings, based on a character order
+     * passed in the `order` argument.
+     */
     function compareStringFactory(order: string): ((a: string, b: string) => number);
+    /**
+     * Current culture, e.g. CultureInfo.CurrentCulture. This is overridden by
+     * settings passed from a `<script>` element in the page with id `ScriptCulture`
+     * containing a JSON object if available. This element is generally created in
+     * the _LayoutHead.cshtml file for Serenity applications, so that the culture
+     * settings determined server, can be passed to the client.
+     */
     let Culture: Locale;
+    /**
+     * A string to lowercase function that handles special Turkish
+     * characters like 'ı'. Left in for compatibility reasons.
+     */
+    function turkishLocaleToLower(a: string): string;
+    /**
+     * A string to uppercase function that handles special Turkish
+     * characters like 'ı'. Left in for compatibility reasons.
+     */
     function turkishLocaleToUpper(a: string): string;
+    /**
+     * This is an alias for Culture.stringCompare, left in for compatibility reasons.
+     */
     let turkishLocaleCompare: (a: string, b: string) => number;
+    /**
+     * Formats a string with parameters similar to .NET's String.Format function
+     * using current `Culture` locale settings.
+     */
     function format(format: string, ...prm: any[]): string;
-    function localeFormat(format: string, l: Locale, ...prm: any[]): string;
+    /**
+     * Formats a string with parameters similar to .NET's String.Format function
+     * using the locale passed as the first argument.
+     */
+    function localeFormat(l: Locale, format: string, ...prm: any[]): string;
+    /**
+     * Rounds a number to specified digits or an integer number if digits are not specified.
+     * @param n the number to round
+     * @param d the number of digits to round to. default is zero.
+     * @param rounding whether to use banker's rounding
+     * @returns the rounded number
+     */
     let round: (n: number, d?: number, rounding?: boolean) => number;
+    /**
+     * Truncates a number to an integer number.
+     */
     let trunc: (n: number) => number;
+    /**
+     * Formats a number using the current `Culture` locale (or the passed locale) settings.
+     * It supports format specifiers similar to .NET numeric formatting strings.
+     * @param num the number to format
+     * @param format the format specifier. default is 'g'.
+     */
     function formatNumber(num: number, format?: string, decOrLoc?: string | NumberFormat, grp?: string): string;
     function parseInteger(s: string): number;
     function parseDecimal(s: string): number;
@@ -748,29 +1153,66 @@ declare namespace Q {
     function parseISODateTime(s: string): Date;
     function parseHourAndMin(value: string): number;
     function parseDayHourAndMin(s: string): number;
-    function parseDate(s: string, dateOrder?: string): any;
+    function parseDate(s: string, dateOrder?: string): Date;
     function splitDateString(s: string): string[];
 
-    function addOption(select: JQuery, key: string, text: string): void;
-    function addEmptyOption(select: JQuery): void;
-    function clearOptions(select: JQuery): void;
-    function findElementWithRelativeId(element: JQuery, relativeId: string): JQuery;
     /**
-     * Html attribute encodes a string (encodes quotes in addition to &, > and <)
-     * @param s String to be HTML attribute encoded
+     * Adds an empty option to the select.
+     * @param select the select element
      */
-    function attrEncode(s: any): string;
+    function addEmptyOption(select: JQuery | HTMLSelectElement): void;
     /**
-     * Html encodes a string
-     * @param s String to be HTML encoded
+     * Adds an option to the select.
+     */
+    function addOption(select: JQuery | HTMLSelectElement, key: string, text: string): void;
+    /** @obsolete use htmlEncode as it also encodes quotes */
+    const attrEncode: typeof htmlEncode;
+    /** Clears the options in the select element */
+    function clearOptions(select: JQuery): void;
+    /**
+     * Finds the first element with the given relative id to the source element.
+     * It can handle underscores in the source element id.
+     * @param element the source element
+     * @param relativeId the relative id to the source element
+     * @param context the context element (optional)
+     * @returns the element with the given relative id to the source element.
+     */
+    function findElementWithRelativeId(element: JQuery, relativeId: string, context?: HTMLElement): JQuery;
+    /**
+     * Finds the first element with the given relative id to the source element.
+     * It can handle underscores in the source element id.
+     * @param element the source element
+     * @param relativeId the relative id to the source element
+     * @param context the context element (optional)
+     * @returns the element with the given relative id to the source element.
+     */
+    function findElementWithRelativeId(element: HTMLElement, relativeId: string, context?: HTMLElement): HTMLElement;
+    /**
+     * Html encodes a string (encodes single and double quotes, & (ampersand), > and < characters)
+     * @param s String (or number etc.) to be HTML encoded
      */
     function htmlEncode(s: any): string;
-    function log(m: any): void;
+    /**
+     * Creates a new DIV and appends it to the body.
+     * @returns the new DIV element.
+     */
     function newBodyDiv(): JQuery;
+    /**
+     * Returns the outer HTML of the element.
+     */
     function outerHtml(element: JQuery): string;
+    /**
+     * Toggles the class on the element handling spaces like jQuery addClass does.
+     * @param el the element
+     * @param cls the class to toggle
+     * @param remove if true, the class will be added, if false the class will be removed, otherwise it will be toggled.
+     */
+    function toggleClass(el: Element, cls: string, remove?: boolean): void;
 
     function autoFullHeight(element: JQuery): void;
-    function initFullHeightGridPage(gridDiv: JQuery): void;
+    function initFullHeightGridPage(gridDiv: JQuery, opt?: {
+        noRoute?: boolean;
+    }): void;
     function layoutFillHeightValue(element: JQuery): number;
     function layoutFillHeight(element: JQuery): void;
     function setMobileDeviceMode(): void;
@@ -789,17 +1231,19 @@ declare namespace Q {
     function executeOnceWhenVisible(element: JQuery, callback: Function): void;
     function executeEverytimeWhenVisible(element: JQuery, callback: Function, callNowIfVisible: boolean): void;
 
-    function text(key: string): string;
+    function localText(key: string): string;
+    /** @obsolete prefer localText for better discoverability */
+    const text: typeof localText;
     function dbText(prefix: string): ((key: string) => string);
     function prefixedText(prefix: string): (text: string, key: string | ((p?: string) => string)) => string;
     function tryGetText(key: string): string;
     function dbTryText(prefix: string): ((key: string) => string);
-    function proxyTexts(o: Object, p: string, t: Object): Object;
+    function proxyTexts(o: Record<string, any>, p: string, t: Record<string, any>): Object;
     class LT {
         private key;
         static empty: LT;
         constructor(key: string);
-        static add(obj: any, pre?: string): void;
+        static add(key: string, value: string): void;
         get(): string;
         toString(): string;
         static initializeTextClass: (type: any, prefix: string) => void;
@@ -812,7 +1256,16 @@ declare namespace Q {
         textField?: string;
         textFormatter?(item: TItem): string;
     }
-
+    interface Lookup<TItem> {
+        items: TItem[];
+        itemById: {
+            [key: string]: TItem;
+        };
+        idField: string;
+        parentIdField: string;
+        textField: string;
+        textFormatter: (item: TItem) => string;
+    }
     class Lookup<TItem> {
         items: TItem[];
         itemById: {
@@ -823,15 +1276,70 @@ declare namespace Q {
         textField: string;
         textFormatter: (item: TItem) => string;
         constructor(options: LookupOptions<TItem>, items?: TItem[]);
-        update(value: TItem[]): void;
-        protected get_idField(): string;
-        protected get_parentIdField(): string;
-        protected get_textField(): string;
-        protected get_textFormatter(): (item: TItem) => string;
-        protected get_itemById(): {
-            [key: string]: TItem;
-        };
-        protected get_items(): TItem[];
+        update?(value: TItem[]): void;
+    }
+
+    type ToastContainerOptions = {
+        containerId?: string;
+        positionClass?: string;
+        target?: string;
+    };
+    type ToastrOptions = ToastContainerOptions & {
+        tapToDismiss?: boolean;
+        toastClass?: string;
+        showDuration?: number;
+        onShown?: () => void;
+        hideDuration?: number;
+        onHidden?: () => void;
+        closeMethod?: boolean;
+        closeDuration?: number | false;
+        closeEasing?: boolean;
+        closeOnHover?: boolean;
+        extendedTimeOut?: number;
+        iconClass?: string;
+        positionClass?: string;
+        timeOut?: number;
+        titleClass?: string;
+        messageClass?: string;
+        escapeHtml?: boolean;
+        target?: string;
+        closeHtml?: string;
+        closeClass?: string;
+        newestOnTop?: boolean;
+        preventDuplicates?: boolean;
+        onclick?: (event: MouseEvent) => void;
+        onCloseClick?: (event: Event) => void;
+        closeButton?: boolean;
+        rtl?: boolean;
+    };
+    type NotifyMap = {
+        type: string;
+        iconClass: string;
+        title?: string;
+        message?: string;
+    };
+    class Toastr {
+        private listener;
+        private toastId;
+        private previousToast;
+        options: ToastrOptions;
+        constructor(options?: ToastrOptions);
+        private createContainer;
+        getContainer(options?: ToastContainerOptions, create?: boolean): HTMLElement;
+        error(message?: string, title?: string, opt?: ToastrOptions): HTMLElement | null;
+        warning(message?: string, title?: string, opt?: ToastrOptions): HTMLElement | null;
+        success(message?: string, title?: string, opt?: ToastrOptions): HTMLElement | null;
+        info(message?: string, title?: string, opt?: ToastrOptions): HTMLElement | null;
+        subscribe(callback: (response: Toastr) => void): void;
+        publish(args: Toastr): void;
+        clear(toastElement?: HTMLElement | null, clearOptions?: {
+            force?: boolean;
+        }): void;
+        remove(toastElement?: HTMLElement | null): void;
+        removeToast(toastElement: HTMLElement, options?: ToastrOptions): void;
+        private clearContainer;
+        private clearToast;
+        private notify;
     }
 
     let defaultNotifyOptions: ToastrOptions;
@@ -898,7 +1406,7 @@ declare namespace Q {
         quickFilterSeparator?: boolean;
         quickFilterCssClass?: string;
     }
-    interface PropertyItemsData$1 {
+    interface PropertyItemsData {
         items: PropertyItem[];
         additionalItems: PropertyItem[];
     }
@@ -930,25 +1438,20 @@ declare namespace Q {
         function bindToChange(name: string, regClass: string, onChange: () => void): void;
         function triggerChange(name: string): void;
         function unbindFromChange(regClass: string): void;
-        function ensure(name: string): any;
-        function ensureAsync(name: string): Promise<any>;
-        function reload(name: string): any;
-        function reloadAsync(name: string): Promise<any>;
+        function ensure<TData = any>(name: string): TData;
+        function ensureAsync<TData = any>(name: string): Promise<TData>;
+        function reload<TData = any>(name: string): TData;
+        function reloadAsync<TData = any>(name: string): Promise<TData>;
         function canLoad(name: string): boolean;
         function setRegisteredScripts(scripts: any[]): void;
         function set(name: string, value: any): void;
     }
-    function getRemoteData(key: string): any;
-    function getRemoteDataAsync(key: string): Promise<any>;
-    function getLookup<TItem>(key: string): Q.Lookup<TItem>;
-    function getLookupAsync<TItem>(key: string): Promise<Q.Lookup<TItem>>;
-    function reloadLookup(key: string): void;
-    function reloadLookupAsync(key: string): Promise<any>;
-    interface PropertyItemsData {
-        items: PropertyItem[];
-        additionalItems: PropertyItem[];
-        type: "form" | "columns";
-    }
+    function getRemoteData<TData = any>(key: string): TData;
+    function getRemoteDataAsync<TData = any>(key: string): Promise<TData>;
+    function getLookup<TItem>(key: string): Lookup<TItem>;
+    function getLookupAsync<TItem>(key: string): Promise<Lookup<TItem>>;
+    function reloadLookup<TItem = any>(key: string): Lookup<TItem>;
+    function reloadLookupAsync<TItem = any>(key: string): Promise<Lookup<TItem>>;
     function getColumns(key: string): PropertyItem[];
     function getColumnsData(key: string): PropertyItemsData;
     function getColumnsAsync(key: string): Promise<PropertyItem[]>;
@@ -962,8 +1465,8 @@ declare namespace Q {
     function canLoadScriptData(name: string): boolean;
 
     function getCookie(name: string): any;
-    function serviceCall<TResponse>(options: ServiceOptions<TResponse>): JQueryXHR;
-    function serviceRequest<TResponse>(service: string, request?: any, onSuccess?: (response: TResponse) => void, options?: ServiceOptions<TResponse>): JQueryXHR;
+    function serviceCall<TResponse extends ServiceResponse>(options: ServiceOptions<TResponse>): JQueryXHR;
+    function serviceRequest<TResponse extends ServiceResponse>(service: string, request?: any, onSuccess?: (response: TResponse) => void, options?: ServiceOptions<TResponse>): JQueryXHR;
     function setEquality(request: ListRequest, field: string, value: any): void;
     interface PostToServiceOptions {
         url?: string;
@@ -981,19 +1484,82 @@ declare namespace Q {
     function postToUrl(options: PostToUrlOptions): void;
     function resolveUrl(url: string): string;
 
+    /**
+     * Checks if the string ends with the specified substring.
+     * @param s String to check.
+     * @param suffix Suffix to check.
+     * @returns True if the string ends with the specified substring.
+     */
     function endsWith(s: string, suffix: string): boolean;
+    /**
+     * Checks if the string is empty or null.
+     * @param s String to check.
+     * @returns True if the string is empty or null.
+     */
     function isEmptyOrNull(s: string): boolean;
+    /**
+     * Checks if the string is empty or null or whitespace.
+     * @param s String to check.
+     * @returns True if the string is empty or null or whitespace.
+     */
     function isTrimmedEmpty(s: string): boolean;
+    /**
+     * Pads the string to the left with the specified character.
+     * @param s String to pad.
+     * @param len Target length of the string.
+     * @param ch Character to pad with.
+     * @returns Padded string.
+     */
     function padLeft(s: string | number, len: number, ch?: string): any;
+    /**
+     * Checks if the string starts with the prefix
+     * @param s String to check.
+     * @param prefix Prefix to check.
+     * @returns True if the string starts with the prefix.
+     */
     function startsWith(s: string, prefix: string): boolean;
+    /**
+     * Converts the string to single line by removing line end characters
+     * @param str String to convert.
+     */
     function toSingleLine(str: string): string;
-    var trimEnd: (s: string) => string;
-    var trimStart: (s: string) => string;
+    /**
+     * Trims the whitespace characters from the end of the string
+     */
+    var trimEnd: (s: string) => any;
+    /**
+     * Trims the whitespace characters from the start of the string
+     */
+    var trimStart: (s: string) => any;
+    /**
+     * Trims the whitespace characters from the start and end of the string
+     * This returns empty string even when the string is null or undefined.
+     */
     function trim(s: string): string;
+    /**
+     * Trims the whitespace characters from the start and end of the string
+     * Returns empty string if the string is null or undefined.
+     */
     function trimToEmpty(s: string): string;
+    /**
+     * Trims the whitespace characters from the start and end of the string
+     * Returns null if the string is null, undefined or whitespace.
+     */
     function trimToNull(s: string): string;
-    function replaceAll(s: string, f: string, r: string): string;
-    function zeroPad(n: number, digits: number): string;
+    /**
+     * Replaces all occurrences of the search string with the replacement string.
+     * @param str String to replace.
+     * @param find String to find.
+     * @param replace String to replace with.
+     * @returns Replaced string.
+     */
+    function replaceAll(str: string, find: string, replace: string): string;
+    /**
+     * Pads the start of string to make it the specified length.
+     * @param s String to pad.
+     * @param len Target length of the string.
+     */
+    function zeroPad(n: number, len: number): string;
 
     type Dictionary<TItem> = {
         [key: string]: TItem;
@@ -1012,9 +1578,12 @@ declare namespace Q {
         setter?: string;
     }
     function getNested(from: any, name: string): any;
+    function getGlobalThis(): any;
     function getType(name: string, target?: any): Type;
+    function getTypeNameProp(type: Type): string;
+    function setTypeNameProp(type: Type, value: string): void;
     function getTypeFullName(type: Type): string;
-    function getTypeName(type: Type): string;
+    function getTypeShortName(type: Type): string;
     function getInstanceType(instance: any): any;
     function isAssignableFrom(target: any, type: Type): boolean;
     function isInstanceOfType(instance: any, type: Type): boolean;
@@ -1031,7 +1600,7 @@ declare namespace Q {
     function getTypes(from?: any): any[];
     function clearKeys(d: any): void;
     function delegateCombine(delegate1: any, delegate2: any): any;
-    function getStateStore(): any;
+    function getStateStore(key?: string): any;
     namespace Enum {
         let toString: (enumType: any, value: number) => string;
         let getValues: (enumType: any) => any[];
@@ -1043,23 +1612,19 @@ declare namespace Q {
     function fieldsProxy<TRow>(): Readonly<Record<keyof TRow, string>>;
     function keyOf<T>(prop: keyof T): keyof T;
     function registerClass(type: any, name: string, intf?: any[]): void;
-    function registerEnum(type: any, name: string): void;
+    function registerEditor(type: any, name: string, intf?: any[]): void;
+    function registerEnum(type: any, name: string, enumKey?: string): void;
     function registerInterface(type: any, name: string, intf?: any[]): void;
     function addAttribute(type: any, attr: any): void;
-    function setTypeName(target: Type, value: string): void;
     class ISlickFormatter {
+    }
+    class EditorAttribute {
     }
     function initializeTypes(root: any, pre: string, limit: number): void;
     class Exception extends Error {
         constructor(message: string);
     }
-    class NullReferenceException extends Exception {
-        constructor(message?: string);
-    }
     class ArgumentNullException extends Exception {
-        constructor(paramName: string, message?: string);
-    }
-    class ArgumentOutOfRangeException extends Exception {
         constructor(paramName: string, message?: string);
     }
     class InvalidCastException extends Exception {
@@ -1067,7 +1632,7 @@ declare namespace Q {
     }
 
     function validatorAbortHandler(validator: any): void;
-    function validateOptions(options: JQueryValidation.ValidationOptions): JQueryValidation.ValidationOptions;
+    function validateOptions(options?: JQueryValidation.ValidationOptions): JQueryValidation.ValidationOptions;
 
     function loadValidationErrorMessages(): void;
     function getHighlightTarget(el: HTMLElement): HTMLElement;
@@ -1076,50 +1641,149 @@ declare namespace Q {
     function addValidationRule(element: JQuery, eventClass: string, rule: (p1: JQuery) => string): JQuery;
     function removeValidationRule(element: JQuery, eventClass: string): JQuery;
 
-    function Criteria(field: string): any[];
+    /**
+     * CriteriaBuilder is a class that allows to build unary or binary criteria with completion support.
+     */
+    class CriteriaBuilder extends Array {
+        /**
+         * Creates a between criteria.
+         * @param fromInclusive from value
+         * @param toInclusive to value
+         */
+        bw(fromInclusive: any, toInclusive: any): Array<any>;
+        /**
+         * Creates a contains criteria
+         * @param value contains value
+         */
+        contains(value: string): Array<any>;
+        /**
+         * Creates a endsWith criteria
+         * @param value endsWith value
+         */
+        endsWith(value: string): Array<any>;
+        /**
+         * Creates an equal (=) criteria
+         * @param value equal value
+         */
+        eq(value: any): Array<any>;
+        /**
+         * Creates a greater than criteria
+         * @param value greater than value
+         */
+        gt(value: any): Array<any>;
+        /**
+         * Creates a greater than or equal criteria
+         * @param value greater than or equal value
+         */
+        ge(value: any): Array<any>;
+        /**
+         * Creates a in criteria
+         * @param values in values
+         */
+        in(values: any[]): Array<any>;
+        /**
+         * Creates a IS NULL criteria
+         */
+        isNull(): Array<any>;
+        /**
+         * Creates a IS NOT NULL criteria
+         */
+        isNotNull(): Array<any>;
+        /**
+         * Creates a less than or equal to criteria
+         * @param value less than or equal to value
+         */
+        le(value: any): Array<any>;
+        /**
+         * Creates a less than criteria
+         * @param value less than value
+         */
+        lt(value: any): Array<any>;
+        /**
+         * Creates a not equal criteria
+         * @param value not equal value
+         */
+        ne(value: any): Array<any>;
+        /**
+         * Creates a LIKE criteria
+         * @param value like value
+         */
+        like(value: any): Array<any>;
+        /**
+         * Creates a STARTS WITH criteria
+         * @param value startsWith value
+         */
+        startsWith(value: string): Array<any>;
+        /**
+         * Creates a NOT IN criteria
+         * @param values array of NOT IN values
+         */
+        notIn(values: any[]): Array<any>;
+        /**
+         * Creates a NOT LIKE criteria
+         * @param value not like value
+         */
+        notLike(value: any): Array<any>;
+    }
+    /**
+     * Parses a criteria expression to Serenity Criteria array format.
+     * The string may optionally contain parameters like `A >= @p1 and B < @p2`.
+     * @param expression The criteria expression.
+     * @param params The dictionary containing parameter values like { p1: 10, p2: 20 }.
+     * @example
+     * parseCriteria('A >= @p1 and B < @p2', { p1: 5, p2: 4 }) // [[[a], '>=' 5], 'and', [[b], '<', 4]]
+     */
+    function parseCriteria(expression: string, params?: any): any[];
+    /**
+     * Parses a criteria expression to Serenity Criteria array format.
+     * The expression may contain parameter placeholders like `A >= ${p1}`
+     * where p1 is a variable in the scope.
+     * @param strings The string fragments.
+     * @param values The tagged template arguments.
+     * @example
+     * var a = 5, b = 4;
+     * parseCriteria`A >= ${a} and B < ${b}` // [[[a], '>=' 5], 'and', [[b], '<', 4]]
+     */
+    function parseCriteria(strings: TemplateStringsArray, ...values: any[]): any[];
+    enum CriteriaOperator {
+        paren = "()",
+        not = "not",
+        isNull = "is null",
+        isNotNull = "is not null",
+        exists = "exists",
+        and = "and",
+        or = "or",
+        xor = "xor",
+        eq = "=",
+        ne = "!=",
+        gt = ">",
+        ge = ">=",
+        lt = "<",
+        le = "<=",
+        in = "in",
+        notIn = "not in",
+        like = "like",
+        notLike = "not like"
+    }
+    /**
+     * Creates a new criteria builder containg the passed field name.
+     * @param field The field name.
+     */
+    function Criteria(field: string): CriteriaBuilder;
     namespace Criteria {
-        function isEmpty(c: any[]): boolean;
-        function join(c1: any[], op: string, c2: any[]): any[];
-        function paren(c: any[]): any[];
-        function and(c1: any[], c2: any[], ...rest: any[][]): any[];
-        function or(c1: any[], c2: any[], ...rest: any[][]): any[];
-        enum Operator {
-            paren = "()",
-            not = "not",
-            isNull = "is null",
-            isNotNull = "is not null",
-            exists = "exists",
-            and = "and",
-            or = "or",
-            xor = "xor",
-            eq = "=",
-            ne = "!=",
-            gt = ">",
-            ge = ">=",
-            lt = "<",
-            le = "<=",
-            in = "in",
-            notIn = "not in",
-            like = "like",
-            notLike = "not like"
-        }
+        var and: (c1: any[], c2: any[], ...rest: any[][]) => any[];
+        var Operator: typeof CriteriaOperator;
+        var isEmpty: (c: any[]) => boolean;
+        var join: (c1: any[], op: string, c2: any[]) => any[];
+        var not: (c: any[]) => (string | any[])[];
+        var or: (c1: any[], c2: any[], ...rest: any[][]) => any[];
+        var paren: (c: any[]) => any[];
+        var parse: typeof parseCriteria;
     }
 }
-declare namespace Q {
-    interface Lookup<TItem> {
-        items: TItem[];
-        itemById: {
-            [key: string]: TItem;
-        };
-        idField: string;
-        parentIdField: string;
-        textField: string;
-        textFormatter: (item: TItem) => string;
-    }
-}
+
 
 declare namespace Slick {
-
     /***
      * A base class that all special / non-data rows (like Group and GroupTotals) derive from.
      */
@@ -1143,20 +1807,20 @@ declare namespace Slick {
     	/** when returning a formatter result, prefer ctx.escape() to avoid html injection attacks! */
     	value?: any;
     }
-    type ColumnFormat<TItem = any> = (ctx: FormatterContext<TItem>) => string;
+    export type ColumnFormat<TItem = any> = (ctx: FormatterContext<TItem>) => string;
     interface CompatFormatterResult {
     	addClasses?: string;
     	text?: string;
     	toolTip?: string;
     }
-    type CompatFormatter<TItem = any> = (row: number, cell: number, value: any, column: Column<TItem>, item: TItem, grid?: any) => string | CompatFormatterResult;
+    export type CompatFormatter<TItem = any> = (row: number, cell: number, value: any, column: Column<TItem>, item: TItem, grid?: any) => string | CompatFormatterResult;
     interface FormatterFactory<TItem = any> {
     	getFormat?(column: Column<TItem>): ColumnFormat<TItem>;
     	getFormatter?(column: Column<TItem>): CompatFormatter<TItem>;
     }
-    type AsyncPostRender<TItem = any> = (cellNode: HTMLElement, row: number, item: TItem, column: Column<TItem>, reRender: boolean) => void;
-    type AsyncPostCleanup<TItem = any> = (cellNode: HTMLElement, row?: number, column?: Column<TItem>) => void;
-    type CellStylesHash = {
+    export type AsyncPostRender<TItem = any> = (cellNode: HTMLElement, row: number, item: TItem, column: Column<TItem>, reRender: boolean) => void;
+    export type AsyncPostCleanup<TItem = any> = (cellNode: HTMLElement, row?: number, column?: Column<TItem>) => void;
+    export type CellStylesHash = {
     	[row: number]: {
     		[columnId: string]: string;
     	};
@@ -1273,7 +1937,7 @@ declare namespace Slick {
     	 */
     	max?: any;
     }
-    type Handler<TArgs, TEventData extends IEventData = IEventData> = (e: TEventData, args: TArgs) => void;
+    export type EventListener<TArgs, TEventData extends IEventData = IEventData> = (e: TEventData, args: TArgs) => void;
     interface IEventData {
     	readonly type?: string;
     	currentTarget?: EventTarget | null;
@@ -1290,8 +1954,6 @@ declare namespace Slick {
     /***
      * An event object for passing data to event handlers and letting them control propagation.
      * <p>This is pretty much identical to how W3C and jQuery implement events.</p>
-     * @class EventData
-     * @constructor
      */
     class EventData implements IEventData {
     	private _isPropagationStopped;
@@ -1303,46 +1965,38 @@ declare namespace Slick {
     	stopPropagation(): void;
     	/***
     	 * Returns whether stopPropagation was called on this event object.
-    	 * @method isPropagationStopped
-    	 * @return {Boolean}
     	 */
     	isPropagationStopped(): boolean;
     	/***
     	 * Prevents the rest of the handlers from being executed.
-    	 * @method stopImmediatePropagation
     	 */
     	stopImmediatePropagation(): void;
     	/***
     	 * Returns whether stopImmediatePropagation was called on this event object.\
-    	 * @method isImmediatePropagationStopped
-    	 * @return {Boolean}
     	 */
     	isImmediatePropagationStopped(): boolean;
     }
     /***
      * A simple publisher-subscriber implementation.
-     * @class Event
-     * @constructor
      */
-    class Event<TArgs = any, TEventData extends IEventData = IEventData> {
+    class EventEmitter<TArgs = any, TEventData extends IEventData = IEventData> {
     	private _handlers;
     	/***
     	 * Adds an event handler to be called when the event is fired.
-    	 * <p> Slick.Event handler will receive two arguments - an <code>EventData</code> and the <code>data</code>
+    	 * <p>Slick.Event handler will receive two arguments - an <code>EventData</code> and the <code>data</code>
     	 * object the event was fired with.<p>
     	 * @method subscribe
     	 * @param fn {Function} Event handler.
     	 */
-    	subscribe(fn: Handler<TArgs, TEventData>): void;
+    	subscribe(fn: EventListener<TArgs, TEventData>): void;
     	/***
     	 * Removes an event handler added with <code>subscribe(fn)</code>.
     	 * @method unsubscribe
     	 * @param fn {Function} Event handler to be removed.
     	 */
-    	unsubscribe(fn: Handler<TArgs, TEventData>): void;
+    	unsubscribe(fn: EventListener<TArgs, TEventData>): void;
     	/***
     	 * Fires an event notifying all subscribers.
-    	 * @method notify
     	 * @param args {Object} Additional data object to be passed to all handlers.
     	 * @param e {EventData}
     	 *      Optional.
@@ -1351,16 +2005,16 @@ declare namespace Slick {
     	 * @param scope {Object}
     	 *      Optional.
     	 *      The scope ("this") within which the handler will be executed.
-    	 *      If not specified, the scope will be set to the <code> Slick.Event</code> instance.
+    	 *      If not specified, the scope will be set to the <code>Slick.Event</code> instance.
     	 */
     	notify(args?: any, e?: TEventData, scope?: object): any;
     	clear(): void;
     }
-    class EventHandler<TArgs = any, TEventData extends IEventData = IEventData> {
+    class EventSubscriber<TArgs = any, TEventData extends IEventData = IEventData> {
     	private _handlers;
-    	subscribe(event: Slick.Event<TArgs, TEventData>, handler: Handler<TArgs, TEventData>): this;
-    	unsubscribe(event: Slick.Event<TArgs, TEventData>, handler: Handler<TArgs, TEventData>): this;
-    	unsubscribeAll(): EventHandler<TArgs, TEventData>;
+    	subscribe(event: EventEmitter<TArgs, TEventData>, handler: EventListener<TArgs, TEventData>): this;
+    	unsubscribe(event: EventEmitter<TArgs, TEventData>, handler: EventListener<TArgs, TEventData>): this;
+    	unsubscribeAll(): EventSubscriber<TArgs, TEventData>;
     }
     /** @deprecated */
     const keyCode: {
@@ -1401,7 +2055,7 @@ declare namespace Slick {
     	getActiveCell(): RowCell;
     	navigateNext(): boolean;
     	navigatePrev(): boolean;
-    	onCompositeEditorChange: Slick.Event<any>;
+    	onCompositeEditorChange: EventEmitter<any>;
     }
     interface CompositeEditorOptions {
     	formValues: any;
@@ -1549,6 +2203,8 @@ declare namespace Slick {
     const columnDefaults: Partial<Column>;
     interface ColumnMetadata<TItem = any> {
     	colspan: number | "*";
+    	cssClasses?: string;
+    	editor?: EditorClass;
     	format?: ColumnFormat<TItem>;
     	/** @deprecated */
     	formatter?: CompatFormatter<TItem>;
@@ -1558,12 +2214,15 @@ declare namespace Slick {
     	sortAsc?: boolean;
     }
     interface ItemMetadata<TItem = any> {
+    	cssClasses?: string;
     	columns?: {
     		[key: string]: ColumnMetadata<TItem>;
     	};
+    	focusable?: boolean;
     	format?: ColumnFormat<TItem>;
     	/** @deprecated */
     	formatter?: CompatFormatter<TItem>;
+    	selectable?: boolean;
     }
     function initializeColumns(columns: Column[], defaults: Partial<Column<any>>): void;
     function titleize(str: string): string;
@@ -1621,7 +2280,7 @@ declare namespace Slick {
     }
     interface SelectionModel extends IPlugin {
     	setSelectedRanges(ranges: Range[]): void;
-    	onSelectedRangesChanged: Slick.Event<Range[]>;
+    	onSelectedRangesChanged: EventEmitter<Range[]>;
     	refreshSelections?(): void;
     }
     interface ViewRange {
@@ -1747,7 +2406,10 @@ declare namespace Slick {
     	groupingPanelHeight?: number;
     	groupTotalsFormatter?: (p1?: GroupTotals<TItem>, p2?: Column<TItem>, grid?: any) => string;
     	headerRowHeight?: number;
-    	jQuery?: JQueryStatic;
+    	jQuery?: {
+    		ready: any;
+    		fn: any;
+    	};
     	leaveSpaceForNewRows?: boolean;
     	layoutEngine?: LayoutEngine;
     	minBuffer?: number;
@@ -1770,6 +2432,7 @@ declare namespace Slick {
     	syncColumnCellResize?: boolean;
     	topPanelHeight?: number;
     	useLegacyUI?: boolean;
+    	useCssVars?: boolean;
     	viewportClass?: string;
     }
     const gridDefaults: GridOptions;
@@ -1844,43 +2507,47 @@ declare namespace Slick {
     	private _focusSink1;
     	private _focusSink2;
     	private _groupingPanel;
-    	readonly onActiveCellChanged: Slick.Event<ArgsCell, IEventData>;
-    	readonly onActiveCellPositionChanged: Slick.Event<ArgsGrid, IEventData>;
-    	readonly onAddNewRow: Slick.Event<ArgsAddNewRow, IEventData>;
-    	readonly onBeforeCellEditorDestroy: Slick.Event<ArgsEditorDestroy, IEventData>;
-    	readonly onBeforeDestroy: Slick.Event<ArgsGrid, IEventData>;
-    	readonly onBeforeEditCell: Slick.Event<ArgsCellEdit, IEventData>;
-    	readonly onBeforeFooterRowCellDestroy: Slick.Event<ArgsColumnNode, IEventData>;
-    	readonly onBeforeHeaderCellDestroy: Slick.Event<ArgsColumnNode, IEventData>;
-    	readonly onBeforeHeaderRowCellDestroy: Slick.Event<ArgsColumnNode, IEventData>;
-    	readonly onCellChange: Slick.Event<ArgsCellChange, IEventData>;
-    	readonly onCellCssStylesChanged: Slick.Event<ArgsCssStyle, IEventData>;
-    	readonly onClick: Slick.Event<ArgsCell, MouseEvent>;
-    	readonly onColumnsReordered: Slick.Event<ArgsGrid, IEventData>;
-    	readonly onColumnsResized: Slick.Event<ArgsGrid, IEventData>;
-    	readonly onCompositeEditorChange: Slick.Event<ArgsGrid, IEventData>;
-    	readonly onContextMenu: Slick.Event<ArgsGrid, UIEvent>;
-    	readonly onDblClick: Slick.Event<ArgsCell, MouseEvent>;
-    	readonly onDrag: Slick.Event<ArgsGrid, UIEvent>;
-    	readonly onDragEnd: Slick.Event<ArgsGrid, UIEvent>;
-    	readonly onDragInit: Slick.Event<ArgsGrid, UIEvent>;
-    	readonly onDragStart: Slick.Event<ArgsGrid, UIEvent>;
-    	readonly onFooterRowCellRendered: Slick.Event<ArgsColumnNode, IEventData>;
-    	readonly onHeaderCellRendered: Slick.Event<ArgsColumnNode, IEventData>;
-    	readonly onHeaderClick: Slick.Event<ArgsColumn, IEventData>;
-    	readonly onHeaderContextMenu: Slick.Event<ArgsColumn, IEventData>;
-    	readonly onHeaderMouseEnter: Slick.Event<ArgsColumn, MouseEvent>;
-    	readonly onHeaderMouseLeave: Slick.Event<ArgsColumn, MouseEvent>;
-    	readonly onHeaderRowCellRendered: Slick.Event<ArgsColumnNode, IEventData>;
-    	readonly onKeyDown: Slick.Event<ArgsCell, KeyboardEvent>;
-    	readonly onMouseEnter: Slick.Event<ArgsGrid, MouseEvent>;
-    	readonly onMouseLeave: Slick.Event<ArgsGrid, MouseEvent>;
-    	readonly onScroll: Slick.Event<ArgsScroll, IEventData>;
-    	readonly onSelectedRowsChanged: Slick.Event<ArgsSelectedRowsChange, IEventData>;
-    	readonly onSort: Slick.Event<ArgsSort, IEventData>;
-    	readonly onValidationError: Slick.Event<ArgsValidationError, IEventData>;
-    	readonly onViewportChanged: Slick.Event<ArgsGrid, IEventData>;
-    	constructor(container: JQuery | HTMLElement, data: any, columns: Column<TItem>[], options: GridOptions<TItem>);
+    	readonly onActiveCellChanged: EventEmitter<ArgsCell, IEventData>;
+    	readonly onActiveCellPositionChanged: EventEmitter<ArgsGrid, IEventData>;
+    	readonly onAddNewRow: EventEmitter<ArgsAddNewRow, IEventData>;
+    	readonly onBeforeCellEditorDestroy: EventEmitter<ArgsEditorDestroy, IEventData>;
+    	readonly onBeforeDestroy: EventEmitter<ArgsGrid, IEventData>;
+    	readonly onBeforeEditCell: EventEmitter<ArgsCellEdit, IEventData>;
+    	readonly onBeforeFooterRowCellDestroy: EventEmitter<ArgsColumnNode, IEventData>;
+    	readonly onBeforeHeaderCellDestroy: EventEmitter<ArgsColumnNode, IEventData>;
+    	readonly onBeforeHeaderRowCellDestroy: EventEmitter<ArgsColumnNode, IEventData>;
+    	readonly onCellChange: EventEmitter<ArgsCellChange, IEventData>;
+    	readonly onCellCssStylesChanged: EventEmitter<ArgsCssStyle, IEventData>;
+    	readonly onClick: EventEmitter<ArgsCell, MouseEvent>;
+    	readonly onColumnsReordered: EventEmitter<ArgsGrid, IEventData>;
+    	readonly onColumnsResized: EventEmitter<ArgsGrid, IEventData>;
+    	readonly onCompositeEditorChange: EventEmitter<ArgsGrid, IEventData>;
+    	readonly onContextMenu: EventEmitter<ArgsGrid, UIEvent>;
+    	readonly onDblClick: EventEmitter<ArgsCell, MouseEvent>;
+    	readonly onDrag: EventEmitter<ArgsGrid, UIEvent>;
+    	readonly onDragEnd: EventEmitter<ArgsGrid, UIEvent>;
+    	readonly onDragInit: EventEmitter<ArgsGrid, UIEvent>;
+    	readonly onDragStart: EventEmitter<ArgsGrid, UIEvent>;
+    	readonly onFooterRowCellRendered: EventEmitter<ArgsColumnNode, IEventData>;
+    	readonly onHeaderCellRendered: EventEmitter<ArgsColumnNode, IEventData>;
+    	readonly onHeaderClick: EventEmitter<ArgsColumn, IEventData>;
+    	readonly onHeaderContextMenu: EventEmitter<ArgsColumn, IEventData>;
+    	readonly onHeaderMouseEnter: EventEmitter<ArgsColumn, MouseEvent>;
+    	readonly onHeaderMouseLeave: EventEmitter<ArgsColumn, MouseEvent>;
+    	readonly onHeaderRowCellRendered: EventEmitter<ArgsColumnNode, IEventData>;
+    	readonly onKeyDown: EventEmitter<ArgsCell, KeyboardEvent>;
+    	readonly onMouseEnter: EventEmitter<ArgsGrid, MouseEvent>;
+    	readonly onMouseLeave: EventEmitter<ArgsGrid, MouseEvent>;
+    	readonly onScroll: EventEmitter<ArgsScroll, IEventData>;
+    	readonly onSelectedRowsChanged: EventEmitter<ArgsSelectedRowsChange, IEventData>;
+    	readonly onSort: EventEmitter<ArgsSort, IEventData>;
+    	readonly onValidationError: EventEmitter<ArgsValidationError, IEventData>;
+    	readonly onViewportChanged: EventEmitter<ArgsGrid, IEventData>;
+    	constructor(container: HTMLElement | {
+    		jquery: string;
+    		length: number;
+    	}, data: any, columns: Column<TItem>[], options: GridOptions<TItem>);
+    	private createGroupingPanel;
     	private bindAncestorScroll;
     	init(): void;
     	private hasFrozenColumns;
@@ -1889,6 +2556,7 @@ declare namespace Slick {
     	unregisterPlugin(plugin: IPlugin): void;
     	getPluginByName(name: string): IPlugin;
     	setSelectionModel(model: SelectionModel): void;
+    	private unregisterSelectionModel;
     	getScrollBarDimensions(): {
     		width: number;
     		height: number;
@@ -1901,13 +2569,11 @@ declare namespace Slick {
     	getSelectionModel(): SelectionModel;
     	private colIdOrIdxToCell;
     	getCanvasNode(columnIdOrIdx?: string | number, row?: number): HTMLElement;
-    	getCanvases(): JQuery | HTMLElement[];
+    	getCanvases(): any | HTMLElement[];
     	getActiveCanvasNode(e?: IEventData): HTMLElement;
-    	setActiveCanvasNode(e?: IEventData): void;
     	getViewportNode(columnIdOrIdx?: string | number, row?: number): HTMLElement;
     	private getViewports;
     	getActiveViewportNode(e?: IEventData): HTMLElement;
-    	setActiveViewportNode(e?: IEventData): void;
     	private getAvailableWidth;
     	private updateCanvasWidth;
     	private unbindAncestorScrollEvents;
@@ -2014,7 +2680,8 @@ declare namespace Slick {
     	private invalidatePostProcessingResults;
     	private updateRowPositions;
     	private updateGrandTotals;
-    	private render;
+    	groupTotalsFormatter(p1?: GroupTotals<TItem>, p2?: Column<TItem>, grid?: any): string;
+    	render: () => void;
     	private handleHeaderRowScroll;
     	private handleFooterRowScroll;
     	private handleMouseWheel;
@@ -2123,7 +2790,7 @@ declare namespace Slick {
     interface ArgsColumnNode extends ArgsColumn {
     	node: HTMLElement;
     }
-    type ArgsSortCol = {
+    export type ArgsSortCol = {
     	sortCol: Column;
     	sortAsc: boolean;
     };
@@ -2280,6 +2947,64 @@ declare namespace Slick {
     	const PercentComplete: typeof PercentCompleteEditor;
     	const LongText: typeof LongTextEditor;
     }
+    interface GroupItemMetadataProviderOptions {
+    	enableExpandCollapse?: boolean;
+    	groupCellCssClass?: string;
+    	groupCssClass?: string;
+    	groupIndentation?: number;
+    	groupFocusable?: boolean;
+    	groupFormat?: ColumnFormat<Group>;
+    	groupFormatter?: CompatFormatter<Group>;
+    	groupLevelPrefix?: string;
+    	groupRowTotals?: boolean;
+    	groupTitleCssClass?: string;
+    	hasSummaryType?: (column: Column) => boolean;
+    	toggleCssClass?: string;
+    	toggleExpandedCssClass?: string;
+    	toggleCollapsedCssClass?: string;
+    	totalsCssClass?: string;
+    	totalsFocusable?: boolean;
+    	totalsFormat?: ColumnFormat<GroupTotals>;
+    	totalsFormatter?: CompatFormatter<GroupTotals>;
+    }
+    class GroupItemMetadataProvider {
+    	protected grid: Pick<Grid, "getActiveCell" | "getColumns" | "getData" | "getDataItem" | "getRenderedRange" | "onClick" | "onKeyDown" | "groupTotalsFormatter">;
+    	private options;
+    	constructor(opt?: GroupItemMetadataProviderOptions);
+    	static readonly defaults: GroupItemMetadataProviderOptions;
+    	static defaultGroupFormat(ctx: FormatterContext, opt?: GroupItemMetadataProviderOptions): string;
+    	static defaultTotalsFormat(ctx: FormatterContext, grid?: typeof this.prototype["grid"]): string;
+    	init(grid: typeof this.grid): void;
+    	readonly pluginName = "GroupItemMetadataProvider";
+    	destroy(): void;
+    	getOptions(): GroupItemMetadataProviderOptions;
+    	setOptions(value: GroupItemMetadataProviderOptions): void;
+    	handleGridClick: (e: MouseEvent, args: ArgsCell) => void;
+    	handleGridKeyDown: (e: KeyboardEvent, args: ArgsCell) => void;
+    	groupCellPosition: () => {
+    		cell: number;
+    		colspan: number | "*";
+    	};
+    	getGroupRowMetadata: ((item: Group) => ItemMetadata);
+    	getTotalsRowMetadata: ((item: GroupTotals) => ItemMetadata);
+    }
+    interface AutoTooltipsOptions {
+    	enableForCells?: boolean;
+    	enableForHeaderCells?: boolean;
+    	maxToolTipLength?: number;
+    	replaceExisting?: boolean;
+    }
+    class AutoTooltips implements IPlugin {
+    	private grid;
+    	private options;
+    	constructor(options?: AutoTooltipsOptions);
+    	static readonly defaults: AutoTooltipsOptions;
+    	init(grid: Grid): void;
+    	destroy(): void;
+    	private handleMouseEnter;
+    	private handleHeaderMouseEnter;
+    	pluginName: string;
+    }
 }
 
 
@@ -2325,13 +3050,6 @@ declare namespace Slick {
         onChangePage?: (newPage: number) => void;
         onRowsPerPageChange?: (n: number) => void;
     }
-    class RowSelectionModel implements SelectionModel {
-        init(grid: Grid): void;
-        destroy?: () => void;
-        setSelectedRanges(ranges: Range[]): void;
-        onSelectedRangesChanged: Slick.Event<Range[]>;
-        refreshSelections?(): void;
-    }
     interface SummaryOptions {
         aggregators: any[];
     }
@@ -2356,7 +3074,7 @@ declare namespace Slick {
         onProcessData?: RemoteViewProcessCallback<any>;
         method?: string;
         inlineFilters?: boolean;
-        groupItemMetadataProvider?: Slick.Data.GroupItemMetadataProvider;
+        groupItemMetadataProvider?: GroupItemMetadataProvider;
         onAjaxCall?: RemoteViewAjaxCallback<any>;
         getItemMetadata?: (p1?: any, p2?: number) => any;
         errorMsg?: string;
@@ -2375,16 +3093,16 @@ declare namespace Slick {
     type RemoteViewProcessCallback<TEntity> = (data: Q.ListResponse<TEntity>, view: RemoteView<TEntity>) => Q.ListResponse<TEntity>;
     interface RemoteView<TEntity> {
         onSubmit: CancellableViewCallback<TEntity>;
-        onDataChanged: Slick.Event;
-        onDataLoading: Slick.Event;
-        onDataLoaded: Slick.Event;
-        onPagingInfoChanged: Slick.Event;
-        onRowCountChanged: Slick.Event;
-        onRowsChanged: Slick.Event;
-        onRowsOrCountChanged: Slick.Event;
+        onDataChanged: EventEmitter;
+        onDataLoading: EventEmitter;
+        onDataLoaded: EventEmitter;
+        onPagingInfoChanged: EventEmitter;
+        onRowCountChanged: EventEmitter;
+        onRowsChanged: EventEmitter;
+        onRowsOrCountChanged: EventEmitter;
         getPagingInfo(): PagingInfo;
-        onGroupExpanded: Slick.Event;
-        onGroupCollapsed: Slick.Event;
+        onGroupExpanded: EventEmitter;
+        onGroupCollapsed: EventEmitter;
         onAjaxCall: RemoteViewAjaxCallback<TEntity>;
         onProcessData: RemoteViewProcessCallback<TEntity>;
         addData(data: Q.ListResponse<TEntity>): void;
@@ -2395,6 +3113,8 @@ declare namespace Slick {
         setFilter(filter: RemoteViewFilter<TEntity>): void;
         getFilter(): RemoteViewFilter<TEntity>;
         getFilteredItems(): any;
+        getGroupItemMetadataProvider(): GroupItemMetadataProvider;
+        setGroupItemMetadataProvider(value: GroupItemMetadataProvider): void;
         fastSort: any;
         setItems(items: any[], newIdProperty?: boolean | string): void;
         getIdPropertyName(): string;
@@ -2452,15 +3172,9 @@ declare namespace Slick {
 }
 
 
-declare namespace Slick {
-    interface Column<TItem = any> {
-        referencedFields?: string[];
-        sourceItem?: Q.PropertyItem;
-    }
-}
-
 declare namespace Serenity {
     export import ColumnSelection = Q.ColumnSelection;
+    export import Criteria = Q.Criteria;
     export import DeleteRequest = Q.DeleteRequest;
     export import DeleteResponse = Q.DeleteResponse;
     export import ISlickFormatter = Q.ISlickFormatter;
@@ -2484,36 +3198,8 @@ declare namespace Serenity {
     export import SummaryType = Q.SummaryType;
     export import UndeleteRequest = Q.UndeleteRequest;
     export import UndeleteResponse = Q.UndeleteResponse;
+    export import Formatter = Slick.Formatter;
 
-
-    function Criteria(field: string): any[];
-    namespace Criteria {
-        function isEmpty(c: any[]): boolean;
-        function join(c1: any[], op: string, c2: any[]): any[];
-        function paren(c: any[]): any[];
-        function and(c1: any[], c2: any[], ...rest: any[][]): any[];
-        function or(c1: any[], c2: any[], ...rest: any[][]): any[];
-        enum Operator {
-            paren = "()",
-            not = "not",
-            isNull = "is null",
-            isNotNull = "is not null",
-            exists = "exists",
-            and = "and",
-            or = "or",
-            xor = "xor",
-            eq = "=",
-            ne = "!=",
-            gt = ">",
-            ge = ">=",
-            lt = "<",
-            le = "<=",
-            in = "in",
-            notIn = "not in",
-            like = "like",
-            notLike = "not like"
-        }
-    }
 
     class IBooleanValue {
     }
@@ -2538,7 +3224,7 @@ declare namespace Serenity {
     class IEditDialog {
     }
     interface IEditDialog {
-        load(entityOrId: any, done: () => void, fail: (p1: any) => void): void;
+        load(entityOrId: any, done: () => void, fail?: (p1: any) => void): void;
     }
 
     class IGetEditValue {
@@ -2574,7 +3260,7 @@ declare namespace Serenity {
     class IValidateRequired {
     }
 
-    const enum CaptureOperationType {
+    enum CaptureOperationType {
         Before = 0,
         Delete = 1,
         Insert = 2,
@@ -2594,18 +3280,33 @@ declare namespace Serenity {
     }
 
     namespace DialogTypeRegistry {
-        function tryGet(key: string): any;
         function get(key: string): any;
+        function reset(): void;
+        function tryGet(key: string): any;
     }
 
     namespace EditorTypeRegistry {
         function get(key: string): any;
         function reset(): void;
+        function tryGet(key: string): any;
     }
 
     namespace EnumTypeRegistry {
-        function tryGet(key: string): Function;
         function get(key: string): Function;
+        function reset(): void;
+        function tryGet(key: string): any;
+    }
+
+    interface IRowDefinition {
+        readonly deletePermission?: string;
+        readonly idProperty?: string;
+        readonly insertPermission?: string;
+        readonly isActiveProperty?: string;
+        readonly isDeletedProperty?: string;
+        readonly localTextPrefix?: string;
+        readonly nameProperty?: string;
+        readonly readPermission?: string;
+        readonly updatePermission?: string;
     }
 
     class EnumKeyAttribute {
@@ -2635,10 +3336,6 @@ declare namespace Serenity {
     class DialogTypeAttribute {
         value: any;
         constructor(value: any);
-    }
-    class EditorAttribute {
-        constructor();
-        key: string;
     }
     class EditorOptionAttribute {
         key: string;
@@ -2766,7 +3463,7 @@ declare namespace Serenity {
         function enumKey(value: string): (target: Function) => void;
         function option(): (target: Object, propertyKey: string) => void;
         function dialogType(value: any): (target: Function) => void;
-        function editor(key?: string): (target: Function) => void;
+        function editor(): (target: Function) => void;
         function element(value: string): (target: Function) => void;
         function filterable(value?: boolean): (target: Function) => void;
         function flexify(value?: boolean): (target: Function) => void;
@@ -2780,8 +3477,8 @@ declare namespace Serenity {
     }
 
     namespace LazyLoadHelper {
-        const executeOnceWhenShown: typeof executeOnceWhenVisible;
-        const executeEverytimeWhenShown: typeof executeEverytimeWhenVisible;
+        const executeOnceWhenShown: typeof Q.executeOnceWhenVisible;
+        const executeEverytimeWhenShown: typeof Q.executeEverytimeWhenVisible;
     }
 
     class PrefixedContext {
@@ -2825,13 +3522,13 @@ declare namespace Serenity {
         value?: any;
         defaultValue?: any;
     }
-    class Widget<TOptions> {
+    class Widget<TOptions = any> {
         private static nextWidgetNumber;
         element: JQuery;
         protected options: TOptions;
         protected widgetName: string;
         protected uniqueName: string;
-        protected idPrefix: string;
+        readonly idPrefix: string;
         constructor(element: JQuery, options?: TOptions);
         destroy(): void;
         protected addCssClass(): void;
@@ -2854,6 +3551,7 @@ declare namespace Serenity {
     }
 
     interface ToolButton {
+        action?: string;
         title?: string;
         hint?: string;
         cssClass?: string;
@@ -2890,6 +3588,7 @@ declare namespace Serenity {
         constructor(div: JQuery, options: ToolbarOptions);
         destroy(): void;
         protected mouseTrap: any;
+        protected createButtons(): void;
         protected createButton(container: JQuery, b: ToolButton): void;
         findButton(className: string): JQuery;
         updateInterface(): void;
@@ -2905,7 +3604,16 @@ declare namespace Serenity {
         protected getFallbackTemplate(): string;
         protected getTemplate(): string;
         protected renderContents(): void;
+        protected useIdPrefix(): IdPrefixType;
     }
+    type IdPrefixType = {
+        [key: string]: string;
+        Form: string;
+        Tabs: string;
+        Toolbar: string;
+        PropertyGrid: string;
+    };
+    function useIdPrefix(prefix: string): IdPrefixType;
 
     class TemplatedDialog<TOptions> extends TemplatedWidget<TOptions> {
         protected tabs: JQuery;
@@ -2932,11 +3640,11 @@ declare namespace Serenity {
         static openPanel(element: JQuery, uniqueName: string): void;
         static closePanel(element: JQuery, e?: JQueryEventObject): void;
         protected onDialogOpen(): void;
-        protected arrange(): void;
+        arrange(): void;
         protected onDialogClose(): void;
         protected addCssClass(): void;
         protected getDialogButtons(): Q.DialogButton[];
-        protected getDialogOptions(): JQueryUI.DialogOptions;
+        protected getDialogOptions(): any;
         protected getDialogTitle(): string;
         dialogClose(): void;
         get dialogTitle(): string;
@@ -2961,7 +3669,7 @@ declare namespace Serenity {
         protected validator: JQueryValidation.Validator;
         protected isPanel: boolean;
         protected responsive: boolean;
-        protected arrange(): void;
+        arrange(): void;
         protected getToolbarButtons(): ToolButton[];
         protected getValidatorOptions(): JQueryValidation.ValidationOptions;
         protected initTabs(): void;
@@ -3011,6 +3719,7 @@ declare namespace Serenity {
     class PropertyGrid extends Widget<PropertyGridOptions> {
         private editors;
         private items;
+        readonly idPrefix: string;
         constructor(div: JQuery, opt: PropertyGridOptions);
         destroy(): void;
         private createItems;
@@ -3039,7 +3748,7 @@ declare namespace Serenity {
         updateInterface(): void;
         enumerateItems(callback: (p1: Q.PropertyItem, p2: Widget<any>) => void): void;
     }
-    const enum PropertyGridMode {
+    enum PropertyGridMode {
         insert = 1,
         update = 2
     }
@@ -3098,7 +3807,7 @@ declare namespace Serenity {
         protected afterInit(): void;
         protected useAsync(): boolean;
         destroy(): void;
-        protected getDialogOptions(): JQueryUI.DialogOptions;
+        protected getDialogOptions(): any;
         protected getDialogButtons(): Q.DialogButton[];
         protected okClick(): void;
         protected okClickValidated(): void;
@@ -3108,7 +3817,7 @@ declare namespace Serenity {
         protected getPropertyGridOptions(): PropertyGridOptions;
         protected getPropertyItems(): Q.PropertyItem[];
         protected getPropertyItemsData(): Q.PropertyItemsData;
-        protected getPropertyItemsDataAsync(): Promise<PropertyItemsData>;
+        protected getPropertyItemsDataAsync(): Promise<Q.PropertyItemsData>;
         protected getSaveEntity(): TItem;
         protected loadInitialEntity(): void;
         protected get_entity(): TItem;
@@ -3199,9 +3908,6 @@ declare namespace Serenity {
     class DateEditor extends Widget<any> implements IStringValue, IReadOnly {
         private minValue;
         private maxValue;
-        private minDate;
-        private maxDate;
-        private sqlMinMax;
         constructor(input: JQuery);
         static useFlatpickr: boolean;
         static flatPickrOptions(input: JQuery): {
@@ -3234,6 +3940,7 @@ declare namespace Serenity {
         static dateInputChange: (e: JQueryEventObject) => void;
         static flatPickrTrigger(input: JQuery): JQuery;
         static dateInputKeyup(e: JQueryEventObject): void;
+        static uiPickerZIndexWorkaround(input: JQuery): void;
     }
 
     class DateTimeEditor extends Widget<DateTimeEditorOptions> implements IStringValue, IReadOnly {
@@ -3392,6 +4099,10 @@ declare namespace Serenity {
         protected mapItems(items: TItem[]): Select2Item[];
         protected allowClear(): boolean;
         protected isMultiple(): boolean;
+        private initSelectionPromise;
+        private queryPromise;
+        private typeTimeout;
+        protected abortPendingQuery(): void;
         protected getSelect2Options(): Select2Options;
         get_delimited(): boolean;
         get items(): Select2Item[];
@@ -3509,7 +4220,7 @@ declare namespace Serenity {
         lookupKey?: string;
         async?: boolean;
     }
-    class LookupEditorBase<TOptions extends LookupEditorOptions, TItem> extends Select2Editor<TOptions, TItem> {
+    abstract class LookupEditorBase<TOptions extends LookupEditorOptions, TItem> extends Select2Editor<TOptions, TItem> {
         constructor(input: JQuery, opt?: TOptions);
         hasAsyncSource(): boolean;
         destroy(): void;
@@ -3547,7 +4258,7 @@ declare namespace Serenity {
         equalityFilter?: any;
         criteria?: any[];
     }
-    class ServiceLookupEditorBase<TOptions extends ServiceLookupEditorOptions, TItem> extends Select2Editor<TOptions, TItem> {
+    abstract class ServiceLookupEditorBase<TOptions extends ServiceLookupEditorOptions, TItem> extends Select2Editor<TOptions, TItem> {
         constructor(input: JQuery, opt?: TOptions);
         protected getDialogTypeKey(): string;
         protected getService(): string;
@@ -3559,7 +4270,7 @@ declare namespace Serenity {
         protected getIdListCriteria(idList: any[]): any[];
         protected getCriteria(query: Select2SearchQuery): any[];
         protected getListRequest(query: Select2SearchQuery): Q.ListRequest;
-        protected getServiceCallOptions(query: Select2SearchQuery, results: (result: Select2SearchResult<TItem>) => void): Q.ServiceOptions<ListResponse<TItem>>;
+        protected getServiceCallOptions(query: Select2SearchQuery, results: (result: Select2SearchResult<TItem>) => void): Q.ServiceOptions<Q.ListResponse<TItem>>;
         protected hasAsyncSource(): boolean;
         protected asyncSearch(query: Select2SearchQuery, results: (result: Select2SearchResult<TItem>) => void): Select2SearchPromise;
     }
@@ -3644,6 +4355,8 @@ declare namespace Serenity {
         progress?: JQuery;
         inputName?: string;
         allowMultiple?: boolean;
+        uploadIntent?: string;
+        uploadUrl?: string;
         fileDone?: (p1: UploadResponse, p2: string, p3: any) => void;
     }
     interface UploadResponse {
@@ -3666,6 +4379,8 @@ declare namespace Serenity {
 
     interface FileUploadEditorOptions extends FileUploadConstraints {
         displayFileName?: boolean;
+        uploadIntent?: string;
+        uploadUrl?: string;
         urlPrefix?: string;
     }
     interface ImageUploadEditorOptions extends FileUploadEditorOptions {
@@ -3705,6 +4420,7 @@ declare namespace Serenity {
         protected progress: JQuery;
         protected hiddenInput: JQuery;
         constructor(div: JQuery, opt: ImageUploadEditorOptions);
+        protected getUploadInputOptions(): UploadInputOptions;
         protected addFileButtonText(): string;
         protected getToolButtons(): ToolButton[];
         protected populate(): void;
@@ -4052,147 +4768,8 @@ declare namespace Serenity {
         protected getTemplate(): string;
     }
 
-    type Format<TItem = any> = (ctx: Slick.FormatterContext<TItem>) => string;
-
-    interface Formatter {
-        format(ctx: Slick.FormatterContext): string;
-    }
-    interface GroupInfo<TItem> {
-        getter?: any;
-        formatter?: (p1: Slick.Group<TItem>) => string;
-        comparer?: (a: Slick.Group<TItem>, b: Slick.Group<TItem>) => number;
-        aggregators?: any[];
-        aggregateCollapsed?: boolean;
-        lazyTotalsCalculation?: boolean;
-    }
-    interface PagerOptions {
-        view?: any;
-        showRowsPerPage?: boolean;
-        rowsPerPage?: number;
-        rowsPerPageOptions?: number[];
-        onChangePage?: (newPage: number) => void;
-        onRowsPerPageChange?: (n: number) => void;
-    }
-    interface SummaryOptions {
-        aggregators: any[];
-    }
-    interface PagingOptions {
-        rowsPerPage?: number;
-        page?: number;
-    }
-
-    interface RemoteViewOptions {
-        autoLoad?: boolean;
-        idField?: string;
-        contentType?: string;
-        dataType?: string;
-        filter?: any;
-        params?: any;
-        onSubmit?: CancellableViewCallback<any>;
-        url?: string;
-        localSort?: boolean;
-        sortBy?: any;
-        rowsPerPage?: number;
-        seekToPage?: number;
-        onProcessData?: RemoteViewProcessCallback<any>;
-        method?: string;
-        inlineFilters?: boolean;
-        groupItemMetadataProvider?: Slick.Data.GroupItemMetadataProvider;
-        onAjaxCall?: RemoteViewAjaxCallback<any>;
-        getItemMetadata?: (p1?: any, p2?: number) => any;
-        errorMsg?: string;
-    }
-    interface PagingInfo {
-        rowsPerPage: number;
-        page: number;
-        totalCount: number;
-        loading: boolean;
-        error: string;
-        dataView: RemoteView<any>;
-    }
-    type CancellableViewCallback<TEntity> = (view: RemoteView<TEntity>) => boolean | void;
-    type RemoteViewAjaxCallback<TEntity> = (view: RemoteView<TEntity>, options: JQueryAjaxSettings) => boolean | void;
-    type RemoteViewFilter<TEntity> = (item: TEntity, view: RemoteView<TEntity>) => boolean;
-    type RemoteViewProcessCallback<TEntity> = (data: Q.ListResponse<TEntity>, view: RemoteView<TEntity>) => Q.ListResponse<TEntity>;
-    interface RemoteView<TEntity> {
-        onSubmit: CancellableViewCallback<TEntity>;
-        onDataChanged: Slick.Event;
-        onDataLoading: Slick.Event;
-        onDataLoaded: Slick.Event;
-        onPagingInfoChanged: Slick.Event;
-        onRowCountChanged: Slick.Event;
-        onRowsChanged: Slick.Event;
-        onRowsOrCountChanged: Slick.Event;
-        getPagingInfo(): PagingInfo;
-        onGroupExpanded: Slick.Event;
-        onGroupCollapsed: Slick.Event;
-        onAjaxCall: RemoteViewAjaxCallback<TEntity>;
-        onProcessData: RemoteViewProcessCallback<TEntity>;
-        addData(data: Q.ListResponse<TEntity>): void;
-        beginUpdate(): void;
-        endUpdate(): void;
-        deleteItem(id: any): void;
-        getItems(): TEntity[];
-        setFilter(filter: RemoteViewFilter<TEntity>): void;
-        getFilter(): RemoteViewFilter<TEntity>;
-        getFilteredItems(): any;
-        fastSort: any;
-        setItems(items: any[], newIdProperty?: boolean | string): void;
-        getIdPropertyName(): string;
-        getItemById(id: any): TEntity;
-        getGrandTotals(): any;
-        getGrouping(): GroupInfo<TEntity>[];
-        getGroups(): any[];
-        getRowById(id: any): number;
-        getRowByItem(item: any): number;
-        getRows(): any[];
-        mapItemsToRows(itemArray: any[]): any[];
-        mapRowsToIds(rowArray: number[]): any[];
-        mapIdsToRows(idAray: any[]): number[];
-        setFilterArgs(args: any): void;
-        setRefreshHints(hints: any[]): void;
-        insertItem(insertBefore: number, item: any): void;
-        sortedAddItem(item: any): void;
-        sortedUpdateItem(id: any, item: any): void;
-        syncGridSelection(grid: any, preserveHidden?: boolean, preserveHiddenOnSelectionChange?: boolean): void;
-        syncGridCellCssStyles(grid: any, key: string): void;
-        getItemMetadata(i: number): any;
-        updateItem(id: any, item: TEntity): void;
-        addItem(item: TEntity): void;
-        getIdxById(id: any): any;
-        getItemByIdx(index: number): any;
-        setGrouping(groupInfo: GroupInfo<TEntity>[]): void;
-        collapseAllGroups(level: number): void;
-        expandAllGroups(level: number): void;
-        expandGroup(keys: any[]): void;
-        collapseGroup(keys: any[]): void;
-        setSummaryOptions(options: SummaryOptions): void;
-        setPagingOptions(options: PagingOptions): void;
-        refresh(): void;
-        populate(): void;
-        populateLock(): void;
-        populateUnlock(): void;
-        getItem(row: number): any;
-        getLength(): number;
-        rowsPerPage: number;
-        errormsg: string;
-        params: any;
-        getLocalSort(): boolean;
-        setLocalSort(value: boolean): void;
-        sort(comparer?: (a: any, b: any) => number, ascending?: boolean): void;
-        reSort(): void;
-        sortBy: string[];
-        url: string;
-        method: string;
-        idField: string;
-        seekToPage?: number;
-    }
-    class RemoteView<TEntity> {
-        constructor(options: RemoteViewOptions);
-    }
-
-    class SlickPager extends Widget<PagerOptions> {
-        constructor(div: JQuery, o: PagerOptions);
+    class SlickPager extends Widget<Slick.PagerOptions> {
+        constructor(div: JQuery, o: Slick.PagerOptions);
         _changePage(ctype: string): boolean;
         _updatePager(): void;
     }
@@ -4200,7 +4777,7 @@ declare namespace Serenity {
     interface IDataGrid {
         getElement(): JQuery;
         getGrid(): Slick.Grid;
-        getView(): RemoteView<any>;
+        getView(): Slick.RemoteView<any>;
         getFilterStore(): FilterStore;
     }
 
@@ -4248,8 +4825,8 @@ declare namespace Serenity {
     }
     namespace GridUtils {
         function addToggleButton(toolDiv: JQuery, cssClass: string, callback: (p1: boolean) => void, hint: string, initial?: boolean): void;
-        function addIncludeDeletedToggle(toolDiv: JQuery, view: RemoteView<any>, hint?: string, initial?: boolean): void;
-        function addQuickSearchInput(toolDiv: JQuery, view: RemoteView<any>, fields?: QuickSearchField[], onChange?: () => void): void;
+        function addIncludeDeletedToggle(toolDiv: JQuery, view: Slick.RemoteView<any>, hint?: string, initial?: boolean): void;
+        function addQuickSearchInput(toolDiv: JQuery, view: Slick.RemoteView<any>, fields?: QuickSearchField[], onChange?: () => void): void;
         function addQuickSearchInputCustom(container: JQuery, onSearch: (p1: string, p2: string, done: (p3: boolean) => void) => void, fields?: QuickSearchField[]): QuickSearchInput;
         function makeOrderable(grid: Slick.Grid, handleMove: (p1: any, p2: number) => void): void;
         function makeOrderableWithUpdateRequest(grid: IDataGrid, getId: (p1: any) => number, getDisplayOrder: (p1: any) => any, service: string, getUpdateRequest: (p1: number, p2: number) => Q.SaveRequest<any>): void;
@@ -4260,26 +4837,26 @@ declare namespace Serenity {
     }
     namespace SlickFormatting {
         function getEnumText(enumKey: string, name: string): string;
-        function treeToggle(getView: () => RemoteView<any>, getId: (x: any) => any, formatter: Format): Format;
-        function date(format?: string): Format;
-        function dateTime(format?: string): Format;
-        function checkBox(): Format;
-        function number(format: string): Format;
+        function treeToggle(getView: () => Slick.RemoteView<any>, getId: (x: any) => any, formatter: Slick.Format): Slick.Format;
+        function date(format?: string): Slick.Format;
+        function dateTime(format?: string): Slick.Format;
+        function checkBox(): Slick.Format;
+        function number(format: string): Slick.Format;
         function getItemType(link: JQuery): string;
         function getItemId(link: JQuery): string;
         function itemLinkText(itemType: string, id: any, text: any, extraClass: string, encode: boolean): string;
-        function itemLink<TItem = any>(itemType: string, idField: string, getText: Format<TItem>, cssClass?: Format<TItem>, encode?: boolean): Format<TItem>;
+        function itemLink<TItem = any>(itemType: string, idField: string, getText: Slick.Format<TItem>, cssClass?: Slick.Format<TItem>, encode?: boolean): Slick.Format<TItem>;
     }
     namespace SlickHelper {
         function setDefaults(columns: Slick.Column[], localTextPrefix?: string): any;
     }
     namespace SlickTreeHelper {
         function filterCustom<TItem>(item: TItem, getParent: (x: TItem) => any): boolean;
-        function filterById<TItem>(item: TItem, view: RemoteView<TItem>, getParentId: (x: TItem) => any): boolean;
+        function filterById<TItem>(item: TItem, view: Slick.RemoteView<TItem>, getParentId: (x: TItem) => any): boolean;
         function setCollapsed<TItem>(items: TItem[], collapsed: boolean): void;
         function setCollapsedFlag<TItem>(item: TItem, collapsed: boolean): void;
         function setIndents<TItem>(items: TItem[], getId: (x: TItem) => any, getParentId: (x: TItem) => any, setCollapsed?: boolean): void;
-        function toggleClick<TItem>(e: JQueryEventObject, row: number, cell: number, view: RemoteView<TItem>, getId: (x: TItem) => any): void;
+        function toggleClick<TItem>(e: JQueryEventObject, row: number, cell: number, view: Slick.RemoteView<TItem>, getId: (x: TItem) => any): void;
     }
 
     interface IInitializeColumn {
@@ -4317,6 +4894,7 @@ declare namespace Serenity {
         initializeColumn(column: Slick.Column): void;
         displayFormat: string;
         originalNameProperty: string;
+        iconClass: string;
     }
     class MinuteFormatter implements Formatter {
         format(ctx: Slick.FormatterContext): string;
@@ -4336,10 +4914,14 @@ declare namespace Serenity {
         urlFormat: string;
         target: string;
     }
+
     namespace FormatterTypeRegistry {
-        function get(key: string): Function;
+        function get(key: string): any;
         function reset(): void;
+        function tryGet(key: string): any;
     }
+
+    type GroupItemMetadataProviderType = typeof GroupItemMetadataProvider;
 
     interface SettingStorage {
         getItem(key: string): string;
@@ -4373,6 +4955,10 @@ declare namespace Serenity {
         includeDeleted?: boolean;
     }
     class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IDataGrid, IReadOnly {
+        private _isDisabled;
+        private _layoutTimer;
+        private _slickGridOnSort;
+        private _slickGridOnClick;
         protected titleDiv: JQuery;
         protected toolbar: Toolbar;
         protected filterBar: FilterDisplayBar;
@@ -4383,13 +4969,7 @@ declare namespace Serenity {
         protected propertyItemsData: Q.PropertyItemsData;
         protected initialSettings: PersistedGridSettings;
         protected restoringSettings: number;
-        private idProperty;
-        private isActiveProperty;
-        private localTextDbPrefix;
-        private isDisabled;
-        private slickGridOnSort;
-        private slickGridOnClick;
-        view: RemoteView<TItem>;
+        view: Slick.RemoteView<TItem>;
         slickGrid: Slick.Grid;
         openDialogsAsPanel: boolean;
         static defaultRowHeight: number;
@@ -4397,7 +4977,6 @@ declare namespace Serenity {
         static defaultPersistanceStorage: SettingStorage;
         static defaultColumnWidthScale: number;
         static defaultColumnWidthDelta: number;
-        private layoutTimer;
         constructor(container: JQuery, options?: TOptions);
         protected internalInit(): void;
         protected initSync(): void;
@@ -4458,24 +5037,24 @@ declare namespace Serenity {
         protected onViewSubmit(): boolean;
         protected markupReady(): void;
         protected createSlickContainer(): JQuery;
-        protected createView(): RemoteView<TItem>;
+        protected createView(): Slick.RemoteView<TItem>;
         protected getDefaultSortBy(): any[];
         protected usePager(): boolean;
         protected enableFiltering(): boolean;
         protected populateWhenVisible(): boolean;
         protected createFilterBar(): void;
-        protected getPagerOptions(): PagerOptions;
+        protected getPagerOptions(): Slick.PagerOptions;
         protected createPager(): void;
-        protected getViewOptions(): RemoteViewOptions;
+        protected getViewOptions(): Slick.RemoteViewOptions;
         protected createToolbar(buttons: ToolButton[]): void;
         getTitle(): string;
         setTitle(value: string): void;
         protected getItemType(): string;
-        protected itemLink(itemType?: string, idField?: string, text?: (ctx: Slick.FormatterContext) => string, cssClass?: (ctx: Slick.FormatterContext) => string, encode?: boolean): Format<TItem>;
+        protected itemLink(itemType?: string, idField?: string, text?: (ctx: Slick.FormatterContext) => string, cssClass?: (ctx: Slick.FormatterContext) => string, encode?: boolean): Slick.Format<TItem>;
         protected getColumnsKey(): string;
         protected getPropertyItems(): Q.PropertyItem[];
         protected getPropertyItemsData(): Q.PropertyItemsData;
-        protected getPropertyItemsDataAsync(): Promise<PropertyItemsData>;
+        protected getPropertyItemsDataAsync(): Promise<Q.PropertyItemsData>;
         protected getColumns(): Slick.Column[];
         protected propertyItemsToSlickColumns(propertyItems: Q.PropertyItem[]): Slick.Column[];
         protected getSlickOptions(): Slick.GridOptions;
@@ -4492,10 +5071,14 @@ declare namespace Serenity {
         get_readOnly(): boolean;
         set_readOnly(value: boolean): void;
         protected updateInterface(): void;
+        protected getRowDefinition(): IRowDefinition;
+        private _localTextDbPrefix;
         protected getLocalTextDbPrefix(): string;
         protected getLocalTextPrefix(): string;
+        private _idProperty;
         protected getIdProperty(): string;
         protected getIsDeletedProperty(): string;
+        private _isActiveProperty;
         protected getIsActiveProperty(): string;
         protected updateDisabledState(): void;
         protected resizeCanvas(): void;
@@ -4521,7 +5104,7 @@ declare namespace Serenity {
         protected getCurrentSettings(flags?: GridPersistanceFlags): PersistedGridSettings;
         getElement(): JQuery;
         getGrid(): Slick.Grid;
-        getView(): RemoteView<TItem>;
+        getView(): Slick.RemoteView<TItem>;
         getFilterStore(): FilterStore;
     }
 
@@ -4539,7 +5122,7 @@ declare namespace Serenity {
             text: string;
             click: () => void;
         }[];
-        protected getDialogOptions(): JQueryUI.DialogOptions;
+        protected getDialogOptions(): any;
         private getTitle;
         private allowHide;
         private createLI;
@@ -4686,11 +5269,11 @@ declare namespace Serenity {
         protected createToolbarExtensions(): void;
         protected getInitialTitle(): string;
         protected getLocalTextPrefix(): string;
-        private entityType;
+        private _entityType;
         protected getEntityType(): string;
-        private displayName;
+        private _displayName;
         protected getDisplayName(): string;
-        private itemName;
+        private _itemName;
         protected getItemName(): string;
         protected getAddButtonCaption(): string;
         protected getButtons(): ToolButton[];
@@ -4698,9 +5281,9 @@ declare namespace Serenity {
         protected addButtonClick(): void;
         protected editItem(entityOrId: any): void;
         protected editItemOfType(itemType: string, entityOrId: any): void;
-        private service;
+        private _service;
         protected getService(): string;
-        protected getViewOptions(): RemoteViewOptions;
+        protected getViewOptions(): Slick.RemoteViewOptions;
         protected getItemType(): string;
         protected routeDialog(itemType: string, dialog: Widget<any>): void;
         protected getInsertPermission(): string;
@@ -4709,12 +5292,12 @@ declare namespace Serenity {
         protected initDialog(dialog: Widget<any>): void;
         protected initEntityDialog(itemType: string, dialog: Widget<any>): void;
         protected createEntityDialog(itemType: string, callback?: (dlg: Widget<any>) => void): Widget<any>;
-        protected getDialogOptions(): JQueryUI.DialogOptions;
-        protected getDialogOptionsFor(itemType: string): JQueryUI.DialogOptions;
+        protected getDialogOptions(): any;
+        protected getDialogOptionsFor(itemType: string): any;
         protected getDialogTypeFor(itemType: string): {
             new (...args: any[]): Widget<any>;
         };
-        private dialogType;
+        private _dialogType;
         protected getDialogType(): {
             new (...args: any[]): Widget<any>;
         };
@@ -4756,32 +5339,33 @@ declare namespace Serenity {
         protected isDeleted(): boolean;
         protected isNew(): boolean;
         protected isNewOrDeleted(): boolean;
-        protected getDeleteOptions(callback: (response: Q.DeleteResponse) => void): Q.ServiceOptions<DeleteResponse>;
-        protected deleteHandler(options: Q.ServiceOptions<DeleteResponse>, callback: (response: Q.DeleteResponse) => void): void;
+        protected getDeleteOptions(callback: (response: Q.DeleteResponse) => void): Q.ServiceOptions<Q.DeleteResponse>;
+        protected deleteHandler(options: Q.ServiceOptions<Q.DeleteResponse>, callback: (response: Q.DeleteResponse) => void): void;
         protected doDelete(callback: (response: Q.DeleteResponse) => void): void;
         protected onDeleteSuccess(response: Q.DeleteResponse): void;
         protected attrs<TAttr>(attrType: {
             new (...args: any[]): TAttr;
         }): TAttr[];
-        private entityType;
+        protected getRowDefinition(): IRowDefinition;
+        private _entityType;
         protected getEntityType(): string;
-        private formKey;
+        private _formKey;
         protected getFormKey(): string;
-        private localTextDbPrefix;
+        private _localTextDbPrefix;
         protected getLocalTextDbPrefix(): string;
         protected getLocalTextPrefix(): string;
-        private entitySingular;
+        private _entitySingular;
         protected getEntitySingular(): string;
-        private nameProperty;
+        private _nameProperty;
         protected getNameProperty(): string;
-        private idProperty;
+        private _idProperty;
         protected getIdProperty(): string;
-        protected isActiveProperty: string;
+        private _isActiveProperty;
         protected getIsActiveProperty(): string;
         protected getIsDeletedProperty(): string;
-        protected service: string;
+        private _service;
         protected getService(): string;
-        load(entityOrId: any, done: () => void, fail: (ex: Q.Exception) => void): void;
+        load(entityOrId: any, done: () => void, fail?: (ex: Q.Exception) => void): void;
         loadNewAndOpenDialog(asPanel?: boolean): void;
         loadEntityAndOpenDialog(entity: TItem, asPanel?: boolean): void;
         protected loadResponse(data: any): void;
@@ -4790,11 +5374,11 @@ declare namespace Serenity {
         protected afterLoadEntity(): void;
         loadByIdAndOpenDialog(entityId: any, asPanel?: boolean): void;
         protected onLoadingData(data: Q.RetrieveResponse<TItem>): void;
-        protected getLoadByIdOptions(id: any, callback: (response: Q.RetrieveResponse<TItem>) => void): Q.ServiceOptions<RetrieveResponse<TItem>>;
+        protected getLoadByIdOptions(id: any, callback: (response: Q.RetrieveResponse<TItem>) => void): Q.ServiceOptions<Q.RetrieveResponse<TItem>>;
         protected getLoadByIdRequest(id: any): Q.RetrieveRequest;
         protected reloadById(): void;
         loadById(id: any, callback?: (response: Q.RetrieveResponse<TItem>) => void, fail?: () => void): void;
-        protected loadByIdHandler(options: Q.ServiceOptions<RetrieveResponse<TItem>>, callback: (response: Q.RetrieveResponse<TItem>) => void, fail: () => void): void;
+        protected loadByIdHandler(options: Q.ServiceOptions<Q.RetrieveResponse<TItem>>, callback: (response: Q.RetrieveResponse<TItem>) => void, fail: () => void): void;
         protected initLocalizationGrid(): void;
         protected initLocalizationGridCommon(pgOptions: PropertyGridOptions): void;
         protected isLocalizationMode(): boolean;
@@ -4809,23 +5393,23 @@ declare namespace Serenity {
         protected initPropertyGrid(): void;
         protected getPropertyItems(): Q.PropertyItem[];
         protected getPropertyItemsData(): Q.PropertyItemsData;
-        protected getPropertyItemsDataAsync(): Promise<PropertyItemsData>;
+        protected getPropertyItemsDataAsync(): Promise<Q.PropertyItemsData>;
         protected getPropertyGridOptions(): PropertyGridOptions;
         protected validateBeforeSave(): boolean;
-        protected getSaveOptions(callback: (response: Q.SaveResponse) => void): Q.ServiceOptions<SaveResponse>;
+        protected getSaveOptions(callback: (response: Q.SaveResponse) => void): Q.ServiceOptions<Q.SaveResponse>;
         protected getSaveEntity(): TItem;
         protected getSaveRequest(): Q.SaveRequest<TItem>;
         protected onSaveSuccess(response: Q.SaveResponse): void;
         protected save_submitHandler(callback: (response: Q.SaveResponse) => void): void;
         protected save(callback?: (response: Q.SaveResponse) => void): void | boolean;
-        protected saveHandler(options: Q.ServiceOptions<SaveResponse>, callback: (response: Q.SaveResponse) => void): void;
+        protected saveHandler(options: Q.ServiceOptions<Q.SaveResponse>, callback: (response: Q.SaveResponse) => void): void;
         protected initToolbar(): void;
         protected showSaveSuccessMessage(response: Q.SaveResponse): void;
         protected getToolbarButtons(): ToolButton[];
         protected getCloningEntity(): TItem;
         protected updateInterface(): void;
-        protected getUndeleteOptions(callback?: (response: Q.UndeleteResponse) => void): Q.ServiceOptions<UndeleteResponse>;
-        protected undeleteHandler(options: Q.ServiceOptions<UndeleteResponse>, callback: (response: Q.UndeleteResponse) => void): void;
+        protected getUndeleteOptions(callback?: (response: Q.UndeleteResponse) => void): Q.ServiceOptions<Q.UndeleteResponse>;
+        protected undeleteHandler(options: Q.ServiceOptions<Q.UndeleteResponse>, callback: (response: Q.UndeleteResponse) => void): void;
         protected undelete(callback?: (response: Q.UndeleteResponse) => void): void;
         private _readonly;
         get readOnly(): boolean;
@@ -4844,6 +5428,17 @@ declare namespace Serenity {
         protected useViewMode(): boolean;
         protected getFallbackTemplate(): string;
     }
+
+    type JsxDomWidgetProps<P> = P & WidgetComponentProps<any> & {
+        children?: any | undefined;
+        class?: string;
+    };
+    interface JsxDomWidget<P = {}, TElement extends Element = HTMLElement> {
+        (props: JsxDomWidgetProps<P>, context?: any): TElement | null;
+    }
+    function jsxDomWidget<TWidget extends Widget<TOptions>, TOptions>(type: new (element: JQuery, options?: TOptions) => TWidget): JsxDomWidget<TOptions & {
+        ref?: (r: TWidget) => void;
+    }>;
 
     namespace Reporting {
         interface ReportDialogOptions {
@@ -4885,11 +5480,6 @@ declare namespace Serenity {
             InitialSettings?: any;
             IsDataOnlyReport?: boolean;
         }
-    }
-
-    class AsyncLookupEditor extends LookupEditorBase<LookupEditorOptions, any> {
-        constructor(hidden: JQuery, opt: LookupEditorOptions);
-        getLookupKey(): string;
     }
 
     interface ScriptContext {
@@ -4947,9 +5537,9 @@ declare namespace Serenity {
         protected emptyItemText(): string;
         protected getService(): string;
         protected query(request: Q.ListRequest, callback: (p1: Q.ListResponse<any>) => void): void;
-        protected executeQuery(options: Q.ServiceOptions<ListResponse<any>>): void;
+        protected executeQuery(options: Q.ServiceOptions<Q.ListResponse<any>>): void;
         protected queryByKey(key: string, callback: (p1: any) => void): void;
-        protected executeQueryByKey(options: Q.ServiceOptions<RetrieveResponse<any>>): void;
+        protected executeQueryByKey(options: Q.ServiceOptions<Q.RetrieveResponse<any>>): void;
         protected getItemKey(item: any): string;
         protected getItemText(item: any): string;
         protected getTypeDelay(): number;
@@ -4962,6 +5552,25 @@ declare namespace Serenity {
         set_value(value: string): void;
         set value(v: string);
     }
+
+    /**
+     *
+     * This is the main entry point for `@serenity-is/corelib` package.
+     *
+     * The types from this module are available by importing from "@serenity-is/corelib":
+     *
+     * ```ts
+     * import { EntityGrid } from "serenity-is/corelib"
+     *
+     * export class MyGrid extends EntityGrid<MyRow, any> {
+     * }
+     * ```
+     *
+     * > When using classic namespaces instead of the ESM modules, the types and functions in this module are directly available from the global `Serenity` namespace.
+     * > e.g. `Serenity.EntityGrid`
+     * @packageDocumentation
+     * @module corelib
+     */
 
     type Constructor<T> = new (...args: any[]) => T;
 }
@@ -5077,26 +5686,9 @@ interface JQuery {
     flexY(flexY: number): JQuery;
 }
 declare namespace Slick {
-    interface AutoTooltipsOptions {
-        enableForHeaderCells?: boolean;
-        enableForCells?: boolean;
-        maxToolTipLength?: number;
-    }
-    class AutoTooltips {
-        constructor(options: AutoTooltipsOptions);
-        init(): void;
-    }
     namespace Data {
-        interface GroupItemMetadataProvider {
-            getGroupRowMetadata(item: any): Slick.ItemMetadata;
-            getTotalsRowMetadata(item: any): Slick.ItemMetadata;
-        }
-        class GroupItemMetadataProvider implements GroupItemMetadataProvider, Slick.IPlugin {
-            constructor();
-            init(grid: Slick.Grid): void;
-            getGroupRowMetadata(item: any): Slick.ItemMetadata;
-            getTotalsRowMetadata(item: any): Slick.ItemMetadata;
-        }
+        /** @obsolete use the type exported from @serenity-is/sleekgrid */
+        const GroupItemMetadataProvider: GroupItemMetadataProviderType;
     }
     interface RowMoveManagerOptions {
         cancelEditOnDrag: boolean;
@@ -5104,7 +5696,14 @@ declare namespace Slick {
     class RowMoveManager implements IPlugin {
         constructor(options: RowMoveManagerOptions);
         init(): void;
-        onBeforeMoveRows: Slick.Event;
-        onMoveRows: Slick.Event;
+        onBeforeMoveRows: Slick.EventEmitter;
+        onMoveRows: Slick.EventEmitter;
+    }
+    class RowSelectionModel implements SelectionModel {
+        init(grid: Slick.Grid): void;
+        destroy?: () => void;
+        setSelectedRanges(ranges: Slick.Range[]): void;
+        onSelectedRangesChanged: Slick.EventEmitter<Slick.Range[]>;
+        refreshSelections?(): void;
     }
 }

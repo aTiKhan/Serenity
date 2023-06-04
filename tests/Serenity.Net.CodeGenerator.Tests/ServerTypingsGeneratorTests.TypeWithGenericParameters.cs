@@ -1,8 +1,4 @@
-﻿using Serenity.ComponentModel;
-using Serenity.Data;
-using Serenity.Services;
-using System.Collections.Generic;
-using Xunit;
+﻿using ServerTypingsTest.TypeWithGenericParameters;
 
 namespace Serenity.Tests.CodeGenerator
 {
@@ -11,12 +7,11 @@ namespace Serenity.Tests.CodeGenerator
         [Fact]
         public void HandlesTypeWithOneGenericParameter()
         {
-            var generator = CreateGenerator();
+            var generator = CreateGenerator(typeof(TypeWithOneGenericParameter<>));
             generator.RootNamespaces.Add("Serenity");
             var result = generator.Run();
-            var expectedFile = "Tests.CodeGenerator.TypeWithOneGenericParameter`1.ts";
-            var code = Assert.Single(result, x => x.Filename == expectedFile).Text;
-            Assert.Contains("namespace Serenity.Tests.CodeGenerator {", code);
+            var code = Assert.Single(result).Text;
+            Assert.Contains("namespace ServerTypingsTest.TypeWithGenericParameters {", code);
             Assert.True(
                 code.Contains("export interface TypeWithOneGenericParameter<T> extends ServiceRequest") ||
                 code.Contains("export interface TypeWithOneGenericParameter<T> extends Serenity.ServiceRequest"));
@@ -27,12 +22,11 @@ namespace Serenity.Tests.CodeGenerator
         [Fact]
         public void HandlesTypeWithOneGenericParameterAndBaseClass()
         {
-            var generator = CreateGenerator();
+            var generator = CreateGenerator(typeof(TypeWithOneGenericAndBase<>));
             generator.RootNamespaces.Add("Serenity");
             var result = generator.Run();
-            var expectedFile = "Tests.CodeGenerator.TypeWithOneGenericAndBase`1.ts";
-            var code = Assert.Single(result, x => x.Filename == expectedFile).Text;
-            Assert.Contains("namespace Serenity.Tests.CodeGenerator {", code);
+            var code = Assert.Single(result).Text;
+            Assert.Contains("namespace ServerTypingsTest.TypeWithGenericParameters {", code);
             Assert.True(
                 code.Contains("export interface TypeWithOneGenericAndBase<T> extends RetrieveResponse<string>") ||
                 code.Contains("export interface TypeWithOneGenericAndBase<T> extends Serenity.RetrieveResponse<string>"));
@@ -43,12 +37,11 @@ namespace Serenity.Tests.CodeGenerator
         [Fact]
         public void HandlesTypeWithTwoGenericParameters()
         {
-            var generator = CreateGenerator();
+            var generator = CreateGenerator(typeof(TypeWithTwoGenericParameters<,>));
             generator.RootNamespaces.Add("Serenity");
             var result = generator.Run();
-            var expectedFile = "Tests.CodeGenerator.TypeWithTwoGenericParameters`2.ts";
-            var code = Assert.Single(result, x => x.Filename == expectedFile).Text;
-            Assert.Contains("namespace Serenity.Tests.CodeGenerator {", code);
+            var code = Assert.Single(result).Text;
+            Assert.Contains("namespace ServerTypingsTest.TypeWithGenericParameters {", code);
             Assert.True(
                 code.Contains("export interface TypeWithTwoGenericParameters<T1, T2> extends ServiceRequest") ||
                 code.Contains("export interface TypeWithTwoGenericParameters<T1, T2> extends Serenity.ServiceRequest"));
@@ -57,7 +50,10 @@ namespace Serenity.Tests.CodeGenerator
             Assert.Contains("SomeDictionary?: { [key: T1]: T2 };", code);
         }
     }
+}
 
+namespace ServerTypingsTest.TypeWithGenericParameters
+{
     [ScriptInclude]
     public class TypeWithOneGenericParameter<T> : ServiceRequest
     {

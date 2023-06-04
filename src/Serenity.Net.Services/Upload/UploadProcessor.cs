@@ -1,184 +1,88 @@
-﻿using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
 using System.IO;
 
-namespace Serenity.Web
+namespace Serenity.Web;
+
+/// <summary>
+/// Obsolete class for upload processing
+/// </summary>
+[Obsolete("Please inject and use IUploadProcessor interface")]
+public class UploadProcessor : ProcessedUploadInfo
 {
-    public class UploadProcessor
+    private readonly IUploadStorage storage;
+
+    /// <summary>
+    /// Creates a new instance of the class
+    /// </summary>
+    /// <param name="storage">Upload storage</param>
+    /// <param name="_">Exception logger, not used.</param>
+    /// <exception cref="ArgumentNullException">Storage is null</exception>
+    public UploadProcessor(IUploadStorage storage, IExceptionLogger _ = null)
     {
-        private readonly IUploadStorage storage;
+        ThumbBackColor = null;
+        this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
+    }
 
-        public UploadProcessor(IUploadStorage storage, IExceptionLogger logger = null)
+    /// <summary>
+    /// Thumb width
+    /// </summary>
+    public int ThumbWidth { get; set; }
+
+    /// <summary>
+    /// Thumb height
+    /// </summary>
+    public int ThumbHeight { get; set; }
+
+    /// <summary>
+    /// Thumb back color
+    /// </summary>
+    public string ThumbBackColor { get; set; }
+
+    /// <summary>
+    /// Thumb scale mode
+    /// </summary>
+    public ImageScaleMode ThumbScaleMode { get; set; }
+
+    /// <summary>
+    /// Thumb quality
+    /// </summary>
+    public int ThumbQuality { get; set; }
+
+    /// <summary>
+    /// Processes an upload
+    /// </summary>
+    /// <param name="fileContent">File content</param>
+    /// <param name="extension">File extension</param>
+    /// <param name="localizer">Text localizer</param>
+    /// <param name="options">Upload options</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentNullException"></exception>
+    public bool ProcessStream(Stream fileContent, string extension, 
+        ITextLocalizer localizer, IUploadOptions options = null)
+    {
+        if (fileContent is null)
+            throw new ArgumentNullException(nameof(fileContent));
+
+        options ??= new UploadOptions
         {
-            ThumbBackColor = null;
-            this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
-            Logger = logger;
-        }
+            ThumbBackColor = ThumbBackColor,
+            ThumbHeight = ThumbHeight,
+            ThumbWidth = ThumbWidth,
+            ThumbQuality = ThumbQuality,
+            ThumbMode = ThumbScaleMode
+        };
 
-        public int ThumbWidth { get; set; }
-        public int ThumbHeight { get; set; }
-        public Color? ThumbBackColor { get; set; }
-        public ImageScaleMode ThumbScaleMode { get; set; }
-        public int ThumbQuality { get; set; }
-        public string ThumbFile { get; private set; }
-        public string ThumbUrl { get; private set; }
-        public int ImageWidth { get; private set; }
-        public int ImageHeight { get; private set; }
-        public ImageCheckResult CheckResult { get; private set; }
-        public string ErrorMessage { get; private set; }
-        public long FileSize { get; private set; }
-        public string TemporaryFile { get; private set; }
-        public bool IsImage { get; private set; }
+        var imageProcessor = new DefaultImageProcessor();
+        var uploadProcessor = new DefaultUploadProcessor(new DefaultImageProcessor(),
+            storage, new DefaultUploadValidator(imageProcessor, localizer));
 
-        protected IExceptionLogger Logger { get; }
-
-        private bool IsImageExtension(string extension)
-        {
-            return extension.EndsWith(".jpg") ||
-                extension.EndsWith(".jpeg") ||
-                extension.EndsWith(".png") ||
-                extension.EndsWith(".gif");
-        }
-
-        private bool IsDangerousExtension(string extension)
-        {
-            return extension.EndsWith(".exe") ||
-                extension.EndsWith(".bat") ||
-                extension.EndsWith(".cmd") ||
-                extension.EndsWith(".dll") ||
-                extension.EndsWith(".jar") ||
-                extension.EndsWith(".jsp") ||
-                extension.EndsWith(".htaccess") ||
-                extension.EndsWith(".htpasswd") ||
-                extension.EndsWith(".lnk") ||
-                extension.EndsWith(".vbs") ||
-                extension.EndsWith(".vbe") ||
-                extension.EndsWith(".aspx") ||
-                extension.EndsWith(".ascx") ||
-                extension.EndsWith(".config") ||
-                extension.EndsWith(".com") ||
-                extension.EndsWith(".asmx") ||
-                extension.EndsWith(".asax") ||
-                extension.EndsWith(".compiled") ||
-                extension.EndsWith(".php");
-        }
-
-        public bool ProcessStream(Stream fileContent, string extension, 
-            ITextLocalizer localizer)
-        {
-            extension = extension.TrimToEmpty().ToLowerInvariant();
-            if (IsDangerousExtension(extension))
-            {
-                ErrorMessage = "Unsupported file extension!";
-                return false;
-            }
-
-            CheckResult = ImageCheckResult.InvalidImage;
-            ErrorMessage = null;
-            ImageWidth = 0;
-            ImageHeight = 0;
-            IsImage = false;
-
-            var success = false;
-
-            storage.PurgeTemporaryFiles();
-            var basePath = "temporary/" + Guid.NewGuid().ToString("N");
-            try
-            {
-                try
-                {
-                    FileSize = fileContent.Length;
-                    fileContent.Seek(0, System.IO.SeekOrigin.Begin);
-                    TemporaryFile = storage.WriteFile(basePath + extension, fileContent, autoRename: false);
-
-                    if (IsImageExtension(extension))
-                    {
-                        IsImage = true;
-                        success = ProcessImageStream(fileContent, localizer);                    
-                    }
-                    else
-                    {
-                        success = true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ErrorMessage = ex.Message;
-                    ex.Log(Logger);
-                    success = false;
-                    return success;
-                }
-            }
-            finally
-            {
-                if (!success)
-                {
-                    if (!ThumbFile.IsNullOrEmpty())
-                        storage.DeleteFile(ThumbFile);
-
-                    if (!TemporaryFile.IsNullOrEmpty())
-                        storage.DeleteFile(TemporaryFile);
-                }
-
-                fileContent.Dispose();
-            }
-
-            return success;
-        }
-
-        private bool ProcessImageStream(Stream fileContent, ITextLocalizer localizer)
-        {
-            var imageChecker = new ImageChecker();
-            CheckResult = imageChecker.CheckStream(fileContent, true, out Image image, Logger);
-            try
-            {
-                FileSize = imageChecker.DataSize;
-                ImageWidth = imageChecker.Width;
-                ImageHeight = imageChecker.Height;
-
-                if (CheckResult != ImageCheckResult.JPEGImage &&
-                    CheckResult != ImageCheckResult.GIFImage &&
-                    CheckResult != ImageCheckResult.PNGImage)
-                {
-                    ErrorMessage = imageChecker.FormatErrorMessage(CheckResult, localizer);
-                    return false;
-                }
-                else
-                {
-                    IsImage = true;
-
-                    var extension = CheckResult == ImageCheckResult.PNGImage ? ".png" :
-                        (CheckResult == ImageCheckResult.GIFImage ? ".gif" : ".jpg");
-
-                    storage.PurgeTemporaryFiles();
-
-                    if (ThumbWidth > 0 || ThumbHeight > 0)
-                    {
-                        ThumbnailGenerator.Generate(image, ThumbWidth, ThumbHeight, ThumbScaleMode, ThumbBackColor,
-                            inplace: true);
-                        var thumbFile = UploadPathHelper.GetThumbnailName(TemporaryFile);
-
-                        using (var ms = new MemoryStream())
-                        {
-                            if (ThumbQuality != 0)
-                                image.Save(ms, new JpegEncoder { Quality = ThumbQuality });
-                            else
-                                image.Save(ms, new JpegEncoder());
-                            ms.Seek(0, SeekOrigin.Begin);
-                            ThumbFile = storage.WriteFile(thumbFile, ms, autoRename: false);
-                        }
-                        ThumbHeight = image.Width;
-                        ThumbWidth = image.Height;
-                    }
-
-                    return true;
-                }
-            }
-            finally
-            {
-                if (image != null)
-                    image.Dispose();
-            }
-        }
+        var result = uploadProcessor.Process(fileContent, "___tempfile__" + extension, options);
+        ErrorMessage = result.ErrorMessage;
+        FileSize = result.FileSize;
+        ImageHeight = result.ImageWidth;
+        ImageHeight = result.ImageHeight;
+        IsImage = result.IsImage;
+        Success = result.Success;
+        TemporaryFile = result.TemporaryFile;
+        return result.Success;
     }
 }

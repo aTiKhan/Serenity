@@ -1,24 +1,27 @@
-﻿namespace Serenity.ComponentModel
+﻿namespace Serenity.ComponentModel;
+
+/// <summary>
+/// Sets editor type to "MultipleImageUpload" which doesn't allow
+/// non-image file types by default.
+/// </summary>
+/// <seealso cref="ImageUploadEditorAttribute" />
+public class MultipleImageUploadEditorAttribute : BaseUploadEditorAttribute
 {
     /// <summary>
-    /// Sets editor type to "MultipleImageUpload" which doesn't allow
-    /// non-image file types by default.
+    /// Editor type key
     /// </summary>
-    /// <seealso cref="ImageUploadEditorAttribute" />
-    public class MultipleImageUploadEditorAttribute : ImageUploadEditorAttribute
-    {
-        /// <summary>
-        /// Editor type key
-        /// </summary>
-        public new const string Key = "MultipleImageUpload";
+    public const string Key = "MultipleImageUpload";
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="MultipleImageUploadEditorAttribute"/> class.
-        /// </summary>
-        public MultipleImageUploadEditorAttribute()
-            : base(Key)
-        {
-            JsonEncodeValue = true;
-        }
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MultipleImageUploadEditorAttribute"/> class.
+    /// </summary>
+    public MultipleImageUploadEditorAttribute()
+        : base(Key)
+    {
+        AllowNonImage = false;
+        JsonEncodeValue = true;
     }
+
+    /// <inheritdoc />
+    public override bool IsMultiple => true;
 }
