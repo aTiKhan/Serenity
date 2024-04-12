@@ -1,13 +1,17 @@
-﻿import { Decorators } from "../../decorators";
+﻿import { Fluent } from "../../base";
 import { IBooleanValue } from "../../interfaces";
-import { Widget } from "../widgets/widget";
+import { Decorators } from "../../types/decorators";
+import { EditorWidget } from "../widgets/widget";
 
 @Decorators.registerEditor('Serenity.BooleanEditor', [IBooleanValue])
-@Decorators.element('<input type="checkbox"/>')
-export class BooleanEditor extends Widget<any> {
+export class BooleanEditor<P = {}> extends EditorWidget<P> {
+
+    static override createDefaultElement() { return Fluent("input").attr("type", "checkbox").getNode(); }
+
+    declare public readonly domNode: HTMLInputElement;
 
     public get value(): boolean {
-        return this.element.is(":checked");
+        return !!(this.domNode as HTMLInputElement).checked;
     }
 
     protected get_value(): boolean {
@@ -15,7 +19,7 @@ export class BooleanEditor extends Widget<any> {
     }
 
     public set value(value: boolean) {
-        this.element.prop("checked", !!value);
+        (this.domNode as HTMLInputElement).checked = !!value;
     }
 
     protected set_value(value: boolean): void {

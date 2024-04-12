@@ -1,57 +1,75 @@
-﻿import { Decorators, DialogTypeAttribute, DisplayNameAttribute, EntityTypeAttribute, ItemNameAttribute, ServiceAttribute } from "../../decorators";
+﻿import { Fluent, faIcon, getActiveRequests, getInstanceType, getTypeFullName, localText, resolveUrl, stringFormat, tryGetText } from "../../base";
 import { IEditDialog } from "../../interfaces";
-import { Authorization, endsWith, format, getInstanceType, getTypeFullName, HandleRouteEventArgs, isEmptyOrNull, LT, replaceAll, resolveUrl, Router, safeCast, localText, tryGetText } from "@serenity-is/corelib/q";
-import { RemoteViewOptions } from "@serenity-is/corelib/slick";
+import { Authorization, HandleRouteEvent, Router, replaceAll, safeCast } from "../../q";
+import { RemoteViewOptions } from "../../slick";
+import { DialogTypeAttribute, DisplayNameAttribute, EntityTypeAttribute, ItemNameAttribute, ServiceAttribute } from "../../types/attributes";
+import { Decorators } from "../../types/decorators";
 import { DialogTypeRegistry } from "../../types/dialogtyperegistry";
 import { EditorUtils } from "../editors/editorutils";
 import { SubDialogHelper } from "../helpers/subdialoghelper";
 import { ToolButton } from "../widgets/toolbar";
-import { Widget, WidgetDialogClass } from "../widgets/widget";
+import { Widget, WidgetProps } from "../widgets/widget";
 import { ColumnPickerDialog } from "./columnpickerdialog";
 import { DataGrid } from "./datagrid";
-import $ from "@optionaldeps/jquery"
 
 @Decorators.registerClass('Serenity.EntityGrid')
-export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
+export class EntityGrid<TItem, P = {}> extends DataGrid<TItem, P> {
 
-    constructor(container: JQuery, options?: TOptions) {
-        super(container, options);
-
-        this.element.addClass('route-handler')
-            .on('handleroute.' + this.uniqueName, (_, args: any) => this.handleRoute(args));
+    constructor(props: WidgetProps<P>) {
+        super(props);
+        this.domNode.classList.add('route-handler');
+        Fluent.on(this.domNode, "handleroute." + this.uniqueName, this.handleRoute.bind(this));
     }
 
-    protected handleRoute(args: HandleRouteEventArgs): void {
-        if (!!args.handled)
+    destroy() {
+        Fluent.off(document, "." + this.uniqueName + "_routerfix");
+        super.destroy();
+    }
+
+    protected handleRoute(e: HandleRouteEvent): void {
+
+        let route = Fluent.eventProp(e, "route");
+        if (typeof route !== "string")
             return;
 
-        if (!!(args.route === 'new')) {
-            args.handled = true;
+        if (route === 'new') {
+            e.preventDefault();
             this.addButtonClick();
             return;
         }
 
-        var oldRequests = ($ as any)?.["active"];
+        var oldRequests = getActiveRequests();
 
-        var parts = args.route.split('/');
-        if (!!(parts.length === 2 && parts[0] === 'edit')) {
-            args.handled = true;
+        var parts = route.split('/');
+        if (parts.length === 2 && parts[0] === 'edit') {
+            e.preventDefault();
             this.editItem(decodeURIComponent(parts[1]));
         }
-        else if (!!(parts.length === 2 && parts[1] === 'new')) {
-            args.handled = true;
+        else if (parts.length === 2 && parts[1] === 'new') {
+            e.preventDefault();
             this.editItemOfType(parts[0], null);
         }
-        else if (!!(parts.length === 3 && parts[1] === 'edit')) {
-            args.handled = true;
+        else if (parts.length === 3 && parts[1] === 'edit') {
+            e.preventDefault();
             this.editItemOfType(parts[0], decodeURIComponent(parts[2]));
         }
         else
             return;
 
-        if (($ as any)?.["active"] > oldRequests && args.handled && args.index >= 0 && args.index < args.parts.length - 1) {
-            $(document).one('ajaxStop', () => {
-                setTimeout(() => Router.resolve('#' + args.parts.join('/+/')), 1);
+        if (!Fluent.eventProp(e, "isInitial"))
+            return;
+        
+        Fluent.off(document, "." + this.uniqueName + "_routerfix");
+
+        let evParts: string[] = Fluent.eventProp(e, "parts");
+        let evIndex = Fluent.eventProp(e, "index");
+        
+        if (getActiveRequests() > oldRequests && 
+            evParts != null && evIndex != null && evIndex >= 0 && evIndex < evParts.length - 1 &&
+            !evParts[evIndex + 1].startsWith("!") &&
+            Fluent.isDefaultPrevented(e)) {
+            Fluent.one(document, "ajaxStop." + this.uniqueName + "_routerfix", () => {
+                window.location.hash = '#' + evParts.join('/+/');
             });
         }
     }
@@ -75,7 +93,7 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
         if (result != null ||
             this.getRowDefinition())
             return result;
-            
+
         return this.getEntityType();
     }
 
@@ -85,10 +103,9 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
         if (this._entityType != null)
             return this._entityType;
 
-        var attr = this.attrs(EntityTypeAttribute);
-
-        if (attr.length === 1) {
-            return (this._entityType = attr[0].value);
+        var attr = this.getCustomAttribute(EntityTypeAttribute);
+        if (attr) {
+            return (this._entityType = attr.value);
         }
 
         var name = getTypeFullName(getInstanceType(this));
@@ -98,11 +115,11 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
             name = name.substring(px + 1);
         }
 
-        if (endsWith(name, 'Grid')) {
-            name = name.substr(0, name.length - 4);
+        if (name.endsWith('Grid')) {
+            name = name.substring(0, name.length - 4);
         }
-        else if (endsWith(name, 'SubGrid')) {
-            name = name.substr(0, name.length - 7);
+        else if (name.endsWith('SubGrid')) {
+            name = name.substring(0, name.length - 7);
         }
 
         this._entityType = name;
@@ -116,10 +133,10 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
         if (this._displayName != null)
             return this._displayName;
 
-        var attr = this.attrs(DisplayNameAttribute);
-        if (attr.length >= 1) {
-            this._displayName = attr[0].displayName;
-            this._displayName = LT.getDefault(this._displayName, this._displayName);
+        var attr = this.getCustomAttribute(DisplayNameAttribute);
+        if (attr) {
+            this._displayName = attr.displayName;
+            this._displayName = localText(this._displayName, this._displayName);
         }
         else {
             this._displayName = tryGetText(this.getLocalTextDbPrefix() + 'EntityPlural');
@@ -136,10 +153,10 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
         if (this._itemName != null)
             return this._itemName;
 
-        var attr = this.attrs(ItemNameAttribute);
-        if (attr.length >= 1) {
-            this._itemName = attr[0].value;
-            this._itemName = LT.getDefault(this._itemName, this._itemName);
+        var attr = this.getCustomAttribute(ItemNameAttribute);
+        if (attr) {
+            this._itemName = attr.value;
+            this._itemName = localText(this._itemName, this._itemName);
         }
         else {
             this._itemName = tryGetText(this.getLocalTextDbPrefix() + 'EntitySingular');
@@ -151,7 +168,7 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
     }
 
     protected getAddButtonCaption(): string {
-        return format(localText('Controls.EntityGrid.NewButton'), this.getItemName());
+        return stringFormat(localText('Controls.EntityGrid.NewButton'), this.getItemName());
     }
 
     protected getButtons(): ToolButton[] {
@@ -161,7 +178,7 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
             title: this.getAddButtonCaption(),
             action: 'add',
             cssClass: 'add-button',
-            icon: 'fa-plus-circle text-green',
+            icon: faIcon("plus-circle", "green"),
             hotkey: 'alt+n',
             onClick: () => {
                 this.addButtonClick();
@@ -179,7 +196,7 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
         return {
             title: (noText ? null : localText('Controls.EntityGrid.RefreshButton')),
             hint: (noText ? localText('Controls.EntityGrid.RefreshButton') : null),
-            icon: 'fa-refresh text-blue',
+            icon: faIcon("refresh", "blue"),
             action: 'refresh',
             cssClass: 'refresh-button',
             onClick: () => {
@@ -204,7 +221,7 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
             }
 
             throw new Error(
-                format("{0} doesn't implement IEditDialog!",
+                stringFormat("{0} doesn't implement IEditDialog!",
                     getTypeFullName(getInstanceType(dlg))));
         });
     }
@@ -225,7 +242,7 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
             }
 
             throw new Error(
-                format("{0} doesn't implement IEditDialog!",
+                stringFormat("{0} doesn't implement IEditDialog!",
                     getTypeFullName(getInstanceType(dlg))));
         });
     }
@@ -236,9 +253,9 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
         if (this._service != null)
             return this._service;
 
-        var attr = this.attrs(ServiceAttribute);
-        if (attr.length >= 1)
-            this._service = attr[0].value;
+        var attr = this.getCustomAttribute(ServiceAttribute);
+        if (attr)
+            this._service = attr.value;
         else
             this._service = replaceAll(this.getEntityType(), '.', '/');
 
@@ -256,13 +273,13 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
     }
 
     protected routeDialog(itemType: string, dialog: Widget<any>) {
-        Router && Router.dialog && Router.dialog(this.element, dialog.element, () => {
+        Router && Router.dialog && Router.dialog(this.domNode, dialog.domNode, () => {
             var hash = '';
 
             if (itemType !== this.getItemType())
                 hash = itemType + '/';
 
-            if (!!(dialog != null && (dialog as any).entityId != null))
+            if (dialog != null && (dialog as any).entityId != null)
                 hash += 'edit/' + (dialog as any).entityId.toString();
             else
                 hash += 'new';
@@ -286,7 +303,7 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
     }
 
     protected initDialog(dialog: Widget<any>): void {
-        SubDialogHelper.bindToDataChange(dialog, this, (e, dci) => {
+        SubDialogHelper.bindToDataChange(dialog, this, (_) => {
             this.subDialogDataChange();
         }, true);
 
@@ -300,7 +317,7 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
             return;
         }
 
-        SubDialogHelper.bindToDataChange(dialog, this, (e, dci) => {
+        SubDialogHelper.bindToDataChange(dialog, this, (_) => {
             this.subDialogDataChange();
         }, true);
 
@@ -309,16 +326,12 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
     }
 
     protected createEntityDialog(itemType: string, callback?: (dlg: Widget<any>) => void): Widget<any> {
-        var dialogClass = this.getDialogTypeFor(itemType);
         var dialog = Widget.create({
-            type: dialogClass,
-            options: this.getDialogOptionsFor(itemType),
-            init: d => {
-                this.initEntityDialog(itemType, d);
-                callback && callback(d);
-            }
+            type: this.getDialogTypeFor(itemType),
+            options: this.getDialogOptionsFor(itemType)
         });
-
+        this.initEntityDialog(itemType, dialog);
+        callback?.(dialog);
         return dialog;
     }
 
@@ -342,16 +355,16 @@ export class EntityGrid<TItem, TOptions> extends DataGrid<TItem, TOptions> {
         return DialogTypeRegistry.get(itemType) as any;
     }
 
-    private _dialogType: WidgetDialogClass;
+    private _dialogType: any;
 
     protected getDialogType(): { new(...args: any[]): Widget<any> } {
 
         if (this._dialogType != null)
             return this._dialogType;
 
-        var attr = this.attrs(DialogTypeAttribute);
-        if (attr.length >= 1)
-            this._dialogType = attr[0].value;
+        var attr = this.getCustomAttribute(DialogTypeAttribute);
+        if (attr)
+            this._dialogType = attr.value;
         else
             this._dialogType = DialogTypeRegistry.get(this.getEntityType());
 

@@ -1,23 +1,32 @@
-﻿import { Decorators } from "../../decorators";
+﻿import { Fluent, getjQuery, notifyError } from "../../base";
 import { IStringValue } from "../../interfaces";
-import { Widget } from "../widgets/widget";
+import { Decorators } from "../../types/decorators";
+import { EditorProps, EditorWidget } from "../widgets/widget";
 
 // http://digitalbush.com/projects/masked-input-plugin/
 @Decorators.registerEditor('Serenity.MaskedEditor', [IStringValue])
-@Decorators.element("<input type=\"text\"/>")
-export class MaskedEditor extends Widget<MaskedEditorOptions> {
+export class MaskedEditor<P extends MaskedEditorOptions = MaskedEditorOptions> extends EditorWidget<P> {
 
-    constructor(input: JQuery, opt?: MaskedEditorOptions) {
-        super(input, opt);
+    static override createDefaultElement() { return Fluent("input").attr("type", "text").getNode(); }
+    declare readonly domNode: HTMLInputElement;
 
-        (input as any).mask(this.options.mask || '', {
-            placeholder: (this.options.placeholder ?? '_')
-        });
+    constructor(props: EditorProps<P>) {
+        super(props);
+
+        let $ = getjQuery();
+        if ($?.fn?.mask) {
+            $(this.domNode).mask(this.options.mask || '', {
+                placeholder: (this.options.placeholder ?? '_')
+            });
+        }
+        else {
+            notifyError('MaskedInput requires jQuery masked input plugin ("~/Serenity.Assets/Scripts/jquery.maskedinput.js") to be loaded in the page along with jQuery!');
+        }
     }
 
     public get value(): string {
-        this.element.triggerHandler("blur.mask");
-        return this.element.val();
+        Fluent.trigger(this.domNode, "blur.mask");
+        return this.domNode.value;
     }
 
     protected get_value(): string {
@@ -25,7 +34,7 @@ export class MaskedEditor extends Widget<MaskedEditorOptions> {
     }
 
     public set value(value: string) {
-        this.element.val(value);
+        this.domNode.value = value;
     }
 
     protected set_value(value: string): void {

@@ -13,15 +13,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+      with: 
+        submodules: true
 
     - name: setup .net
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 6.0.x
+        dotnet-version: 8.0.x
 
     - name: Nuget package cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: nuget-package-cache
       env:
         cache-name: nuget-package-cache
@@ -43,19 +45,25 @@ jobs:
       run: dotnet test --no-build --verbosity normal
       working-directory: "src"
 
-  js-corelib-tests:
+  js-tests:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+      with:
+        submodules: true
 
     - name: setup node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '18.14.2'
 
     - name: pnpm install
       uses: ./.github/actions/pnpm-install
+
+    - name: sleekgrid tests
+      run: pnpm test
+      working-directory: "packages/sleekgrid"
 
     - name: corelib tests
       run: pnpm test

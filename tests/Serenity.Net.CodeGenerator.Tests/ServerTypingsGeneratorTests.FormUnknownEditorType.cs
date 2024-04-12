@@ -1,5 +1,3 @@
-using ServerTypingsTest.TypeWithGenericParameters;
-
 namespace Serenity.Tests.CodeGenerator
 {
     public partial class ServerTypingsGeneratorTests
@@ -12,13 +10,13 @@ namespace Serenity.Tests.CodeGenerator
             {
                 Name = "Widget",
                 Namespace = "Serenity",
-                GenericParameters = new()
-                {
+                GenericParameters =
+                [
                     new()
                     {
                         Name = "TOptions",
                     }
-                }
+                ]
             });
             var result = generator.Run();
             var code = Assert.Single(result).Text;
@@ -28,7 +26,7 @@ namespace Serenity.Tests.CodeGenerator {export interface FormWithUnknownEditor {
     }
 
     export class FormWithUnknownEditor extends Serenity.PrefixedContext {
-        static formKey = 'FormWithUnknownEditor';
+        static readonly formKey = 'FormWithUnknownEditor';
         private static init: boolean;
 
         constructor(prefix: string) {

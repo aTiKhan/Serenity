@@ -1,17 +1,16 @@
-﻿import { ArgumentNullException, EditorAttribute, Exception, getAttributes, htmlEncode, isAssignableFrom, isEmptyOrNull, notifyError } from "@serenity-is/corelib/q";
+﻿import { EditorAttribute, hasCustomAttribute, htmlEncode, isAssignableFrom, notifyError } from "../base";
+import { ArgumentNullException, Exception } from "../q";
 import { Widget } from "../ui/widgets/widget";
 import { commonTypeRegistry } from "./commontyperegistry";
-
-let knownTypes: { [key: string] : any };
 
 export namespace EditorTypeRegistry {
     
     let registry = commonTypeRegistry(
-        type => !!getAttributes(type, EditorAttribute).length || isAssignableFrom(Widget, type), 
+        type => hasCustomAttribute(type, EditorAttribute, false) || isAssignableFrom(Widget, type), 
         null, "Editor");
 
     export function get(key: string): any {
-        if (isEmptyOrNull(key)) 
+        if (!key) 
             throw new ArgumentNullException('key');
         
         var type = registry.tryGet(key);

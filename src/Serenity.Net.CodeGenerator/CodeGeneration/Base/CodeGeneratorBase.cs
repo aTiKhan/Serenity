@@ -1,4 +1,4 @@
-﻿namespace Serenity.CodeGeneration;
+namespace Serenity.CodeGeneration;
 
 public abstract class CodeGeneratorBase
 {
@@ -9,7 +9,10 @@ public abstract class CodeGeneratorBase
     public CodeGeneratorBase()
     {
         sb = new StringBuilder(4096);
-        cw = new CodeWriter(sb, 4);
+        cw = new CodeWriter(sb, 4)
+        {
+            GlobalUsings = GlobalUsings
+        };
     }
 
     public bool FileScopedNamespaces
@@ -18,10 +21,12 @@ public abstract class CodeGeneratorBase
         set => cw.FileScopedNamespaces = value;
     }
 
+    public readonly HashSet<string> GlobalUsings = [];
+
     protected virtual void Reset()
     {
         sb.Clear();
-        generatedCode = new();
+        generatedCode = [];
     }
 
     protected virtual void AddFile(string filename, bool module = false)

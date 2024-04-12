@@ -1,7 +1,6 @@
-﻿import { Decorators } from "../../decorators";
-import { isEmptyOrNull, isValue, localText, trim } from "@serenity-is/corelib/q";
-import { PopupMenuButton } from "../widgets/toolbar";
-import { Widget } from "../widgets/widget";
+﻿import { Fluent, localText } from "../../base";
+import { Decorators } from "../../types/decorators";
+import { Widget, WidgetProps } from "../widgets/widget";
 
 export interface QuickSearchField {
     name: string;
@@ -17,77 +16,78 @@ export interface QuickSearchInputOptions {
 }
 
 @Decorators.registerClass('Serenity.QuickSearchInput')
-export class QuickSearchInput extends Widget<QuickSearchInputOptions> {
+export class QuickSearchInput<P extends QuickSearchInputOptions = QuickSearchInputOptions> extends Widget<P> {
+    static override createDefaultElement() { return Fluent("input").attr("type", "text").getNode(); }
+    declare readonly domNode: HTMLInputElement;
+
     private lastValue: string;
     private field: QuickSearchField;
+    private fieldLink: HTMLElement;
     private fieldChanged: boolean;
     private timer: number;
 
-    constructor(input: JQuery, opt: QuickSearchInputOptions) {
-        super(input, opt);
+    constructor(props: WidgetProps<P>) {
+        super(props);
 
-        input.attr('title', localText('Controls.QuickSearch.Hint'))
-            .attr('placeholder', localText('Controls.QuickSearch.Placeholder'));
-        this.lastValue = trim(input.val() ?? '');
+        this.domNode.setAttribute('title', localText('Controls.QuickSearch.Hint'));
+        this.domNode.setAttribute('placeholder', localText('Controls.QuickSearch.Placeholder'));
+        this.lastValue = (this.domNode.value ?? "").trim();
 
-        var self = this;
-        this.element.bind('keyup.' + this.uniqueName, function () {
-            self.checkIfValueChanged();
-        });
+        Fluent.on(this.domNode, "keyup." + this.uniqueName, this.checkIfValueChanged.bind(this));
+        Fluent.on(this.domNode, "change." + this.uniqueName, this.checkIfValueChanged.bind(this));
 
-        this.element.bind('change.' + this.uniqueName, function () {
-            self.checkIfValueChanged();
-        });
+        Fluent("span")
+            .class("quick-search-icon")
+            .append(Fluent("i"))
+            .insertBefore(this.domNode);
 
-        $('<span><i></i></span>').addClass('quick-search-icon')
-            .insertBefore(input);
+        if (this.options.fields?.length > 0) {
+            var dropdown = Fluent("div")
+                .class("dropdown quick-search-field")
+                .insertBefore(this.domNode);
 
-        if (isValue(this.options.fields) && this.options.fields.length > 0) {
-            var a = $('<a/>').addClass('quick-search-field').attr('title',
-                localText('Controls.QuickSearch.FieldSelection')).insertBefore(input);
+            this.fieldLink = Fluent("a").class('.quick-search-field-toggle')
+                .attr('title', localText('Controls.QuickSearch.FieldSelection'))
+                .data("bs-toggle", "dropdown")
+                .appendTo(dropdown)
+                .getNode();
 
-            var menu = $('<ul></ul>').css('width', '120px');
+            var menu = Fluent("ul").class("dropdown-menu")
+                .appendTo(dropdown);
 
-            for (var item of this.options.fields) {
-                var field = { $: item };
-                $('<li><a/></li>').appendTo(menu).children().attr('href', '#')
-                    .text(item.title ?? '').click(function (e: any) {
-                        e.preventDefault();
-                        this.$this.fieldChanged = self.field !== this.field.$;
-                        self.field = this.field.$;
-                        this.$this.updateInputPlaceHolder();
-                        this.$this.checkIfValueChanged();
-                    }.bind({
-                        field: field,
-                        $this: this
-                    }));
-            }
-
-            new PopupMenuButton(a, {
-                positionMy: 'right top',
-                positionAt: 'right bottom',
-                menu: menu
-            });
+            this.options.fields.forEach(item =>
+                Fluent("li")
+                    .appendTo(menu)
+                    .append(Fluent("a")
+                        .class("dropdown-item")
+                        .attr("href", "#")
+                        .text(item.title ?? '')
+                        .on("click", e => {
+                            e.preventDefault();
+                            this.fieldChanged = item !== this.field;
+                            this.field = item;
+                            this.updateInputPlaceHolder();
+                            this.checkIfValueChanged();
+                        })));
 
             this.field = this.options.fields[0];
             this.updateInputPlaceHolder();
         }
 
-        this.element.bind('execute-search.' + this.uniqueName, e1 => {
-            if (!!this.timer) {
+        Fluent.on(this.domNode, "execute-search." + this.uniqueName, () => {
+            if (this.timer)
                 window.clearTimeout(this.timer);
-            }
-            this.searchNow(trim(this.element.val() ?? ''));
+            this.searchNow((this.domNode.value ?? '').trim());
         });
     }
 
     protected checkIfValueChanged(): void {
-        if (this.element.hasClass('ignore-change')) {
+        if (this.domNode.classList.contains('ignore-change')) {
             return;
         }
 
         var value = this.get_value();
-        if (value == this.lastValue && (!this.fieldChanged || isEmptyOrNull(value))) {
+        if (value == this.lastValue && (!this.fieldChanged || !value)) {
             this.fieldChanged = false;
             return;
         }
@@ -106,8 +106,8 @@ export class QuickSearchInput extends Widget<QuickSearchInputOptions> {
         this.lastValue = value;
     }
 
-    get_value() {
-        return trim(this.element.val() ?? '');
+    get_value(): string {
+        return (this.domNode.value ?? '').trim();
     }
 
     get_field(): QuickSearchField {
@@ -124,20 +124,14 @@ export class QuickSearchInput extends Widget<QuickSearchInputOptions> {
     }
 
     protected updateInputPlaceHolder() {
-        var qsf = this.element.prevAll('.quick-search-field');
-        if (this.field) {
-            qsf.text(this.field.title);
-        }
-        else {
-            qsf.text('');
-        }
+        this.fieldLink && (this.fieldLink.textContent = this.field?.title ?? "");
     }
 
     public restoreState(value: string, field: QuickSearchField) {
         this.fieldChanged = false;
         this.field = field;
-        var value = trim(value ?? '');
-        this.element.val(value);
+        var value = (value ?? '').trim();
+        this.domNode.value = value;
         this.lastValue = value;
         if (!!this.timer) {
             window.clearTimeout(this.timer);
@@ -147,19 +141,19 @@ export class QuickSearchInput extends Widget<QuickSearchInputOptions> {
     }
 
     protected searchNow(value: string) {
-        this.element.parent().toggleClass(
+        this.domNode.parentElement?.classList.toggle(
             (this.options.filteredParentClass ?? 's-QuickSearchFiltered'), !!(value.length > 0));
 
-        this.element.parent().addClass(this.options.loadingParentClass ?? 's-QuickSearchLoading')
-                .addClass(this.options.loadingParentClass ?? 's-QuickSearchLoading');
+        let klass = this.options.loadingParentClass ?? 's-QuickSearchLoading';
+        this.domNode.classList.add(klass);
+        this.domNode.parentElement?.classList.add(klass);
 
         var done = (results: any) => {
-            this.element.removeClass(this.options.loadingParentClass ?? 's-QuickSearchLoading')
-            .parent().removeClass(this.options.loadingParentClass ?? 's-QuickSearchLoading');
+            this.domNode.classList.remove(klass);
+            this.domNode.parentElement?.classList.remove(klass);
 
             if (!results) {
-                var el = this.element.closest('.s-QuickSearchBar')
-                    .find('.quick-search-icon i')[0] as HTMLElement;
+                var el = this.domNode.closest('.s-QuickSearchBar')?.querySelector<HTMLElement>('.quick-search-icon i');
                 if (el) {
                     el.classList.add('s-shake-effect');
                     setTimeout(() => el.classList.remove('s-shake-effect'), 2000);
@@ -168,8 +162,7 @@ export class QuickSearchInput extends Widget<QuickSearchInputOptions> {
         };
 
         if (this.options.onSearch != null) {
-            this.options.onSearch(((this.field != null &&
-                !isEmptyOrNull(this.field.name)) ? this.field.name : null), value, done);
+            this.options.onSearch(this.field?.name, value, done);
         }
         else {
             done(true);

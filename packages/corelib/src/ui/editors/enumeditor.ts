@@ -1,17 +1,21 @@
-﻿import { Decorators, EnumKeyAttribute } from "../../decorators";
-import { Enum, getAttributes, tryGetText } from "@serenity-is/corelib/q";
+import { Enum, getCustomAttribute, tryGetText } from "../../base";
+import { EnumKeyAttribute } from "../../types/attributes";
+import { Decorators } from "../../types/decorators";
 import { EnumTypeRegistry } from "../../types/enumtyperegistry";
-import { Select2CommonOptions, Select2Editor } from "./select2editor";
+import { EditorProps } from "../widgets/widget";
+import { ComboboxItem } from "./combobox";
+import { ComboboxCommonOptions, ComboboxEditor } from "./comboboxeditor";
 
-export interface EnumEditorOptions extends Select2CommonOptions {
+export interface EnumEditorOptions extends ComboboxCommonOptions {
     enumKey?: string;
     enumType?: any;
 }
 
 @Decorators.registerEditor('Serenity.EnumEditor')
-export class EnumEditor extends Select2Editor<EnumEditorOptions, Select2Item> {
-    constructor(hidden: JQuery, opt: EnumEditorOptions) {
-        super(hidden, opt);
+export class EnumEditor<P extends EnumEditorOptions = EnumEditorOptions> extends ComboboxEditor<P, ComboboxItem> {
+    constructor(props: EditorProps<P>) {
+        super(props);
+
         this.updateItems();
     }
 
@@ -22,9 +26,9 @@ export class EnumEditor extends Select2Editor<EnumEditorOptions, Select2Item> {
         var enumKey = this.options.enumKey;
 
         if (enumKey == null && enumType != null) {
-            var enumKeyAttr = getAttributes(enumType, EnumKeyAttribute, false);
-            if (enumKeyAttr.length > 0) {
-                enumKey = enumKeyAttr[0].value;
+            var enumKeyAttr = getCustomAttribute(enumType, EnumKeyAttribute, false);
+            if (enumKeyAttr) {
+                enumKey = enumKeyAttr.value;
             }
         }
 

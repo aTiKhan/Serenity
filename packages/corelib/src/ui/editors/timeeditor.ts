@@ -1,7 +1,8 @@
-﻿import { Decorators } from "../../decorators";
+﻿import { Fluent, toId } from "../../base";
 import { IDoubleValue, IReadOnly } from "../../interfaces";
-import { addOption, toId } from "@serenity-is/corelib/q";
-import { Widget } from "../widgets/widget";
+import { addOption } from "../../q";
+import { Decorators } from "../../types/decorators";
+import { EditorProps, EditorWidget } from "../widgets/widget";
 import { EditorUtils } from "./editorutils";
 
 export interface TimeEditorOptions {
@@ -12,14 +13,17 @@ export interface TimeEditorOptions {
 }
 
 @Decorators.registerEditor('Serenity.TimeEditor', [IDoubleValue, IReadOnly])
-@Decorators.element("<select />")
-export class TimeEditor extends Widget<TimeEditorOptions> {
+export class TimeEditor<P extends TimeEditorOptions = TimeEditorOptions> extends EditorWidget<P> {
 
-    private minutes: JQuery;
+    static override createDefaultElement(): HTMLElement { return document.createElement("select"); }
+    declare readonly domNode: HTMLSelectElement;
 
-    constructor(input: JQuery, opt?: TimeEditorOptions) {
-        super(input, opt);
+    private minutes: Fluent;
 
+    constructor(props: EditorProps<P>) {
+        super(props);
+        
+        let input = this.element;
         input.addClass('editor s-TimeEditor hour');
 
         if (!this.options.noEmptyOption) {
@@ -30,8 +34,8 @@ export class TimeEditor extends Widget<TimeEditorOptions> {
             addOption(input, h.toString(), ((h < 10) ? ('0' + h) : h.toString()));
         }
 
-        this.minutes = $('<select/>').addClass('editor s-TimeEditor minute').insertAfter(input);
-        this.minutes.change(() => this.element.trigger("change"));
+        this.minutes = Fluent("select").class('editor s-TimeEditor minute').insertAfter(input);
+        this.minutes.on("change", () => Fluent.trigger(this.domNode, "change"));
 
         for (var m = 0; m <= 59; m += (this.options.intervalMinutes || 5)) {
             addOption(this.minutes, m.toString(), ((m < 10) ? ('0' + m) : m.toString()));
@@ -39,7 +43,7 @@ export class TimeEditor extends Widget<TimeEditorOptions> {
     }
 
     public get value(): number {
-        var hour = toId(this.element.val());
+        var hour = toId(this.domNode.value);
         var minute = toId(this.minutes.val());
         if (hour == null || minute == null) {
             return null;
@@ -54,17 +58,17 @@ export class TimeEditor extends Widget<TimeEditorOptions> {
     public set value(value: number) {
         if (!value) {
             if (this.options.noEmptyOption) {
-                this.element.val(this.options.startHour);
+                this.domNode.value = this.options.startHour;
                 this.minutes.val('0');
             }
             else {
-                this.element.val('');
+                this.domNode.value = '';
                 this.minutes.val('0');
             }
         }
         else {
-            this.element.val(Math.floor(value / 60).toString());
-            this.minutes.val(value % 60);
+            this.domNode.value = Math.floor(value / 60).toString();
+            this.minutes.val("" + (value % 60));
         }
     }
 
@@ -73,7 +77,7 @@ export class TimeEditor extends Widget<TimeEditorOptions> {
     }
 
     get_readOnly(): boolean {
-        return this.element.hasClass('readonly');
+        return this.domNode.classList.contains('readonly');
     }
 
     set_readOnly(value: boolean): void {

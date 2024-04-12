@@ -1,16 +1,19 @@
-﻿import { Decorators, FormKeyAttribute } from "../../decorators";
-import { endsWith, getAttributes, getForm, getInstanceType, getTypeFullName, PropertyItem } from "@serenity-is/corelib/q";
+﻿import { PropertyItem, getInstanceType, getTypeFullName } from "../../base";
+import { getForm } from "../../q";
+import { FormKeyAttribute } from "../../types/attributes";
+import { Decorators } from "../../types/decorators";
 import { PropertyGrid, PropertyGridOptions } from "./propertygrid";
 import { TemplatedPanel } from "./templatedpanel";
+import { WidgetProps } from "./widget";
 
 @Decorators.registerClass('Serenity.PropertyPanel')
-export class PropertyPanel<TItem, TOptions> extends TemplatedPanel<TOptions> {
+export class PropertyPanel<TItem, P> extends TemplatedPanel<P> {
 
     private _entity: TItem;
     private _entityId: any;
 
-    constructor(container: JQuery, options?: TOptions) {
-        super(container, options);
+    constructor(props: WidgetProps<P>) {
+        super(props);
 
         this.initPropertyGrid();
         this.loadInitialEntity();
@@ -29,15 +32,11 @@ export class PropertyPanel<TItem, TOptions> extends TemplatedPanel<TOptions> {
     }
 
     protected initPropertyGrid() {
-        var pgDiv = this.byId('PropertyGrid');
-        if (pgDiv.length <= 0) {
+        var pgDiv = this.findById('PropertyGrid');
+        if (!pgDiv)
             return;
-        }
         var pgOptions = this.getPropertyGridOptions();
-        this.propertyGrid = (new PropertyGrid(pgDiv, pgOptions)).init(null);
-        if (this.element.closest('.ui-Panel').hasClass('s-Flexify')) {
-            this.propertyGrid.element.children('.categories').flexHeightOnly(1);
-        }
+        this.propertyGrid = (new PropertyGrid({ element: pgDiv, ...pgOptions })).init();
     }
 
     protected loadInitialEntity(): void {
@@ -47,22 +46,17 @@ export class PropertyPanel<TItem, TOptions> extends TemplatedPanel<TOptions> {
     }
 
     protected getFormKey(): string {
-        var attributes = getAttributes(
-            getInstanceType(this), FormKeyAttribute, true);
-
-        if (attributes.length >= 1) {
-            return attributes[0].value;
+        var attr = this.getCustomAttribute(FormKeyAttribute);
+        if (attr) {
+            return attr.value;
         }
         var name = getTypeFullName(getInstanceType(this));
         var px = name.indexOf('.');
         if (px >= 0) {
             name = name.substring(px + 1);
         }
-        if (endsWith(name, 'Panel')) {
-            name = name.substr(0, name.length - 6);
-        }
-        else if (endsWith(name, 'Panel')) {
-            name = name.substr(0, name.length - 5);
+        else if (name.endsWith('Panel')) {
+            name = name.substring(0, name.length - 5);
         }
         return name;
     }

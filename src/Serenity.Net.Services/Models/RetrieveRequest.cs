@@ -1,4 +1,4 @@
-﻿namespace Serenity.Services;
+namespace Serenity.Services;
 
 /// <summary>
 /// The request model for a Retrieve service
@@ -16,13 +16,16 @@ public class RetrieveRequest : ServiceRequest, IIncludeExcludeColumns
     /// all the table / view columns, but not unmapped or
     /// complex object style (list etc.) columns.
     /// </summary>
+    [JsonConverter(typeof(JsonConverters.NullAsDefaultJsonConverter))]
     public RetrieveColumnSelection ColumnSelection { get; set; }
 
     /// <inheritdoc/>
-    [JsonConverter(typeof(JsonStringHashSetConverter))]
+    [Newtonsoft.Json.JsonConverter(typeof(JsonStringHashSetConverter))]
+    [JsonConverter(typeof(JsonConverters.HashSetStringJsonConverter))]
     public HashSet<string> IncludeColumns { get; set; }
 
     /// <inheritdoc/>
-    [JsonConverter(typeof(JsonStringHashSetConverter))]
+    [Newtonsoft.Json.JsonConverter(typeof(JsonStringHashSetConverter))]
+    [JsonConverter(typeof(JsonConverters.HashSetStringJsonConverter))]
     public HashSet<string> ExcludeColumns { get; set; }
 }

@@ -1,104 +1,75 @@
-﻿import $ from "@optionaldeps/jquery";
+﻿import { Config, Fluent, addClass, addValidationRule, getCustomAttribute, getInstanceType, getTypeFullName, getTypeShortName, isArrayLike, toggleClass } from "../../base";
 import { jQueryPatch } from "../../patch/jquerypatch";
-import { Decorators, ElementAttribute } from "../../decorators";
-import { IDialog } from "../../interfaces";
-import { addValidationRule as addValRule, ArgumentNullException, Config, Exception, format, getAttributes, getInstanceType, getTypeFullName, getTypeShortName, isAssignableFrom, notifyError, replaceAll, startsWith } from "@serenity-is/corelib/q";
+import { reactPatch } from "../../patch/reactpatch";
+import { appendChild, replaceAll } from "../../q";
+import { Decorators } from "../../types/decorators";
+import { ensureParentOrFragment, handleElementProp, isFragmentWorkaround, setElementProps } from "./widgetinternal";
+import { IdPrefixType, associateWidget, deassociateWidget, getWidgetName, useIdPrefix, type EditorProps, type WidgetProps } from "./widgetutils";
+export { getWidgetFrom, tryGetWidget, useIdPrefix, type EditorProps, type IdPrefixType, type WidgetProps } from "./widgetutils";
 
-export interface WidgetClass<TOptions = object> {
-    new(element: JQuery, options?: TOptions): Widget<TOptions>;
-    element: JQuery;
-}
+@Decorators.registerType()
+export class Widget<P = {}> {
+    static typeInfo = Decorators.classType("Serenity.Widget");
 
-export interface WidgetDialogClass<TOptions = object> {
-    new(options?: TOptions): Widget<TOptions> & IDialog;
-    element: JQuery;
-}
+    private static nextWidgetNumber = 0;
+    declare protected readonly options: WidgetProps<P>;
+    declare protected readonly uniqueName: string;
+    declare public readonly idPrefix: string;
+    declare public readonly domNode: HTMLElement;
 
-export type AnyWidgetClass<TOptions = object> = WidgetClass<TOptions> | WidgetDialogClass<TOptions>;
-
-export function reactPatch() {
-    // @ts-ignore check for global
-    let globalObj: any = typeof (global) !== "undefined" ? global : (typeof (window) !== "undefined" ? window : (typeof (self) !== "undefined" ? self : null));
-
-    // @ts-ignore
-    if (typeof React === "undefined" && typeof globalObj !== "undefined") {
-        if (globalObj['preact'] != null) {
-            globalObj['React'] = globalObj['ReactDOM'] = globalObj['preact'];
-            // @ts-ignore
-            (React as any).Fragment = (React as any).Fragment ?? "x-fragment";
-        }
-        else if (globalObj['Nerv'] != null) {
-            globalObj['React'] = globalObj['ReactDOM'] = globalObj['Nerv'];
-            // @ts-ignore
-            (React as any).Fragment = (React as any).Fragment ?? "x-fragment";
+    constructor(props: WidgetProps<P>) {
+        if (isArrayLike(props)) {
+            this.domNode = ensureParentOrFragment(props[0]);
+            this.options = {} as any;
         }
         else {
-            globalObj['React'] = {
-                Component: function () { } as any,
-                Fragment: "x-fragment" as any,
-                createElement: function () { return { _reactNotLoaded: true }; } as any
-            } as any
-            globalObj['ReactDOM'] = {
-                render: function () { throw Error("To use React, it should be included before Serenity.CoreLib.js"); }
-            }
-        }
-    }
-}
-
-reactPatch();
-
-export interface CreateWidgetParams<TWidget extends Widget<TOptions>, TOptions> {
-    type?: new (element: JQuery, options?: TOptions) => TWidget;
-    options?: TOptions;
-    container?: JQuery;
-    element?: (e: JQuery) => void;
-    init?: (w: TWidget) => void;
-}
-
-@Decorators.registerClass('Serenity.Widget')
-export class Widget<TOptions = any> {
-    private static nextWidgetNumber = 0;
-    public element: JQuery;
-    protected options: TOptions;
-    protected widgetName: string;
-    protected uniqueName: string;
-    declare public readonly idPrefix: string;
-
-    constructor(element: JQuery, options?: TOptions) {
-
-        this.element = element;
-        this.options = options || ({} as TOptions);
-
-        this.widgetName = Widget.getWidgetName(getInstanceType(this));
-        this.uniqueName = this.widgetName + (Widget.nextWidgetNumber++).toString();
-
-        if (element.data(this.widgetName)) {
-            throw new Exception(format("The element already has widget '{0}'!", this.widgetName));
+            this.options = props ?? {} as any;
+            this.domNode = handleElementProp(getInstanceType(this), this.options);
         }
 
-        element.on('remove.' + this.widgetName, e => {
-            if (e.bubbles || e.cancelable) {
+        delete this.options.element;
+        setElementProps(this, this.props as any);
+
+        let widgetName = getWidgetName(getInstanceType(this));
+        this.uniqueName = widgetName + (Widget.nextWidgetNumber++).toString();
+
+        associateWidget(this);
+
+        Fluent.one(this.domNode, 'remove.' + widgetName, e => {
+            if (e.bubbles || e.cancelable)
                 return;
-            }
             this.destroy();
-        }).data(this.widgetName, this);
+        });
 
+        this.idPrefix = (this.options as any)?.idPrefix ?? (this.uniqueName + '_');
         this.addCssClass();
-
-        this.idPrefix = this.uniqueName + '_';
-        this.renderContents();
+        !getInstanceType(this).deferRenderContents && this.internalRenderContents();
     }
 
     public destroy(): void {
-        if (this.element) {
-            this.element.removeClass(this.getCssClass());
-            this.element.off('.' + this.widgetName).off('.' + this.uniqueName).removeData(this.widgetName);
-            this.element = null;
+        if (this.domNode) {
+            deassociateWidget(this);
+            toggleClass(this.domNode, this.getCssClass(), false);
+            let widgetName = getWidgetName(getInstanceType(this));
+            Fluent.off(this.domNode, '.' + widgetName);
+            Fluent.off(this.domNode, '.' + this.uniqueName);
+            delete (this as any).domNode;
         }
     }
 
+    static createDefaultElement(): HTMLElement {
+        return document.createElement("div");
+    }
+
+    /**
+     * Returns a Fluent(this.domNode) object
+     */
+    public get element(): Fluent {
+        return Fluent(this.domNode);
+    }
+
     protected addCssClass(): void {
-        this.element.addClass(this.getCssClass());
+        addClass(this.domNode, this.getCssClass());
     }
 
     protected getCssClass(): string {
@@ -108,8 +79,8 @@ export class Widget<TOptions = any> {
         classList.push(fullClass);
 
         for (let k of Config.rootNamespaces) {
-            if (startsWith(fullClass, k + '-')) {
-                classList.push(fullClass.substr(k.length + 1));
+            if (fullClass.startsWith(k + '-')) {
+                classList.push(fullClass.substring(k.length + 1));
                 break;
             }
         }
@@ -122,144 +93,129 @@ export class Widget<TOptions = any> {
     }
 
     public static getWidgetName(type: Function): string {
-        return replaceAll(getTypeFullName(type), '.', '_');
+        return getWidgetName(type);
     }
 
-    public static elementFor<TWidget>(editorType: { new (...args: any[]): TWidget }): JQuery {
-        var elementAttr = getAttributes(editorType, ElementAttribute, true);
-        var elementHtml = ((elementAttr.length > 0) ? elementAttr[0].value : '<input/>');
-        return $(elementHtml);
-    };
-
-    public addValidationRule(eventClass: string, rule: (p1: JQuery) => string): JQuery {
-        return addValRule(this.element, eventClass, rule);
+    public addValidationRule(rule: (input: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) => string, uniqueName?: string): void;
+    public addValidationRule(uniqueName: string, rule: (input: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) => string): void;
+    public addValidationRule(rule: any, uniqueName: any): void {
+        addValidationRule(this.domNode, typeof rule === "function" ? rule : uniqueName,
+            typeof rule === "function" ? uniqueName ?? this.uniqueName : rule);
     }
 
-    public getGridField(): JQuery {
-        return this.element.closest('.field');
-    } 
+    public getFieldElement(): HTMLElement {
+        return this.domNode.closest('.field');
+    }
 
-    public change(handler: (e: JQueryEventObject) => void) {
-        this.element.on('change.' + this.uniqueName, handler);
+    public getGridField(): Fluent {
+        return Fluent(this.domNode.closest('.field'));
+    }
+
+    public change(handler: (e: Event) => void) {
+        Fluent.on(this.domNode, "change." + this.uniqueName, handler);
     };
 
-    public changeSelect2(handler: (e: JQueryEventObject) => void) {
-        this.element.on('change.' + this.uniqueName, function (e, valueSet) {
-            if (valueSet !== true)
-                handler(e);
+    public changeSelect2(handler: (e: Event) => void) {
+        Fluent.on(this.domNode, "change." + this.uniqueName, e => {
+            if ((e.target as HTMLElement)?.dataset?.comboboxsettingvalue)
+                return;
+            handler(e);
         });
-    };
+    }
 
-    public static create<TWidget extends Widget<TOpt>, TOpt>(params: CreateWidgetParams<TWidget, TOpt>) {
-        let widget: TWidget;
-
-        if (isAssignableFrom(IDialog, params.type)) {
-            widget = new (params.type as any)(params.options);
-            if (params.container)
-                widget.element.appendTo(params.container);
-            params.element && params.element(widget.element);
-        }
-        else {
-            var e = Widget.elementFor(params.type);
-            if (params.container)
-                e.appendTo(params.container);
-            params.element && params.element(e);
-            widget = new params.type(e, params.options);
-        }
-
-        widget.init(null);
-        params.init && params.init(widget);
-
+    public static create<TWidget extends Widget<P>, P>(params: CreateWidgetParams<TWidget, P>) {
+        let props: WidgetProps<P> = params.options ?? ({} as any);
+        let node = handleElementProp(params.type as any, props);
+        params.container && (isArrayLike(params.container) ? params.container[0] : params.container)?.appendChild(node);
+        params.element?.(Fluent(node));
+        props.element = node;
+        let widget = new params.type(props as any);
+        widget.init();
+        params.init?.(widget);
         return widget;
     }
 
-    public initialize(): void {
+    protected getCustomAttribute<TAttr>(attrType: { new(...args: any[]): TAttr }, inherit: boolean = true): TAttr {
+        return getCustomAttribute(getInstanceType(this), attrType, inherit);
     }
 
-    public init(action?: (widget: any) => void): this {
-        action && action(this);
+    protected internalInit() {
+        getInstanceType(this).deferRenderContents && this.internalRenderContents();
+    }
+
+    public init(): this {
+        if (!(this as any)[initialized]) {
+            (this as any)[initialized] = true;
+            this.internalInit();
+        }
         return this;
     }
 
-    protected renderContents(): void {
+    /**
+     * Returns the main element for this widget or the document fragment.
+     * As widgets may get their elements from props unlike regular JSX widgets, 
+     * this method should not be overridden. Override renderContents() instead.
+     */
+    public render(): any {
+        let el = this.init().domNode;
+        let parent = el?.parentNode;
+        if (parent instanceof DocumentFragment &&
+            parent.childNodes.length > 1 &&
+            (parent as any)[isFragmentWorkaround])
+            return parent;
+        return el;
     }
 
-    private static __isWidgetType = true;
+    protected internalRenderContents() {
+        if ((this as any)[renderContentsCalled])
+            return;
+        (this as any)[renderContentsCalled] = true;
+        let contents = this.renderContents();
+        if (typeof contents !== "undefined" && contents !== false && this.domNode)
+            appendChild(contents, this.domNode);
+    }
+
+    protected renderContents(): any | void {
+        return (this.options as any).children;
+    }
+
+    public get props(): WidgetProps<P> {
+        return this.options;
+    }
+
+    protected syncOrAsyncThen<T>(syncMethod: (() => T), asyncMethod: (() => PromiseLike<T>), then: (v: T) => void) {
+        if (!(this as any).useAsync?.())
+            then.call(this, syncMethod.call(this));
+        else
+            asyncMethod.call(this).then(then.bind(this));
+    }
+
+    protected useIdPrefix(): IdPrefixType {
+        return useIdPrefix(this.idPrefix);
+    }
 }
 
-if (typeof $ !== "undefined" && $.fn) {
-    ($.fn as any).tryGetWidget = function (this: JQuery, type: any) {
-        var element = this;
-        var w;
-        if (isAssignableFrom(Widget, type)) {
-            var widgetName = Widget.getWidgetName(type);
-            w = element.data(widgetName);
-            if (w != null && !isAssignableFrom(type, getInstanceType(w))) {
-                w = null;
-            }
-            if (w != null) {
-                return w;
-            }
-        }
+Object.defineProperties(Widget.prototype, { isReactComponent: { value: true } });
 
-        var data = element.data();
-        if (data == null) {
-            return null;
-        }
+@Decorators.registerType()
+export class EditorWidget<P> extends Widget<EditorProps<P>> {
+    static override typeInfo = Decorators.classType("Serenity.EditorWidget");
 
-        for (var key of Object.keys(data)) {
-            w = data[key];
-            if (w != null && isAssignableFrom(type, getInstanceType(w))) {
-                return w;
-            }
-        }
-
-        return null;
-    };
-
-    $.fn.getWidget = function<TWidget>(this: JQuery, type: { new (...args: any[]): TWidget }) {
-        if (this == null) {
-            throw new ArgumentNullException('element');
-        }
-        if (this.length === 0) {
-            throw new Exception(format("Searching for widget of type '{0}' on a non-existent element! ({1})",
-                getTypeFullName(type), this.selector));
-        }
-
-        var w = (this as any).tryGetWidget(type);
-        if (w == null) {
-            var message = format("Element has no widget of type '{0}'! If you have recently changed " +
-                "editor type of a property in a form class, or changed data type in row (which also changes " +
-                "editor type) your script side Form definition might be out of date. Make sure your project " +
-                "builds successfully and transform T4 templates", getTypeFullName(type));
-            notifyError(message, '', null);
-            throw new Exception(message);
-        }
-        return w;
-    };
+    constructor(props: EditorProps<P>) {
+        super(props);
+    }
 }
 
-export interface WidgetComponentProps<W extends Widget<any>> {
-    id?: string;
-    name?: string;
-    className?: string;
-    maxLength?: number;
-    placeholder?: string;
-    setOptions?: any;
-    required?: boolean;
-    readOnly?: boolean;
-    oneWay?: boolean;
-    onChange?: (e: JQueryEventObject) => void;
-    onChangeSelect2?: (e: JQueryEventObject) => void;
-    value?: any;
-    defaultValue?: any;
+export interface CreateWidgetParams<TWidget extends Widget<P>, P> {
+    type?: { new(options?: P): TWidget, prototype: TWidget };
+    options?: P & WidgetProps<{}>;
+    container?: HTMLElement | ArrayLike<HTMLElement>;
+    element?: (e: Fluent) => void;
+    init?: (w: TWidget) => void;
 }
 
-export declare interface Widget<TOptions> {
-    change(handler: (e: JQueryEventObject) => void): void;
-    changeSelect2(handler: (e: JQueryEventObject) => void): void;
-}
+const initialized = Symbol();
+const renderContentsCalled = Symbol();
 
-if (typeof $ === "function") {
-    jQueryPatch(jQuery);
-}
+!jQueryPatch() && Fluent.ready(jQueryPatch);
+reactPatch();

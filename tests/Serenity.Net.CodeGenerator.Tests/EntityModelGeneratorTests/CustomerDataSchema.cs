@@ -1,4 +1,4 @@
-﻿using static Serenity.Tests.CustomerEntityInputs;
+using static Serenity.Tests.CustomerEntityInputs;
 using Serenity.CodeGenerator;
 using Serenity.Data.Schema;
 
@@ -92,7 +92,7 @@ public class CustomerDataSchema : IEntityDataSchema
 
     public string DefaultSchema => "dbo";
 
-    public List<(string schema, string table, Data.Schema.FieldInfo item)> FieldInfos { get; } = new();
+    public List<(string schema, string table, Data.Schema.FieldInfo item)> FieldInfos { get; } = [];
 
     public IEnumerable<Data.Schema.FieldInfo> GetFieldInfos(string schema, string table)
     {
@@ -100,7 +100,7 @@ public class CustomerDataSchema : IEntityDataSchema
             .Select(x => x.item);
     }
 
-    public List<(string schema, string table, ForeignKeyInfo item)> ForeignKeys { get; } = new();
+    public List<(string schema, string table, ForeignKeyInfo item)> ForeignKeys { get; } = [];
 
     public IEnumerable<ForeignKeyInfo> GetForeignKeys(string schema, string table)
     {
@@ -112,13 +112,13 @@ public class CustomerDataSchema : IEntityDataSchema
 
     public IEnumerable<string> GetIdentityFields(string schema, string table)
     {
-        return OnGetIdentityFields?.Invoke(schema, table) ?? Array.Empty<string>();
+        return OnGetIdentityFields?.Invoke(schema, table) ?? [];
     }
 
     public Func<string, string, IEnumerable<string>> OnGetPrimaryKeyFields;
 
     public IEnumerable<string> GetPrimaryKeyFields(string schema, string table)
     {
-        return OnGetPrimaryKeyFields?.Invoke(schema, table) ?? Array.Empty<string>();
+        return OnGetPrimaryKeyFields?.Invoke(schema, table) ?? [];
     }
 }

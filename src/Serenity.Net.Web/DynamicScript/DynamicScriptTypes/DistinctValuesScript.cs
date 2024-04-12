@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 
 namespace Serenity.Web;
 
@@ -40,16 +40,10 @@ public class DistinctValuesScript<TRow> : LookupScript
 
     private Field GetFieldFrom(IRow row)
     {
-        Field field = row.FindFieldByPropertyName(propertyName) ??
-            row.FindField(propertyName);
-
-        if (field is null)
-        {
-            throw new InvalidProgramException(string.Format(CultureInfo.CurrentCulture,
+        Field field = (row.FindFieldByPropertyName(propertyName) ??
+            row.FindField(propertyName)) ?? throw new InvalidProgramException(string.Format(CultureInfo.CurrentCulture,
                 "Property '{0}' specified in a distinct values script on " +
                 "row type {1} is not found!", propertyName, row.GetType().FullName));
-        }
-
         return field;
     }
 
@@ -83,9 +77,12 @@ public class DistinctValuesScript<TRow> : LookupScript
     /// <inheritdoc/>
     public override string GetScript()
     {
-        return "Q.ScriptData.set(" + ("Lookup." + LookupKey).ToSingleQuoted() +
-            ", new Q.Lookup(" + LookupParams.ToJson() + ", " + GetItems().ToJson() + 
-            ".map(function(x) { return { v: x }; })));";
+        return string.Format(DataScript.SetScriptDataFormat, 
+            ("Lookup." + LookupKey).ToSingleQuoted(),
+            string.Format(NewLookupFormat,
+                JSON.Stringify(LookupParams, writeNulls: false),
+                JSON.Stringify(GetItems(), writeNulls: false) +
+                ".map(function(x) { return { v: x }; })"));
     }
 
     /// <inheritdoc/>

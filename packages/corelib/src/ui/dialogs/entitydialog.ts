@@ -1,18 +1,21 @@
-﻿import { any, Authorization, confirmDialog, DeleteRequest, DeleteResponse, endsWith, Exception, extend, format, getAttributes, getFormData, getFormDataAsync, getInstanceType, getTypeFullName, isEmptyOrNull, localText, LT, notifySuccess, PropertyItem, PropertyItemsData, replaceAll, RetrieveRequest, RetrieveResponse, safeCast, SaveRequest, SaveResponse, ScriptData, serviceCall, ServiceOptions, startsWith, tryGetText, UndeleteRequest, UndeleteResponse, validatorAbortHandler } from "@serenity-is/corelib/q";
-import { Decorators, EntityTypeAttribute, FormKeyAttribute, IdPropertyAttribute, IsActivePropertyAttribute, ItemNameAttribute, LocalTextPrefixAttribute, NamePropertyAttribute, ServiceAttribute } from "../../decorators";
+﻿import { DeleteRequest, DeleteResponse, Fluent, RetrieveRequest, RetrieveResponse, SaveRequest, SaveResponse, ServiceOptions, UndeleteRequest, UndeleteResponse, confirmDialog, faIcon, getInstanceType, getTypeFullName, localText, notifySuccess, serviceCall, stringFormat, tryGetText, type PropertyItem, type PropertyItemsData } from "../../base";
 import { IEditDialog, IReadOnly } from "../../interfaces";
+import { Authorization, Exception, ScriptData, ValidationHelper, extend, getFormData, getFormDataAsync, replaceAll, safeCast, validatorAbortHandler } from "../../q";
+import { DataChangeInfo } from "../../types";
+import { EntityTypeAttribute, FormKeyAttribute, IdPropertyAttribute, IsActivePropertyAttribute, ItemNameAttribute, LocalTextPrefixAttribute, NamePropertyAttribute, ServiceAttribute } from "../../types/attributes";
+import { Decorators } from "../../types/decorators";
 import { IRowDefinition } from "../datagrid/irowdefinition";
 import { EditorUtils } from "../editors/editorutils";
 import { SubDialogHelper } from "../helpers/subdialoghelper";
 import { TabsExtensions } from "../helpers/tabsextensions";
-import { ValidationHelper } from "../helpers/validationhelper";
 import { PropertyGrid, PropertyGridMode, PropertyGridOptions } from "../widgets/propertygrid";
-import { Toolbar, ToolButton } from "../widgets/toolbar";
-import { Widget } from "../widgets/widget";
+import { ToolButton, Toolbar } from "../widgets/toolbar";
+import { Widget, WidgetProps } from "../widgets/widget";
 import { TemplatedDialog } from "./templateddialog";
 
 @Decorators.registerClass('Serenity.EntityDialog', [IEditDialog, IReadOnly])
-export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> implements IEditDialog, IReadOnly {
+@Decorators.panel(true)
+export class EntityDialog<TItem, P = {}> extends TemplatedDialog<P> implements IEditDialog, IReadOnly {
 
     protected entity: TItem;
     protected entityId: any;
@@ -20,52 +23,41 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
     protected propertyGrid: PropertyGrid;
 
     protected toolbar: Toolbar;
-    protected saveAndCloseButton: JQuery;
-    protected applyChangesButton: JQuery;
-    protected deleteButton: JQuery;
-    protected undeleteButton: JQuery;
-    protected cloneButton: JQuery;
-    protected editButton: JQuery;
+    protected saveAndCloseButton: Fluent;
+    protected applyChangesButton: Fluent;
+    protected deleteButton: Fluent;
+    protected undeleteButton: Fluent;
+    protected cloneButton: Fluent;
+    protected editButton: Fluent;
 
     protected localizationGrid: PropertyGrid;
-    protected localizationButton: JQuery;
+    protected localizationButton: Fluent;
     protected localizationPendingValue: any;
     protected localizationLastValue: any;
 
     static defaultLanguageList: () => string[][];
 
-    constructor(opt?: TOptions) {
-        super(opt);
+    constructor(props?: WidgetProps<P>) {
+        super(props);
 
-        if (this.useAsync())
-            this.initAsync();
-        else 
-            this.initSync();        
+        this.syncOrAsyncThen(this.getPropertyItemsData, this.getPropertyItemsDataAsync, itemsData => {
+            this.propertyItemsReady(itemsData);
+            this.afterInit();
+        });
     }
 
-    internalInit() {
+    protected propertyItemsReady(itemsData: PropertyItemsData) {
+        this.propertyItemsData = itemsData;
         this.initPropertyGrid();
         this.initLocalizationGrid();
     }
 
-    protected initSync() {
-        this.propertyItemsData = this.getPropertyItemsData();
-        this.internalInit();
-        this.afterInit();
-    }
-
-    protected async initAsync() {
-        this.propertyItemsData = await this.getPropertyItemsDataAsync();
-        this.internalInit();
-        this.afterInit();
-    }
-
     protected afterInit() {
-    }    
+    }
 
     protected useAsync() {
         return false;
-    }    
+    }
 
     destroy(): void {
 
@@ -112,14 +104,14 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
 
     protected getEntityTitle(): string {
         if (!this.isEditMode()) {
-            return format(localText('Controls.EntityDialog.NewRecordTitle'), this.getEntitySingular());
+            return stringFormat(localText('Controls.EntityDialog.NewRecordTitle'), this.getEntitySingular());
         }
         else {
             var titleFormat = (this.isViewMode() || this.readOnly || !this.hasSavePermission()) ?
                 localText('Controls.EntityDialog.ViewRecordTitle') : localText('Controls.EntityDialog.EditRecordTitle');
             var title = this.getEntityNameFieldValue() ?? '';
-            return format(titleFormat,
-                this.getEntitySingular(), (isEmptyOrNull(title) ? '' : (' (' + title + ')')));
+            return stringFormat(titleFormat,
+                this.getEntitySingular(), !title ? '' : (' (' + title + ')'));
         }
     }
 
@@ -184,11 +176,11 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
                 if (callback != null) {
                     callback(response);
                 }
-                self.element.triggerHandler('ondatachange', [{
+                Fluent.trigger(this.domNode, "ondatachange", {
                     entityId: request.EntityId,
                     entity: this.entity,
-                    type: 'delete'
-                }]);
+                    operationType: 'delete'
+                } satisfies Partial<DataChangeInfo>);
             }
         };
 
@@ -199,10 +191,6 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
     }
 
     protected onDeleteSuccess(response: DeleteResponse): void {
-    }
-
-    protected attrs<TAttr>(attrType: { new(...args: any[]): TAttr }): TAttr[] {
-        return getAttributes(getInstanceType(this), attrType, true);
     }
 
     protected getRowDefinition(): IRowDefinition {
@@ -216,10 +204,9 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         if (this._entityType != null)
             return this._entityType;
 
-        var typeAttributes = this.attrs(EntityTypeAttribute);
-
-        if (typeAttributes.length === 1)
-            return (this._entityType = typeAttributes[0].value);
+        var attr = this.getCustomAttribute(EntityTypeAttribute);
+        if (attr)
+            return (this._entityType = attr.value);
 
         // remove global namespace
         var name = getTypeFullName(getInstanceType(this));
@@ -228,10 +215,10 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
             name = name.substring(px + 1);
 
         // don't like this kind of convention, make it obsolete soon...
-        if (endsWith(name, 'Dialog') || endsWith(name, 'Control'))
-            name = name.substr(0, name.length - 6);
-        else if (endsWith(name, 'Panel'))
-            name = name.substr(0, name.length - 5);
+        if (name.endsWith('Dialog') || name.endsWith('Control'))
+            name = name.substring(0, name.length - 6);
+        else if (name.endsWith('Panel'))
+            name = name.substring(0, name.length - 5);
 
         return (this._entityType = name);
     }
@@ -242,10 +229,9 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         if (this._formKey != null)
             return this._formKey;
 
-        var attributes = this.attrs(FormKeyAttribute);
-
-        if (attributes.length >= 1)
-            return (this._formKey = attributes[0].value);
+        var attr = this.getCustomAttribute(FormKeyAttribute);
+        if (attr)
+            return (this._formKey = attr.value);
 
         return (this._formKey = this.getEntityType());
     }
@@ -258,7 +244,7 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
 
         this._localTextDbPrefix = this.getLocalTextPrefix() ?? '';
 
-        if (this._localTextDbPrefix.length > 0 && !endsWith(this._localTextDbPrefix, '.'))
+        if (this._localTextDbPrefix.length > 0 && !this._localTextDbPrefix.endsWith('.'))
             this._localTextDbPrefix = 'Db.' + this._localTextDbPrefix + '.';
 
         return this._localTextDbPrefix;
@@ -269,34 +255,22 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         if (rowDefinition)
             return rowDefinition.localTextPrefix;
 
-        var attr = this.attrs(LocalTextPrefixAttribute);
-
-        if (attr.length >= 1)
-            return attr[0].value;
+        var attr = this.getCustomAttribute(LocalTextPrefixAttribute);
+        if (attr)
+            return attr.value;
 
         return this.getEntityType();
     }
-   
+
     private _entitySingular: string;
 
     protected getEntitySingular(): string {
         if (this._entitySingular != null)
             return this._entitySingular;
 
-        var attributes = this.attrs(ItemNameAttribute);
-
-        if (attributes.length >= 1) {
-            this._entitySingular = attributes[0].value;
-            this._entitySingular = LT.getDefault(this._entitySingular, this._entitySingular);
-        }
-        else {
-            var es = tryGetText(this.getLocalTextDbPrefix() + 'EntitySingular');
-            if (es == null) 
-                es = this.getEntityType();
-            this._entitySingular = es;
-        }
-
-        return this._entitySingular;
+        var attr = this.getCustomAttribute(ItemNameAttribute);
+        return (this._entitySingular = attr ? localText(attr.value, attr.value) :
+            tryGetText(this.getLocalTextDbPrefix() + 'EntitySingular') ?? this.getEntityType());
     }
 
     private _nameProperty: string;
@@ -309,11 +283,11 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         if (rowDefinition)
             return this._nameProperty = rowDefinition.nameProperty ?? '';
 
-        var attributes = this.attrs(NamePropertyAttribute);
+        var attr = this.getCustomAttribute(NamePropertyAttribute);
 
-        if (attributes.length >= 1)
-            return this._nameProperty = attributes[0].value ?? '';
-            
+        if (attr)
+            return this._nameProperty = attr.value ?? '';
+
         return this._nameProperty = 'Name';
     }
 
@@ -327,9 +301,9 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         if (rowDefinition)
             return this._idProperty = rowDefinition.idProperty ?? '';
 
-        var attr = this.attrs(IdPropertyAttribute);
-        if (attr.length === 1)
-            return this._idProperty = attr[0].value ?? '';
+        var attr = this.getCustomAttribute(IdPropertyAttribute);
+        if (attr)
+            return this._idProperty = attr.value ?? '';
 
         return this._idProperty = 'ID';
     }
@@ -344,9 +318,9 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         if (rowDefinition)
             return this._isActiveProperty = rowDefinition.isActiveProperty ?? '';
 
-        var attr = this.attrs(IsActivePropertyAttribute);
-        if (attr.length === 1)
-            return this._isActiveProperty = attr[0].value ?? '';
+        var attr = this.getCustomAttribute(IsActivePropertyAttribute);
+        if (attr)
+            return this._isActiveProperty = attr.value ?? '';
 
         return this._isActiveProperty = '';
     }
@@ -361,9 +335,9 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         if (this._service != null)
             return this._service;
 
-        var attributes = this.attrs(ServiceAttribute);
-        if (attributes.length >= 1)
-            this._service = attributes[0].value;
+        var attr = this.getCustomAttribute(ServiceAttribute);
+        if (attr)
+            this._service = attr.value;
         else
             this._service = replaceAll(this.getEntityType(), '.', '/');
 
@@ -436,7 +410,7 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
 
         if (idField != null)
             this.set_entityId((entity as any)[idField]);
-        
+
         this.set_entity(entity);
 
         if (this.propertyGrid != null) {
@@ -460,8 +434,8 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         this.loadById(entityId,
             response => window.setTimeout(() => this.dialogOpen(asPanel), 0),
             () => {
-                if (!this.element.is(':visible')) {
-                    this.element.remove();
+                if (!Fluent.isVisibleLike(this.domNode)) {
+                    this.domNode.remove();
                 }
             });
     }
@@ -506,12 +480,12 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
 
     protected loadByIdHandler(options: ServiceOptions<RetrieveResponse<TItem>>, callback: (response: RetrieveResponse<TItem>) => void, fail: () => void): void {
         var request = serviceCall(options);
-        fail && request.fail(fail);
+        fail && ((request as any)?.fail ? (request as any).fail(fail) : request.then(null, fail));
     }
 
     protected initLocalizationGrid(): void {
-        var pgDiv = this.byId('PropertyGrid');
-        if (pgDiv.length <= 0) {
+        var pgDiv = this.findById('PropertyGrid');
+        if (!pgDiv) {
             return;
         }
         var pgOptions = this.getPropertyGridOptions();
@@ -519,14 +493,15 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
     }
 
     protected initLocalizationGridCommon(pgOptions: PropertyGridOptions) {
-        var pgDiv = this.byId('PropertyGrid');
+        var pgDiv = this.findById('PropertyGrid');
 
-        if (!any(pgOptions.items, x => x.localizable === true))
+        if (!pgOptions.items.some(x => x.localizable === true))
             return;
 
-        var localGridDiv = $('<div/>')
+        var localGridDiv = Fluent("div")
             .attr('id', this.idPrefix + 'LocalizationGrid')
-            .hide().insertAfter(pgDiv);
+            .hide()
+            .insertAfter(pgDiv);
 
         pgOptions.idPrefix = this.idPrefix + 'Localization_';
 
@@ -563,7 +538,7 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
 
         pgOptions.items = items;
 
-        this.localizationGrid = (new PropertyGrid(localGridDiv, pgOptions)).init(null);
+        this.localizationGrid = (new PropertyGrid({ element: localGridDiv, ...pgOptions })).init();
         localGridDiv.addClass('s-LocalizationGrid');
     }
 
@@ -577,7 +552,7 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         }
 
         var newValue = this.getLocalizationGridValue();
-        return JSON.stringify(this.localizationLastValue) !=  JSON.stringify(newValue);
+        return JSON.stringify(this.localizationLastValue) != JSON.stringify(newValue);
     }
 
     protected localizationButtonClick(): void {
@@ -652,7 +627,7 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
                         }
                     }
                 }
-                
+
                 this.localizationGrid.load(copy);
                 this.setLocalizationGridCurrentValues();
                 this.localizationPendingValue = null;
@@ -667,15 +642,15 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         var valueByName: Record<string, any> = {};
 
         this.localizationGrid.enumerateItems((item, widget) => {
-            if (item.name.indexOf('$') < 0 && widget.element.is(':input')) {
-                valueByName[item.name] = this.byId(item.name).val();
+            if (item.name.indexOf('$') < 0 && Fluent.isInputLike(widget.domNode)) {
+            valueByName[item.name] = this.byId(item.name).val();
                 widget.element.val(valueByName[item.name]);
             }
         });
 
         this.localizationGrid.enumerateItems((item1, widget1) => {
             var idx = item1.name.indexOf('$');
-            if (idx >= 0 && widget1.element.is(':input')) {
+            if (idx >= 0 && Fluent.isInputLike(widget1.domNode)) {
                 var hint = valueByName[item1.name.substr(idx + 1)];
                 if (hint != null && hint.length > 0) {
                     widget1.element.attr('title', hint).attr('placeholder', hint);
@@ -717,7 +692,7 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
             var prefix = language + '$';
 
             for (var k of Object.keys(this.localizationPendingValue)) {
-                if (startsWith(k, prefix)) 
+                if (k.startsWith(prefix))
                     entity[k.substr(prefix.length)] = this.localizationPendingValue[k];
             }
 
@@ -733,13 +708,10 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
             return;
         }
         var pgOptions = this.getPropertyGridOptions();
-        this.propertyGrid = (new PropertyGrid(pgDiv, pgOptions)).init(null);
-        if (this.element.closest('.ui-dialog').hasClass('s-Flexify')) {
-            this.propertyGrid.element.children('.categories').flexHeightOnly(1);
-        }
+        this.propertyGrid = (new PropertyGrid({ element: pgDiv, ...pgOptions })).init();
     }
 
-    protected getPropertyItems() {
+    protected getPropertyItems(): PropertyItem[] {
         return this.propertyItemsData?.items || [];
     }
 
@@ -755,7 +727,7 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
             }
         }
 
-        if (!isEmptyOrNull(formKey)) {
+        if (formKey) {
             return getFormData(formKey);
         }
 
@@ -764,12 +736,12 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
 
     protected async getPropertyItemsDataAsync(): Promise<PropertyItemsData> {
         var formKey = this.getFormKey();
-        if (!isEmptyOrNull(formKey)) {
+        if (formKey) {
             return await getFormDataAsync(formKey);
         }
 
         return { items: [], additionalItems: [] };
-    }    
+    }
 
     protected getPropertyGridOptions(): PropertyGridOptions {
         return {
@@ -791,25 +763,25 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
 
         opt.service = this.getService() + '/' + (this.isEditMode() ? 'Update' : 'Create'),
 
-        opt.onSuccess = response => {
-            this.onSaveSuccess(response);
+            opt.onSuccess = response => {
+                this.onSaveSuccess(response);
 
-            callback && callback(response);
+                callback && callback(response);
 
-            var typ = (this.isEditMode() ? 'update' : 'create');
+                var typ = (this.isEditMode() ? 'update' : 'create');
 
-            var ent = opt.request == null ? null : opt.request.Entity;
-            var eid: any = this.isEditMode() ? this.get_entityId() :
-                (response == null ? null : response.EntityId);
+                var ent = opt.request == null ? null : opt.request.Entity;
+                var eid: any = this.isEditMode() ? this.get_entityId() :
+                    (response == null ? null : response.EntityId);
 
-            var dci = {
-                type: typ,
-                entity: ent,
-                entityId: eid
+                var dci = {
+                    operationType: typ,
+                    entity: ent,
+                    entityId: eid
+                } satisfies Partial<DataChangeInfo>;
+
+                Fluent.trigger(this.domNode, "ondatachange", dci);
             };
-
-            this.element.triggerHandler('ondatachange', [dci]);
-        };
 
         opt.onCleanup = () => {
             this.validator && validatorAbortHandler(this.validator);
@@ -904,11 +876,11 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
             title: localText('Controls.EntityDialog.SaveButton'),
             action: 'save-and-close',
             cssClass: 'save-and-close-button',
-            icon: 'fa-check-circle text-purple',
+            icon: faIcon("check-circle", "purple"),
             hotkey: 'alt+s',
             onClick: () => {
-                this.save(response => {
-                    this.dialogClose();
+                this.save(() => {
+                    this.dialogClose("save-and-close");
                 });
             },
             visible: () => !this.isDeleted() && !this.isViewMode(),
@@ -920,7 +892,7 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
             hint: localText('Controls.EntityDialog.ApplyChangesButton'),
             action: 'apply-changes',
             cssClass: 'apply-changes-button',
-            icon: 'fa-clipboard-check text-purple',
+            icon: faIcon("clipboard-check", "purple"),
             hotkey: 'alt+a',
             onClick: () => {
                 this.save(response1 => {
@@ -945,12 +917,13 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
 
         list.push({
             title: localText('Controls.EntityDialog.DeleteButton'),
+            action: "delete",
             cssClass: 'delete-button',
-            icon: 'fa-trash-o text-red',
+            icon: faIcon("trash-o", "danger"),
             hotkey: 'alt+x',
             onClick: () => {
                 confirmDialog(localText('Controls.EntityDialog.DeleteConfirmation'), () => {
-                    this.doDelete(() => this.dialogClose());
+                    this.doDelete(() => this.dialogClose("delete"));
                 });
             },
             visible: () => this.isEditMode() && !this.isDeleted() && !this.isViewMode(),
@@ -975,9 +948,9 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         if (this.useViewMode()) {
             list.push({
                 title: localText('Controls.EntityDialog.EditButton'),
-                action: 'delete',
+                action: 'edit',
                 cssClass: 'edit-button',
-                icon: 'fa-edit',
+                icon: faIcon("edit"),
                 onClick: () => {
                     if (!this.isEditMode())
                         return;
@@ -1002,21 +975,15 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
             title: localText('Controls.EntityDialog.CloneButton'),
             action: 'clone',
             cssClass: 'clone-button',
-            icon: 'fa-clone',
+            icon: faIcon("clone"),
             onClick: () => {
-
-                if (!this.isEditMode()) {
+                if (!this.isEditMode())
                     return;
-                }
 
                 var cloneEntity = this.getCloningEntity();
-
-                Widget.create({
-                    type: getInstanceType(this),
-                    init: w => SubDialogHelper.bubbleDataChange(
-                        SubDialogHelper.cascade(w, this.element), this, true)
-                        .loadEntityAndOpenDialog(cloneEntity, null)
-                });
+                var cloneDialog = Widget.create({ type: getInstanceType(this) })
+                SubDialogHelper.bubbleDataChange(SubDialogHelper.cascade(cloneDialog, this.domNode), this, true);
+                (cloneDialog as typeof this).loadEntityAndOpenDialog(cloneEntity, null);
             },
             visible: () => false,
             disabled: () => !this.hasInsertPermission() || this.readOnly
@@ -1031,17 +998,17 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         clone = extend(clone, this.get_entity());
 
         var idField = this.getIdProperty();
-        if (!isEmptyOrNull(idField)) {
+        if (idField) {
             delete clone[idField];
         }
 
         var isActiveField = this.getIsActiveProperty();
-        if (!isEmptyOrNull(isActiveField)) {
+        if (isActiveField) {
             delete clone[isActiveField];
         }
 
         var isDeletedField = this.getIsDeletedProperty();
-        if (!isEmptyOrNull(isDeletedField)) {
+        if (isDeletedField) {
             delete clone[isDeletedField];
         }
 
@@ -1059,21 +1026,19 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
 
         this.toolbar.updateInterface();
 
-        if (this.tabs != null) {
-            TabsExtensions.setDisabled(this.tabs, 'Log', this.isNewOrDeleted());
-        }
+        TabsExtensions.setDisabled(this.tabs, 'Log', this.isNewOrDeleted());
 
         if (this.propertyGrid != null) {
-            this.propertyGrid.element.toggle(!isLocalizationMode);
+            Fluent(this.propertyGrid.domNode).toggle(!isLocalizationMode);
         }
 
         if (this.localizationGrid != null) {
-            this.localizationGrid.element.toggle(isLocalizationMode);
+            Fluent(this.localizationGrid.domNode).toggle(isLocalizationMode);
         }
 
         if (this.localizationButton != null) {
             this.localizationButton.toggle(this.localizationGrid != null);
-            this.localizationButton.find('.button-inner')
+            this.localizationButton.findFirst('.button-inner')
                 .text((this.isLocalizationMode() ?
                     localText('Controls.EntityDialog.LocalizationBack') :
                     localText('Controls.EntityDialog.LocalizationButton')));
@@ -1082,8 +1047,7 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         if (isLocalizationMode) {
 
             if (this.toolbar != null)
-                this.toolbar.findButton('tool-button')
-                    .not('.localization-hidden')
+                this.toolbar.findButton('tool-button:not(.localization-hidden)')
                     .addClass('.localization-hidden').hide();
 
             this.localizationButton && this.localizationButton.show();
@@ -1116,11 +1080,11 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         baseOptions.request = request;
         baseOptions.onSuccess = response => {
             callback && callback(response);
-            this.element.triggerHandler('ondatachange', [{
+            Fluent.trigger(this.domNode, "ondatachange", {
                 entityId: this.get_entityId(),
                 entity: this.entity,
-                type: 'undelete'
-            }]);
+                operationType: 'undelete'
+            });
         };
 
         var thisOptions = this.getUndeleteOptions(callback);
@@ -1191,18 +1155,7 @@ export class EntityDialog<TItem, TOptions> extends TemplatedDialog<TOptions> imp
         return false;
     }
 
-    protected getFallbackTemplate() {
-        return `<div class="s-DialogContent">
-    <div id="~_Toolbar" class="s-DialogToolbar">
-    </div>
-    <div class="s-Form">
-        <form id="~_Form" action="">
-            <div class="fieldset">
-                <div id="~_PropertyGrid"></div>
-                <div class="clear"></div>
-            </div>
-        </form> 
-    </div>
-</div>`;
+    protected getTemplate() {
+        return `<div id="~_Toolbar" class="s-DialogToolbar"></div><div class="s-Form"><form id="~_Form" action=""><div id="~_PropertyGrid"></div></form></div>`;
     }
 }

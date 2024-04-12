@@ -1,4 +1,4 @@
-# Serenity Core Library
+# Serenity Core Library (Classic UI)
 
 This is the package containing core TypeScript classes and functions used in Serenity applications.
 
@@ -9,11 +9,11 @@ in your projects created from `Serene` or `StartSharp` template:
 {
   "dependencies": {
     // ...
-    "@serenity-is/corelib": "6.7.1"
+    "@serenity-is/corelib": "./node_modules/.dotnet/serenity.corelib"
   }
 }
 ```
 
-The version number for this package should be equal or as close as possible to Serenity NuGet package versions in your project file.
+If you have "./node_modules/.dotnet/serenity.corelib" in the version value, it means you are using this library directly via the Serenity.Corelib NuGet package reference in your project file instead of NPM. This is recommended to avoid version inconsistencies.
 
-`@serenity-is/corelib/q` and `@serenity-is/corelib/slick` are not separately installable NPM packages. They are just sub-modules exported via `subpath exports` feature of the Node/NPM.
+If you have a version number for this package in package.json, it should be equal or as close as possible to Serenity NuGet package versions in your project file.

@@ -1,6 +1,8 @@
-﻿import { Decorators } from "../../decorators";
-import { findElementWithRelativeId, isEmptyOrNull, notifyError } from "@serenity-is/corelib/q";
+﻿import { Fluent, notifyError } from "../../base";
+import { findElementWithRelativeId } from "../../q";
+import { Decorators } from "../../types/decorators";
 import { Widget } from "../widgets/widget";
+import { tryGetWidget } from "../widgets/widgetutils";
 
 @Decorators.registerClass('Serenity.CascadedWidgetLink')
 export class CascadedWidgetLink<TParent extends Widget<any>> {
@@ -9,7 +11,7 @@ export class CascadedWidgetLink<TParent extends Widget<any>> {
         private widget: Widget<any>,
         private parentChange: (p1: TParent) => void) {
         this.bind();
-        this.widget.element.bind('remove.' + (widget as any).uniqueName + 'cwh', e => {
+        Fluent.on(this.widget.domNode, 'remove.' + (widget as any).uniqueName + 'cwh', () => {
             this.unbind();
             this.widget = null;
             this.parentChange = null;
@@ -20,15 +22,14 @@ export class CascadedWidgetLink<TParent extends Widget<any>> {
 
     bind() {
 
-        if (isEmptyOrNull(this._parentID)) {
+        if (!this._parentID) {
             return null;
         }
 
-        var parent = findElementWithRelativeId(this.widget.element, this._parentID)
-            .tryGetWidget(this.parentType);
+        var parent = tryGetWidget(findElementWithRelativeId(this.widget.domNode, this._parentID), this.parentType);
 
         if (parent != null) {
-            parent.element.bind('change.' + (this.widget as any).uniqueName, () => {
+            Fluent.on(parent.domNode, 'change.' + (this.widget as any).uniqueName, () => {
                 this.parentChange(parent);
             });
             return parent;
@@ -41,14 +42,14 @@ export class CascadedWidgetLink<TParent extends Widget<any>> {
 
     unbind() {
 
-        if (isEmptyOrNull(this._parentID)) {
+        if (!this._parentID) {
             return null;
         }
 
-        var parent = findElementWithRelativeId(this.widget.element, this._parentID).tryGetWidget(this.parentType);
+        var parent = tryGetWidget(findElementWithRelativeId(this.widget.domNode, this._parentID), this.parentType);
 
         if (parent != null) {
-            parent.element.unbind('.' + (this.widget as any).uniqueName);
+            Fluent.off(parent.domNode, '.' + (this.widget as any).uniqueName);
         }
 
         return parent;

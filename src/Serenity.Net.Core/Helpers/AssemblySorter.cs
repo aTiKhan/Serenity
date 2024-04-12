@@ -1,20 +1,14 @@
-﻿namespace Serenity.Reflection;
+namespace Serenity.Reflection;
 
 /// <summary>
 /// Sorts assemblies based on their dependencies
 /// </summary>
 public class AssemblySorter
 {
-    private class AssemblyItem
+    private class AssemblyItem(Assembly item)
     {
-        public Assembly Item { get; set; }
-        public IList<AssemblyItem> Dependencies { get; set; }
-
-        public AssemblyItem(Assembly item)
-        {
-            Item = item;
-            Dependencies = new List<AssemblyItem>();
-        }
+        public Assembly Item { get; set; } = item;
+        public IList<AssemblyItem> Dependencies { get; set; } = [];
     }
 
     /// <summary>

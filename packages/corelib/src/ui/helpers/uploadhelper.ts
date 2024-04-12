@@ -1,9 +1,14 @@
-import { alertDialog, htmlEncode, blockUI, blockUndo, endsWith, format, iframeDialog, isEmptyOrNull, notifyError, replaceAll, resolveUrl, round, startsWith, localText } from "@serenity-is/corelib/q";
+import { Fluent, ServiceResponse, Uploader, blockUI, blockUndo, getjQuery, htmlEncode, isArrayLike, localText, notifyError, resolveUrl, round, stringFormat } from "../../base";
+import { replaceAll } from "../../q";
 
 export namespace UploadHelper {
 
-    export function addUploadInput(options: UploadInputOptions): JQuery {
-        options.container.addClass('fileinput-button');
+    export function addUploadInput(options: UploadInputOptions): Fluent {
+        let container = isArrayLike(options.container) ? options.container[0] : options.container;
+        let progress = Fluent(isArrayLike(options.progress) ? options.progress[0] : options.progress);
+        //container.classList.add('fileinput-button');
+        var button = container.closest(".tool-button") ?? container.closest("button") ?? container;
+        button.classList.add("fileinput-button");
 
         var uploadUrl = options.uploadUrl || '~/File/TemporaryUpload';
         if (options.uploadIntent) {
@@ -15,84 +20,43 @@ export namespace UploadHelper {
             uploadUrl += encodeURIComponent(options.uploadIntent);
         }
 
-        var uploadInput = $('<input/>').attr('type', 'file')
+        var uploadInput = Fluent("input").attr('type', 'file')
             .attr('name', options.inputName + '[]')
             .attr('data-url', resolveUrl(uploadUrl))
-            .appendTo(options.container);
+            .appendTo(container);
 
         if (options.allowMultiple) {
             uploadInput.attr('multiple', 'multiple');
         }
 
-        (uploadInput as any).fileupload({
-            dataType: 'json',
+        const setProgress = (percent: number) => {
+            let bar = progress.children()[0];
+            bar && (bar.style.width = (percent ?? 0).toString() + '%');
+        }
+
+        new Uploader({
+            batchSize: 1,
+            batchSuccess: data => options.fileDone?.(data.response ?? {}, data.batch?.filePaths?.[0], data),
+            input: uploadInput.getNode() as HTMLInputElement,
             dropZone: options.zone,
-            pasteZone: options.zone,
-            done: function (e: JQueryEventObject, data: any) {
-                var response = data.result;
-                if (response.Error) {
-                    notifyError(response.Error.Message);
-                    return;
-                } 
-
-                if (options.fileDone != null) {
-                    options.fileDone(response, data.files[0].name, data);
-                }
-            },
-            fail: function(e: JQueryEventObject, opt: any) {
-                var xhr = opt?._response?.jqXHR;
-                if (!xhr) {
-                    notifyError('An error occurred during file upload.');
-                    return;
-                }
-
-                if ((xhr.getResponseHeader('content-type') || '')
-                    .toLowerCase().indexOf('application/json') >= 0) {
-                    var json = $.parseJSON(xhr.responseText);
-                    if (json && json.Error && json.Error.Message) {
-                        notifyError(json.Error.Message);
-                        return;
-                    }
-                }
-
-                var html = xhr.responseText;
-                if (html) {
-                    iframeDialog({ html: html });
-                    return;
-                }
-
-                if (!xhr.status) {
-                    if (xhr.statusText != "abort")
-                        notifyError("An unknown connection error occurred! Check browser console for details.");
-                    return;
-                }
-
-                if (xhr.status == 500) {
-                    notifyError("HTTP 500: Connection refused! Check browser console for details.");
-                    return;
-                }
-
-                notifyError("HTTP " + xhr.status + ' error! Check browser console for details.');
-            },
-            start: function () {
+            batchStart: () => {
                 blockUI(null);
-                if (options.progress != null) {
-                    options.progress.show();
-                }
+                progress.show();
+                setProgress(0);
             },
-            stop: function () {
+            batchStop: () => {
                 blockUndo();
-                if (options.progress != null) {
-                    options.progress.hide();
-                }
+                setProgress(100);
+                progress.hide();
             },
-            progress: function (e1: JQueryEventObject, data1: any) {
-                if (options.progress != null) {
-                    var percent = data1.loaded / data1.total * 100;
-                    options.progress.children().css('width', percent.toString() + '%');
+            batchProgress: data => {
+                if (typeof data.loaded == "number" && data.total > 0) {
+                    var percent = data.loaded / data.total * 100;
+                    setProgress(percent);
                 }
             }
         });
+
         return uploadInput;
     }
 
@@ -100,16 +64,16 @@ export namespace UploadHelper {
         opt: FileUploadConstraints): boolean {
 
         if (!file.IsImage && !opt.allowNonImage) {
-            alertDialog(localText('Controls.ImageUpload.NotAnImageFile'));
+            notifyError(localText('Controls.ImageUpload.NotAnImageFile'));
             return false;
         }
         if (opt.minSize > 0 && file.Size < opt.minSize) {
-            alertDialog(format(localText('Controls.ImageUpload.UploadFileTooSmall'),
+            notifyError(stringFormat(localText('Controls.ImageUpload.UploadFileTooSmall'),
                 fileSizeDisplay(opt.minSize)));
             return false;
         }
         if (opt.maxSize > 0 && file.Size > opt.maxSize) {
-            alertDialog(format(localText('Controls.ImageUpload.UploadFileTooBig'),
+            notifyError(stringFormat(localText('Controls.ImageUpload.UploadFileTooBig'),
                 fileSizeDisplay(opt.maxSize)));
             return false;
         }
@@ -117,19 +81,19 @@ export namespace UploadHelper {
             return true;
         }
         if (opt.minWidth > 0 && file.Width < opt.minWidth) {
-            alertDialog(format(localText('Controls.ImageUpload.MinWidth'), opt.minWidth));
+            notifyError(stringFormat(localText('Controls.ImageUpload.MinWidth'), opt.minWidth));
             return false;
         }
         if (opt.maxWidth > 0 && file.Width > opt.maxWidth) {
-            alertDialog(format(localText('Controls.ImageUpload.MaxWidth'), opt.maxWidth));
+            notifyError(stringFormat(localText('Controls.ImageUpload.MaxWidth'), opt.maxWidth));
             return false;
         }
         if (opt.minHeight > 0 && file.Height < opt.minHeight) {
-            alertDialog(format(localText('Controls.ImageUpload.MinHeight'), opt.minHeight));
+            notifyError(stringFormat(localText('Controls.ImageUpload.MinHeight'), opt.minHeight));
             return false;
         }
         if (opt.maxHeight > 0 && file.Height > opt.maxHeight) {
-            alertDialog(format(localText('Controls.ImageUpload.MaxHeight'), opt.maxHeight));
+            notifyError(stringFormat(localText('Controls.ImageUpload.MaxHeight'), opt.maxHeight));
             return false;
         }
         return true;
@@ -158,12 +122,13 @@ export namespace UploadHelper {
     }
 
     export function hasImageExtension(filename: string): boolean {
-        if (isEmptyOrNull(filename)) {
+        if (!filename) {
             return false;
         }
         filename = filename.toLowerCase();
-        return endsWith(filename, '.jpg') || endsWith(filename, '.jpeg') ||
-            endsWith(filename, '.gif') || endsWith(filename, '.png');
+        return filename.endsWith('.jpg') || filename.endsWith('.jpeg') ||
+            filename.endsWith('.gif') || filename.endsWith('.png') || 
+            filename.endsWith('.webp');
     }
 
     export function thumbFileName(filename: string): string {
@@ -180,8 +145,14 @@ export namespace UploadHelper {
         return resolveUrl('~/upload/') + filename;
     }
 
-    export function colorBox(link: JQuery, options: any): void {
-        (link as any).colorbox({
+    export function colorBox(link: HTMLElement | ArrayLike<HTMLElement>, options: any): void {
+        link = isArrayLike(link) ? link[0] : link;
+        if (!link)
+            return;
+        let $ = getjQuery();
+        if (!$)
+            return;
+        $(link).colorbox?.({
             current: htmlEncode(localText('Controls.ImageUpload.ColorboxCurrent')),
             previous: htmlEncode(localText('Controls.ImageUpload.ColorboxPrior')),
             next: htmlEncode(localText('Controls.ImageUpload.ColorboxNext')),
@@ -189,14 +160,16 @@ export namespace UploadHelper {
         });
     }
 
-    export function populateFileSymbols(container: JQuery, items: UploadedFile[],
+    export function populateFileSymbols(c: HTMLElement | ArrayLike<HTMLElement>, items: UploadedFile[],
         displayOriginalName?: boolean, urlPrefix?: string): void {
-
+        let container = isArrayLike(c) ? c[0] : c;
+        if (!container)
+            return;
         items = items || [];
-        container.html('');
+        container.innerHTML = "";
         for (var index = 0; index < items.length; index++) {
             var item = items[index];
-            var li = $('<li/>').addClass('file-item').data('index', index);
+            var li = Fluent("li").class('file-item').data('index', index.toString());
             var isImage = hasImageExtension(item.Filename);
             if (isImage) {
                 li.addClass('file-image');
@@ -204,29 +177,27 @@ export namespace UploadHelper {
             else {
                 li.addClass('file-binary');
             }
-            var editLink = '#' + index;
-            var thumb = $('<a/>').addClass('thumb').appendTo(li);
+            var thumb = Fluent("a").class('thumb').appendTo(li);
             var originalName = item.OriginalName ?? '';
             var fileName = item.Filename;
             if (urlPrefix != null && fileName != null &&
-                !startsWith(fileName, 'temporary/')) {
+                !fileName.startsWith('temporary/')) {
                 fileName = urlPrefix + fileName;
             }
 
             thumb.attr('href', dbFileUrl(fileName));
             thumb.attr('target', '_blank');
-            if (!isEmptyOrNull(originalName)) {
+            if (originalName) {
                 thumb.attr('title', originalName);
             }
 
             if (isImage) {
-                thumb.css('backgroundImage', "url('" + dbFileUrl(
-                    thumbFileName(item.Filename)) + "')");
+                thumb.getNode().style.backgroundImage = "url('" + dbFileUrl(thumbFileName(item.Filename)) + "')";
                 colorBox(thumb, new Object());
             }
 
             if (displayOriginalName) {
-                $('<div/>').addClass('filename').text(originalName)
+                Fluent("div").class('filename').text(originalName)
                     .attr('title', originalName).appendTo(li);
             }
 
@@ -241,9 +212,9 @@ export interface UploadedFile {
 }
 
 export interface UploadInputOptions {
-    container?: JQuery;
-    zone?: JQuery;
-    progress?: JQuery;
+    container?: HTMLElement | ArrayLike<HTMLElement>;
+    zone?: HTMLElement | ArrayLike<HTMLElement>;
+    progress?: HTMLElement | ArrayLike<HTMLElement>;
     inputName?: string;
     allowMultiple?: boolean;
     uploadIntent?: string;
@@ -251,7 +222,7 @@ export interface UploadInputOptions {
     fileDone?: (p1: UploadResponse, p2: string, p3: any) => void;
 }
 
-export interface UploadResponse {
+export interface UploadResponse extends ServiceResponse {
     TemporaryFile: string;
     Size: number;
     IsImage: boolean;

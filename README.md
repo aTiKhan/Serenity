@@ -11,11 +11,34 @@ Serenity is an ASP.NET Core / TypeScript application platform designed to simpli
 
 It aims to make development easier while reducing maintenance costs by avoiding boiler-plate code, reducing the time spent on repetitive tasks, and applying best software design practices. 
 
-<img src="https://github.com/serenity-is/Serene/blob/master/build/assets/SereneAnimation.gif" />
+<img src="https://github.com/serenity-is/Serene/blob/master/build/assets/SereneAnimation.webp" />
+
+## Quickstart (Serene)
+
+> Premium customers should use the StartSharp template which they can download from the [Serenity members area](https://serenity.is/Account/Login/).
+
+Ensure you have the necessary [requirements](https://serenity.is/docs/getting_started/README#prerequisites) installed.
+```bash
+# Install/Update Serene.Templates package.
+> dotnet new install Serene.Templates
+
+# Create a new Serene project.
+> dotnet new serene -n MySereneApp
+
+# Navigate into your project folder.
+> cd MySereneApp/MySereneApp.Web
+
+# Install NPM packages.
+> npm i
+
+# Build and run the project.
+> dotnet run
+```
+That's it! ✨ You can visit `http://localhost:5000` (actual port may vary, check the console after `dotnet run`) to see your running [Serene](https://github.com/serenity-is/Serene) application.
 
 ## Documentation and Tutorials
 
-See [Serenity Developer Guide - https://serenity.is/docs](https://serenity.is/docs/) for documentation, and step-by-step tutorials.
+See [Serenity Developer Guide - https://serenity.is/docs](https://serenity.is/docs/) for documentation and step-by-step tutorials.
 
 **Serenity Blog:**
 - https://serenity.is/blog/

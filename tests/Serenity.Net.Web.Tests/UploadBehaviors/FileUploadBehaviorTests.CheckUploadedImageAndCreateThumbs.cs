@@ -1,4 +1,4 @@
-﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
 using MockFileData = System.IO.Abstractions.TestingHelpers.MockFileData;
@@ -89,7 +89,6 @@ public partial class FileUploadBehaviorTests
             foreach (var testFileName in testFileNames)
             {
                 var fileName = testFileName;
-                mockFileSystem.AddFile(testFileName, string.Empty);
 
                 Assert.Throws<ArgumentOutOfRangeException>(() => FileUploadBehavior.CheckUploadedImageAndCreateThumbs(uploadOptions: attr,
                     imageProcessor: new DefaultImageProcessor(),
@@ -480,7 +479,7 @@ public partial class FileUploadBehaviorTests
             temporaryFile: ref fileName,
             validator: new DefaultUploadValidator(new DefaultImageProcessor(), NullTextLocalizer.Instance));
 
-        Assert.Single(mockFileSystem.AllFiles.Except(new[] {originalFile}));
+        Assert.Single(mockFileSystem.AllFiles.Except([originalFile]));
     }
     
     [Fact]
@@ -509,7 +508,7 @@ public partial class FileUploadBehaviorTests
 
         var originalFileNameWithoutExt = mockFileSystem.GetFileNameWithoutExtension(originalFile);
 
-        Assert.Collection(mockFileSystem.AllFiles.Except(new[] {originalFile}).Select(mockFileSystem.GetFileName).OrderBy(fn => fn),
+        Assert.Collection(mockFileSystem.AllFiles.Except([originalFile]).Select(mockFileSystem.GetFileName).OrderBy(fn => fn),
             x => Assert.Equal($"{originalFileNameWithoutExt}_t100x100.jpg", x),
             x => Assert.Equal($"{originalFileNameWithoutExt}_t200x200.jpg", x));
     }
@@ -539,7 +538,7 @@ public partial class FileUploadBehaviorTests
             validator: new DefaultUploadValidator(new DefaultImageProcessor(), NullTextLocalizer.Instance));
 
 
-        Assert.Collection(mockFileSystem.AllFiles.Except(new[] {originalFile}).OrderBy(fn => fn),
+        Assert.Collection(mockFileSystem.AllFiles.Except([originalFile]).OrderBy(fn => fn),
             file100 =>
             {
                 var image = Image.Load(mockFileSystem.GetFile(file100).Contents);
@@ -588,7 +587,7 @@ public partial class FileUploadBehaviorTests
         var white = new Rgb24(255, 255, 255);
         var black = new Rgb24(0, 0, 0);
         
-        Assert.Collection(mockFileSystem.AllFiles.Except(new[] {originalFile}).OrderBy(fn => fn),
+        Assert.Collection(mockFileSystem.AllFiles.Except([originalFile]).OrderBy(fn => fn),
             file100 =>
             {
                 var image = Image.Load<Rgb24>(mockFileSystem.GetFile(file100).Contents);

@@ -1,22 +1,17 @@
-﻿namespace Serenity.Data;
+namespace Serenity.Data;
 
 /// <summary>
 /// Default row type registry
 /// </summary>
 /// <seealso cref="IRowTypeRegistry" />
-public class DefaultRowTypeRegistry : IRowTypeRegistry
+/// <remarks>
+/// Initializes a new instance of the <see cref="DefaultRowTypeRegistry"/> class.
+/// </remarks>
+/// <param name="typeSource">The type source.</param>
+/// <exception cref="ArgumentNullException">typeSource</exception>
+public class DefaultRowTypeRegistry(ITypeSource typeSource) : IRowTypeRegistry
 {
-    private readonly ITypeSource typeSource;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DefaultRowTypeRegistry"/> class.
-    /// </summary>
-    /// <param name="typeSource">The type source.</param>
-    /// <exception cref="ArgumentNullException">typeSource</exception>
-    public DefaultRowTypeRegistry(ITypeSource typeSource)
-    {
-        this.typeSource = typeSource ?? throw new ArgumentNullException(nameof(typeSource));
-    }
+    private readonly ITypeSource typeSource = typeSource ?? throw new ArgumentNullException(nameof(typeSource));
 
     /// <summary>
     /// Gets all row types.
@@ -36,7 +31,7 @@ public class DefaultRowTypeRegistry : IRowTypeRegistry
     public IEnumerable<Type> ByConnectionKey(string connectionKey)
     {
         if (string.IsNullOrEmpty(connectionKey))
-            return Array.Empty<Type>();
+            return [];
 
         return AllRowTypes.Where(x => x.GetCustomAttribute<ConnectionKeyAttribute>()?.Value == connectionKey);
     }

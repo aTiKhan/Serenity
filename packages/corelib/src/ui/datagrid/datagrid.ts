@@ -1,8 +1,10 @@
-﻿import { Authorization, Criteria, debounce, deepClone, endsWith, extend, getAttributes, getColumnsData, getColumnsDataAsync, getInstanceType, getTypeFullName, htmlEncode, indexOf, isEmptyOrNull, isInstanceOfType, layoutFillHeight, LayoutTimer, ListResponse, PropertyItem, PropertyItemsData, ScriptData, setEquality, startsWith, trimEnd, trimToNull, tryGetText } from "@serenity-is/corelib/q";
-import { Format, PagerOptions, RemoteView, RemoteViewOptions } from "@serenity-is/corelib/slick";
-import { AutoTooltips, Column, ColumnSort, EventEmitter, FormatterContext, Grid, GridOptions, GroupItemMetadataProvider, IPlugin, Range, SelectionModel } from "@serenity-is/sleekgrid";
-import { ColumnsKeyAttribute, Decorators, FilterableAttribute, IdPropertyAttribute, IsActivePropertyAttribute, LocalTextPrefixAttribute } from "../../decorators";
+import { Criteria, Fluent, ListResponse, debounce, getInstanceType, getTypeFullName, getjQuery, htmlEncode, isInstanceOfType, tryGetText, type PropertyItem, type PropertyItemsData } from "../../base";
+import { ArgsCell, AutoTooltips, Column, ColumnSort, FormatterContext, Grid, GridOptions } from "@serenity-is/sleekgrid";
 import { IReadOnly } from "../../interfaces";
+import { Authorization, LayoutTimer, ScriptData, deepClone, extend, getColumnsData, getColumnsDataAsync, setEquality } from "../../q";
+import { Format, PagerOptions, RemoteView, RemoteViewOptions } from "../../slick";
+import { ColumnsKeyAttribute, FilterableAttribute, IdPropertyAttribute, IsActivePropertyAttribute, LocalTextPrefixAttribute } from "../../types/attributes";
+import { Decorators } from "../../types/decorators";
 import { DateEditor } from "../editors/dateeditor";
 import { EditorUtils } from "../editors/editorutils";
 import { SelectEditor } from "../editors/selecteditor";
@@ -14,8 +16,9 @@ import { FilterStore } from "../filtering/filterstore";
 import { LazyLoadHelper } from "../helpers/lazyloadhelper";
 import { GridUtils, PropertyItemSlickConverter, SlickFormatting, SlickHelper } from "../helpers/slickhelpers";
 import { ReflectionOptionsSetter } from "../widgets/reflectionoptionssetter";
-import { Toolbar, ToolButton } from "../widgets/toolbar";
-import { Widget } from "../widgets/widget";
+import { ToolButton, Toolbar } from "../widgets/toolbar";
+import { Widget, WidgetProps } from "../widgets/widget";
+import { getWidgetFrom, tryGetWidget } from "../widgets/widgetutils";
 import { IDataGrid } from "./idatagrid";
 import { IRowDefinition } from "./irowdefinition";
 import { QuickFilter } from "./quickfilter";
@@ -23,39 +26,9 @@ import { QuickFilterBar } from "./quickfilterbar";
 import { QuickSearchField, QuickSearchInput } from "./quicksearchinput";
 import { SlickPager } from "./slickpager";
 
-type GroupItemMetadataProviderType = typeof GroupItemMetadataProvider;
-
-declare global {
-    namespace Slick {
-        namespace Data {
-            /** @obsolete use the type exported from @serenity-is/sleekgrid */
-            export const GroupItemMetadataProvider: GroupItemMetadataProviderType;
-        }
-   
-        interface RowMoveManagerOptions {
-            cancelEditOnDrag: boolean;
-        }
-    
-        class RowMoveManager implements IPlugin {
-            constructor(options: RowMoveManagerOptions);
-            init(): void;
-            onBeforeMoveRows: EventEmitter;
-            onMoveRows: EventEmitter;
-        }
-
-        class RowSelectionModel implements SelectionModel {
-            init(grid: Grid): void;
-            destroy?: () => void;
-            setSelectedRanges(ranges: Range[]): void;
-            onSelectedRangesChanged: EventEmitter<Range[]>;
-            refreshSelections?(): void;
-        }        
-    }
-}
-
 export interface SettingStorage {
-    getItem(key: string): string;
-    setItem(key: string, value: string): void;
+    getItem(key: string): string | Promise<string>;
+    setItem(key: string, value: string): void | Promise<void>;
 }
 
 export interface PersistedGridColumn {
@@ -87,19 +60,18 @@ export interface GridPersistanceFlags {
 }
 
 @Decorators.registerClass('Serenity.DataGrid', [IReadOnly])
-@Decorators.element("<div/>")
-export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IDataGrid, IReadOnly {
+export class DataGrid<TItem, P = {}> extends Widget<P> implements IDataGrid, IReadOnly {
 
     private _isDisabled: boolean;
-    private _layoutTimer: number; 
+    private _layoutTimer: number;
     private _slickGridOnSort: any;
     private _slickGridOnClick: any;
-    protected titleDiv: JQuery;
+    protected titleDiv: Fluent;
     protected toolbar: Toolbar;
     protected filterBar: FilterDisplayBar;
-    protected quickFiltersDiv: JQuery;
+    protected quickFiltersDiv: Fluent;
     protected quickFiltersBar: QuickFilterBar;
-    protected slickContainer: JQuery;
+    protected slickContainer: Fluent;
     protected allColumns: Column[];
     protected propertyItemsData: PropertyItemsData;
     protected initialSettings: PersistedGridSettings;
@@ -114,22 +86,21 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     public static defaultColumnWidthScale: number;
     public static defaultColumnWidthDelta: number;
 
-    constructor(container: JQuery, options?: TOptions) {
-        super(container, options);
+    constructor(props: WidgetProps<P>) {
+        super(props);
 
-        var self = this;
+        this.domNode.classList.add('s-DataGrid');
 
-        this.element.addClass('s-DataGrid').html('');
+        var layout = function () {
+            this.layout();
+            if (this._layoutTimer != null)
+                LayoutTimer.store(this._layoutTimer);
+        }.bind(this);
 
-        var layout = function() {
-            self.layout();
-            if (self._layoutTimer != null)
-                LayoutTimer.store(self._layoutTimer);
-        }
         this.element.addClass('require-layout').on('layout.' + this.uniqueName, layout);
 
         if (this.useLayoutTimer())
-            this._layoutTimer = LayoutTimer.onSizeChange(() => this.element && this.element[0], debounce(layout, 50));
+            this._layoutTimer = LayoutTimer.onSizeChange(() => this.domNode && this.domNode, debounce(layout, 50));
 
         this.setTitle(this.getInitialTitle());
 
@@ -141,13 +112,14 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         this.slickContainer = this.createSlickContainer();
         this.view = this.createView();
 
-        if (this.useAsync())
-            this.initAsync();
-        else 
-            this.initSync();
+        this.syncOrAsyncThen(this.getPropertyItemsData, this.getPropertyItemsDataAsync, itemsData => {
+            this.propertyItemsReady(itemsData);
+            this.afterInit();
+        });
     }
 
-    protected internalInit() {
+    protected propertyItemsReady(itemsData: PropertyItemsData) {
+        this.propertyItemsData = itemsData;
         this.allColumns = this.allColumns ?? this.getColumns();
         this.slickGrid = this.createSlickGrid();
 
@@ -171,21 +143,12 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         this.updateInterface();
 
         this.initialSettings = this.getCurrentSettings(null);
-        this.restoreSettings(null, null);
 
-        window.setTimeout(() => this.initialPopulate(), 0);   
-    }
-
-    protected initSync() {
-        this.propertyItemsData = this.getPropertyItemsData();
-        this.internalInit();
-        this.afterInit();
-    }
-
-    protected async initAsync() {
-        this.propertyItemsData = await this.getPropertyItemsDataAsync();
-        this.internalInit();
-        this.afterInit();
+        var restoreResult = this.restoreSettings(null, null);
+        if ((restoreResult as any)?.then)
+            (restoreResult as Promise<void>).then(() => window.setTimeout(() => this.initialPopulate(), 0));
+        else
+            window.setTimeout(() => this.initialPopulate(), 0);
     }
 
     protected afterInit() {
@@ -199,40 +162,23 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         return true;
     }
 
-    protected attrs<TAttr>(attrType: { new(...args: any[]): TAttr }): TAttr[] {
-        return getAttributes(getInstanceType(this), attrType, true);
-    }
-
     protected layout(): void {
-        if (!this.element || !this.element.is(':visible') || !this.slickContainer || !this.slickGrid)
+        if (!this.domNode || !Fluent.isVisibleLike(this.domNode) || !this.slickContainer || !this.slickGrid)
             return;
 
-        var responsiveHeight = this.element.hasClass('responsive-height');
+        var responsiveHeight = this.domNode.classList.contains('responsive-height');
         var madeAutoHeight = this.slickGrid != null && this.slickGrid.getOptions().autoHeight;
         var shouldAutoHeight = responsiveHeight && window.innerWidth < 768;
 
         if (shouldAutoHeight) {
-            if (this.element[0] && this.element[0].style.height != "auto")
-                this.element[0].style.height = "auto";
-
             if (!madeAutoHeight) {
-
-                this.slickContainer.css('height', 'auto')
-                    .children('.slick-pane').each((i, e: HTMLElement) => {
-                        if (e.style.height != null && e.style.height != "auto")
-                            e.style.height = "auto";
-                    });
-
                 this.slickGrid.setOptions({ autoHeight: true });
             }
         }
-        else {
-            if (madeAutoHeight) {
-                this.slickContainer.children('.slick-viewport').css('height', 'auto');
-                this.slickGrid.setOptions({ autoHeight: false });
-            }
-
-            layoutFillHeight(this.slickContainer);
+        else if (madeAutoHeight) {
+            this.slickContainer.getNode().style.height = "";
+            this.slickContainer.findAll('.slick-viewport').forEach(x => x.style.height = "");
+            this.slickGrid.setOptions({ autoHeight: false });
         }
 
         this.slickGrid.resizeCanvas();
@@ -257,19 +203,20 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
 
         if (this.quickFiltersDiv == null && (filters != null ||
             ((filters = this.getQuickFilters()) && filters != null && filters.length))) {
-            this.quickFiltersDiv = $('<div/>').addClass('quick-filters-bar');
+            this.quickFiltersDiv = Fluent("div").class('quick-filters-bar');
             if (this.toolbar) {
-                $('<div/>').addClass('clear').appendTo(this.toolbar.element);
-                this.quickFiltersDiv.appendTo(this.toolbar.element);
+                Fluent("div").class('clear').appendTo(this.toolbar.domNode);
+                this.quickFiltersDiv.appendTo(this.toolbar.domNode);
             }
             else {
-                this.quickFiltersDiv.appendTo($('<div/>').addClass('s-Toolbar').insertBefore(this.slickContainer));
+                this.quickFiltersDiv.appendTo(Fluent("div").class('s-Toolbar').insertBefore(this.slickContainer));
             }
 
-            this.quickFiltersBar = new QuickFilterBar(this.quickFiltersDiv, {
+            this.quickFiltersBar = new QuickFilterBar({
                 filters: filters,
                 getTitle: (filter: QuickFilter<Widget<any>, any>) => this.determineText(pre => pre + filter.field),
-                idPrefix: this.uniqueName + '_QuickFilter_'
+                idPrefix: this.uniqueName + '_QuickFilter_',
+                element: this.quickFiltersDiv
             });
             this.quickFiltersBar.onChange = (e) => this.quickFilterChange(e);
         }
@@ -318,7 +265,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
             quick = QuickFilterBar.boolean(name, title, trueText, falseText);
         }
         else {
-            var filtering = new (filteringType as any)() as IFiltering;
+            var filtering = new (filteringType as any)(item.filteringParams ?? {}) as IFiltering;
             if (filtering && isInstanceOfType(filtering, IQuickFiltering)) {
                 ReflectionOptionsSetter.set(filtering, item.filteringParams);
                 filtering.set_field(item);
@@ -343,25 +290,19 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         if (this.quickFiltersBar != null)
             return this.quickFiltersBar.find(type, field);
 
-        return $('#' + this.uniqueName + '_QuickFilter_' + field).getWidget(type);
+        return getWidgetFrom('#' + this.uniqueName + '_QuickFilter_' + field, type);
     }
 
     protected tryFindQuickFilter<TWidget>(type: { new(...args: any[]): TWidget }, field: string): TWidget {
         if (this.quickFiltersBar != null)
             return this.quickFiltersBar.tryFind(type, field);
 
-        var el = $('#' + this.uniqueName + '_QuickFilter_' + field);
-        if (!el.length)
-            return null;
-
-        return el.tryGetWidget(type);
+        return tryGetWidget('#' + this.uniqueName + '_QuickFilter_' + field, type);
     }
 
     protected createIncludeDeletedButton(): void {
-        if (!isEmptyOrNull(this.getIsActiveProperty()) ||
-            !isEmptyOrNull(this.getIsDeletedProperty())) {
-            GridUtils.addIncludeDeletedToggle(this.toolbar.element, this.view, null, false);
-        }
+        if (this.getIsActiveProperty() || this.getIsDeletedProperty())
+            GridUtils.addIncludeDeletedToggle(this.toolbar.domNode, this.view, null, false);
     }
 
     protected getQuickSearchFields(): QuickSearchField[] {
@@ -369,7 +310,8 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     }
 
     protected createQuickSearchInput(): void {
-        GridUtils.addQuickSearchInput(this.toolbar.element, this.view, this.getQuickSearchFields(), () => this.persistSettings(null));
+        var input = GridUtils.addQuickSearchInput(this.toolbar.domNode, this.view, this.getQuickSearchFields(), () => this.persistSettings(null));
+        input?.domNode?.setAttribute('id', this.idPrefix + 'QuickSearchInput');
     }
 
     public destroy() {
@@ -409,9 +351,8 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     protected getItemCssClass(item: TItem, index: number): string {
         var activeFieldName = this.getIsActiveProperty();
         var deletedFieldName = this.getIsDeletedProperty();
-        if (isEmptyOrNull(activeFieldName) && isEmptyOrNull(deletedFieldName)) {
+        if (activeFieldName && deletedFieldName)
             return null;
-        }
 
         if (activeFieldName) {
             var value = (item as any)[activeFieldName];
@@ -442,7 +383,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
 
     protected getItemMetadata(item: TItem, index: number): any {
         var itemClass = this.getItemCssClass(item, index);
-        if (isEmptyOrNull(itemClass)) {
+        if (!itemClass) {
             return new Object();
         }
         return { cssClasses: itemClass };
@@ -480,10 +421,10 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     protected initialPopulate(): void {
         var self = this;
         if (this.populateWhenVisible()) {
-            LazyLoadHelper.executeEverytimeWhenShown(this.element, function () {
+            LazyLoadHelper.executeEverytimeWhenShown(this.domNode, function () {
                 self.refreshIfNeeded();
             }, false);
-            if (this.element.is(':visible') && this.view) {
+            if (Fluent.isVisibleLike(this.domNode) && this.view) {
                 this.view.populate();
             }
         }
@@ -493,7 +434,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     }
 
     protected canFilterColumn(column: Column): boolean {
-        return (column.sourceItem != null && 
+        return (column.sourceItem != null &&
             column.sourceItem.notFilterable !== true &&
             (column.sourceItem.readPermission == null ||
                 Authorization.hasPermission(column.sourceItem.readPermission)));
@@ -506,7 +447,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
                 .filter(c => this.canFilterColumn(c))
                 .map(x => x.sourceItem)));
 
-        this.filterBar.get_store().add_changed((s: JQueryEventObject, e: any) => {
+        this.filterBar.get_store().add_changed(() => {
             if (this.restoringSettings <= 0) {
                 this.persistSettings(null);
                 this.view && (this.view.seekToPage = 1);
@@ -522,13 +463,13 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         });
 
         var slickOptions = this.getSlickOptions();
-        var grid = new Grid(this.slickContainer, this.view as any, visibleColumns, slickOptions) as Grid;
+        var grid = new Grid(this.slickContainer.getNode(), this.view as any, visibleColumns, slickOptions) as Grid;
         grid.registerPlugin(new AutoTooltips({
             enableForHeaderCells: true
         }));
 
         this.slickGrid = grid;
-        
+
         this.setInitialSortOrder();
 
         return grid;
@@ -543,9 +484,9 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
 
         var mapped = sortBy.map(function (s): ColumnSort {
             var x: ColumnSort;
-            if (s && endsWith(s.toLowerCase(), ' desc')) {
+            if (s && s.toLowerCase().endsWith(' desc')) {
                 return {
-                    columnId: trimEnd(s.substr(0, s.length - 5)),
+                    columnId: s.substr(0, s.length - 5).trimEnd(),
                     sortAsc: false
                 }
             }
@@ -577,7 +518,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
 
     protected bindToSlickEvents() {
         var self = this;
-        this._slickGridOnSort = (e: JQuery, p: any) => {
+        this._slickGridOnSort = (_: Event, p: any) => {
             self.view.populateLock();
             try {
                 var sortBy = [];
@@ -618,17 +559,17 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
 
         this.slickGrid.onSort.subscribe(this._slickGridOnSort);
 
-        this._slickGridOnClick = (e1: JQueryEventObject, p1: any) => {
+        this._slickGridOnClick = (e1: MouseEvent, p1: ArgsCell) => {
             self.onClick(e1, p1.row, p1.cell);
         }
 
         this.slickGrid.onClick.subscribe(this._slickGridOnClick);
 
-        this.slickGrid.onColumnsReordered.subscribe((e2: JQueryEventObject, p2: any) => {
+        this.slickGrid.onColumnsReordered.subscribe(() => {
             return this.persistSettings(null);
         });
 
-        this.slickGrid.onColumnsResized.subscribe((e3: JQueryEventObject, p3: any) => {
+        this.slickGrid.onColumnsResized.subscribe(() => {
             return this.persistSettings(null);
         });
     }
@@ -654,17 +595,17 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         throw new Error("Not Implemented!");
     }
 
-    protected onClick(e: JQueryEventObject, row: number, cell: number): void {
-        if (e.isDefaultPrevented()) {
+    protected onClick(e: Event, row: number, cell: number): void {
+        if (Fluent.isDefaultPrevented(e)) {
             return;
         }
 
-        var target = $(e.target);
-        if (!target.hasClass('s-EditLink')) {
+        var target = e.target as HTMLElement;
+        if (!target.classList.contains('s-EditLink')) {
             target = target.closest('a');
         }
 
-        if (target.hasClass('s-EditLink')) {
+        if (target && target.classList.contains('s-EditLink')) {
             e.preventDefault();
             this.editItemOfType(SlickFormatting.getItemType(target), SlickFormatting.getItemId(target));
         }
@@ -757,8 +698,8 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     protected markupReady(): void {
     }
 
-    protected createSlickContainer(): JQuery {
-        return $('<div class="grid-container"></div>').appendTo(this.element);
+    protected createSlickContainer(): Fluent {
+        return Fluent("div").class("grid-container").appendTo(this.domNode);
     }
 
     protected createView(): RemoteView<TItem> {
@@ -796,8 +737,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     }
 
     protected enableFiltering(): boolean {
-        var attr = this.attrs(FilterableAttribute);
-        return attr.length > 0 && attr[0].value;
+        return this.getCustomAttribute(FilterableAttribute)?.value;
     }
 
     protected populateWhenVisible(): boolean {
@@ -805,8 +745,9 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     }
 
     protected createFilterBar(): void {
-        var filterBarDiv = $('<div/>').appendTo(this.element);
-        this.filterBar = new FilterDisplayBar(filterBarDiv);
+        this.filterBar = new FilterDisplayBar({
+            element: el => this.domNode.append(el)
+        });
         this.initializeFilterBar();
     }
 
@@ -819,8 +760,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     }
 
     protected createPager(): void {
-        var pagerDiv = $('<div></div>').appendTo(this.element);
-        new SlickPager(pagerDiv, this.getPagerOptions());
+        new SlickPager({ ...this.getPagerOptions(), element: el => this.domNode.append(el) });
     }
 
     protected getViewOptions() {
@@ -831,8 +771,8 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         if (!this.usePager()) {
             opt.rowsPerPage = 0;
         }
-        else if (this.element.hasClass('responsive-height')) {
-            opt.rowsPerPage = (($(window.window).width() < 768) ? 20 : 100);
+        else if (this.domNode.classList.contains('responsive-height')) {
+            opt.rowsPerPage = window.innerWidth < 768 ? 20 : 100;
         }
         else {
             opt.rowsPerPage = 100;
@@ -846,8 +786,11 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     }
 
     protected createToolbar(buttons: ToolButton[]): void {
-        var toolbarDiv = $('<div class="grid-toolbar"></div>').appendTo(this.element);
-        this.toolbar = new Toolbar(toolbarDiv, { buttons: buttons, hotkeyContext: this.element[0] });
+        this.toolbar = new Toolbar({
+            buttons: buttons,
+            hotkeyContext: this.domNode,
+            element: el => this.domNode.appendChild(el).classList.add("grid-toolbar")
+        });
     }
 
     getTitle(): string {
@@ -855,7 +798,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
             return null;
         }
 
-        return this.titleDiv.children('.title-text').text();
+        return this.titleDiv.findFirst('.title-text').text();
     }
 
     setTitle(value: string) {
@@ -868,10 +811,12 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
             }
             else {
                 if (!this.titleDiv) {
-                    this.titleDiv = $('<div class="grid-title"><div class="title-text"></div></div>')
-                        .prependTo(this.element);
+                    this.titleDiv = Fluent("div")
+                        .class("grid-title")
+                        .append(Fluent("div").class("title-text"))
+                        .prependTo(this.domNode);
                 }
-                this.titleDiv.children('.title-text').text(value);
+                this.titleDiv.findFirst('.title-text').text(value);
             }
 
             this.layout();
@@ -882,7 +827,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         return 'Item';
     }
 
-    protected itemLink(itemType?: string, idField?: string, text?: (ctx: FormatterContext) => string,
+    protected itemLink(itemType?: string, idField?: string, text?: Format<TItem>,
         cssClass?: (ctx: FormatterContext) => string, encode: boolean = true): Format<TItem> {
 
         if (itemType == null) {
@@ -897,15 +842,10 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     }
 
     protected getColumnsKey(): string {
-        var attr = this.attrs(ColumnsKeyAttribute);
-        if (attr && attr.length > 0) {
-            return attr[0].value;
-        }
-
-        return null;
+        return this.getCustomAttribute(ColumnsKeyAttribute)?.value;
     }
 
-    protected getPropertyItems() {
+    protected getPropertyItems(): PropertyItem[] {
         return this.propertyItemsData?.items || [];
     }
 
@@ -922,7 +862,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         }
 
 
-        if (!isEmptyOrNull(columnsKey)) {
+        if (columnsKey) {
             return getColumnsData(columnsKey);
         }
 
@@ -931,42 +871,38 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
 
     protected async getPropertyItemsDataAsync(): Promise<PropertyItemsData> {
         var columnsKey = this.getColumnsKey();
-        if (!isEmptyOrNull(columnsKey)) {
+        if (columnsKey) {
             return await getColumnsDataAsync(columnsKey);
         }
 
         return { items: [], additionalItems: [] };
     }
 
-    protected getColumns(): Column[] {
+    protected getColumns(): Column<TItem>[] {
         return this.propertyItemsToSlickColumns(this.getPropertyItems());
+    }
+
+    protected wrapFormatterWithEditLink(column: Column, item: PropertyItem) {
+        const orgFormat = column.format;
+        const itemType = item.editLinkItemType || null;
+        const idField = item.editLinkIdField || null;
+        const linkClass = item.editLinkCssClass || null;
+        column.format = this.itemLink(itemType, idField,
+            ctx => orgFormat != null ? orgFormat(ctx) : htmlEncode(ctx.value),
+            () => linkClass, false);
+
+        if (idField) {
+            column.referencedFields = column.referencedFields || [];
+            column.referencedFields.push(idField);
+        }
     }
 
     protected propertyItemsToSlickColumns(propertyItems: PropertyItem[]): Column[] {
         var columns = PropertyItemSlickConverter.toSlickColumns(propertyItems);
         for (var i = 0; i < propertyItems.length; i++) {
             var item = propertyItems[i];
-            var column = columns[i];
-            if (item.editLink === true) {
-                var oldFormat = { $: column.format };
-                var css = { $: (item.editLinkCssClass) != null ? item.editLinkCssClass : null };
-                column.format = this.itemLink(
-                    item.editLinkItemType != null ? item.editLinkItemType : null,
-                    item.editLinkIdField != null ? item.editLinkIdField : null,
-                    function(ctx: FormatterContext) {
-                        if (this.oldFormat.$ != null) {
-                            return this.oldFormat.$(ctx);
-                        }
-                        return htmlEncode(ctx.value);
-                    }.bind({ oldFormat: oldFormat }),
-                    function(ctx1: FormatterContext) {
-                        return (this.css.$ ?? '');
-                    }.bind({ css: css }), false);
-
-                if (!isEmptyOrNull(item.editLinkIdField)) {
-                    column.referencedFields = column.referencedFields || [];
-                    column.referencedFields.push(item.editLinkIdField);
-                }
+            if (item.editLink) {
+                this.wrapFormatterWithEditLink(columns[i], item);
             }
         }
         return columns;
@@ -977,6 +913,10 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         opt.multiSelect = false;
         opt.multiColumnSort = true;
         opt.enableCellNavigation = false;
+        if (!getjQuery()) {
+            opt.emptyNode = Fluent.empty;
+            opt.removeNode = Fluent.remove;
+        }
         if (DataGrid.defaultHeaderHeight)
             opt.headerRowHeight = DataGrid.defaultHeaderHeight;
         if (DataGrid.defaultRowHeight)
@@ -1001,17 +941,17 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
             this.internalRefresh();
             return;
         }
-        if (this.slickContainer.is(':visible')) {
-            this.slickContainer.data('needsRefresh', false);
+        if (Fluent.isVisibleLike(this.slickContainer.getNode())) {
+            this.slickContainer.data("needsRefresh", null);
             this.internalRefresh();
             return;
         }
-        this.slickContainer.data('needsRefresh', true);
+        this.slickContainer.getNode().dataset.needsRefresh = "true";
     }
 
     protected refreshIfNeeded(): void {
-        if (!!this.slickContainer.data('needsRefresh')) {
-            this.slickContainer.data('needsRefresh', false);
+        if (!!this.slickContainer.data("needsRefresh")) {
+            this.slickContainer.data('needsRefresh', null);
             this.internalRefresh();
         }
     }
@@ -1052,7 +992,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         }
     }
 
-    protected updateInterface() {
+    public updateInterface() {
         this.toolbar && this.toolbar.updateInterface();
     }
 
@@ -1068,7 +1008,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
             return this._localTextDbPrefix;
 
         this._localTextDbPrefix = this.getLocalTextPrefix() ?? '';
-        if (this._localTextDbPrefix.length > 0 && !endsWith(this._localTextDbPrefix, '.'))
+        if (this._localTextDbPrefix.length > 0 && !this._localTextDbPrefix.endsWith('.'))
             this._localTextDbPrefix = 'Db.' + this._localTextDbPrefix + '.';
 
         return this._localTextDbPrefix;
@@ -1079,12 +1019,9 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         if (rowDefinition)
             return rowDefinition.localTextPrefix;
 
-        var attr = this.attrs(LocalTextPrefixAttribute);
-
-        if (attr.length >= 1)
-            return attr[0].value;
+        return this.getCustomAttribute(LocalTextPrefixAttribute)?.value;
     }
-   
+
     private _idProperty: string;
 
     protected getIdProperty(): string {
@@ -1095,9 +1032,9 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         if (rowDefinition)
             return this._idProperty = rowDefinition.idProperty ?? '';
 
-        var attr = this.attrs(IdPropertyAttribute);
-        if (attr.length === 1)
-            return this._idProperty = attr[0].value ?? '';
+        var attr = this.getCustomAttribute(IdPropertyAttribute);
+        if (attr)
+            return this._idProperty = attr.value ?? '';
 
         return this._idProperty = 'ID';
     }
@@ -1116,9 +1053,9 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         if (rowDefinition)
             return this._isActiveProperty = rowDefinition.isActiveProperty ?? '';
 
-        var attr = this.attrs(IsActivePropertyAttribute);
-        if (attr.length === 1)
-            return this._isActiveProperty = attr[0].value ?? '';
+        var attr = this.getCustomAttribute(IsActivePropertyAttribute);
+        if (attr)
+            return this._isActiveProperty = attr.value ?? '';
 
         return this._isActiveProperty = '';
     }
@@ -1141,7 +1078,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
 
     protected determineText(getKey: (prefix: string) => string) {
         var localTextPrefix = this.getLocalTextDbPrefix();
-        if (!isEmptyOrNull(localTextPrefix)) {
+        if (localTextPrefix) {
             var local = tryGetText(getKey(localTextPrefix));
             if (local != null) {
                 return local;
@@ -1151,7 +1088,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         return null;
     }
 
-    protected addQuickFilter<TWidget extends Widget<any>, TOptions>(opt: QuickFilter<TWidget, TOptions>): TWidget {
+    protected addQuickFilter<TWidget extends Widget<any>, P>(opt: QuickFilter<TWidget, P>): TWidget {
         return this.ensureQuickFilterBar().add(opt);
     }
 
@@ -1185,7 +1122,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         }
     }
 
-    protected quickFilterChange(e: JQueryEventObject) {
+    protected quickFilterChange(e: Event) {
         this.persistSettings(null);
         this.view && (this.view.seekToPage = 1);
         this.refresh();
@@ -1198,7 +1135,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
     protected getPersistanceKey(): string {
         var key = 'GridSettings:';
         var path = window.location.pathname;
-        if (!isEmptyOrNull(path)) {
+        if (path) {
             key += path.substr(1).split(String.fromCharCode(47)).slice(0, 2).join('/') + ':';
         }
 
@@ -1231,31 +1168,43 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         return Authorization.hasPermission(item.readPermission);
     }
 
-    protected getPersistedSettings(): PersistedGridSettings {
+    protected getPersistedSettings(): PersistedGridSettings | Promise<PersistedGridSettings> {
         var storage = this.getPersistanceStorage();
         if (storage == null)
             return null;
 
-        var json = trimToNull(storage.getItem(this.getPersistanceKey()));
-        if (json != null && startsWith(json, '{') && endsWith(json, '}'))
-            return JSON.parse(json);
+        function fromJson(json: string) {
+            json = json?.trim();
+            if (json?.startsWith('{') && json.endsWith('}'))
+                return JSON.parse(json);
+            return null;
+        }
 
-        return null;
+        var jsonOrPromise = storage.getItem(this.getPersistanceKey());
+        if ((jsonOrPromise as any)?.then)
+            return (jsonOrPromise as Promise<string>).then(json => fromJson(json));
+
+        return fromJson(jsonOrPromise as string);
     }
 
-    protected restoreSettings(settings?: PersistedGridSettings, flags?: GridPersistanceFlags): void {
-        if (!this.slickGrid)
-            return;
+    protected restoreSettings(settings?: PersistedGridSettings, flags?: GridPersistanceFlags): void | Promise<void> {
+        if (settings != null)
+            return this.restoreSettingsFrom(settings, flags);
 
-        if (settings == null) {
-            settings = this.getPersistedSettings();
-            if (settings == null)
-                return;
-        }
+        var settingsOrPromise = this.getPersistedSettings();
+        if ((settingsOrPromise as any)?.then)
+            return (settingsOrPromise as Promise<PersistedGridSettings>).then((s) => this.restoreSettingsFrom(s));
+
+        this.restoreSettingsFrom(settingsOrPromise as PersistedGridSettings);
+    }
+
+    protected restoreSettingsFrom(settings: PersistedGridSettings, flags?: GridPersistanceFlags): void {
+        if (!this.slickGrid || !settings)
+            return;
 
         var columns = this.slickGrid.getColumns();
         var colById: { [key: string]: Column } = null;
-        var updateColById = function(cl: Column[]) {
+        var updateColById = function (cl: Column[]) {
             colById = {};
             for (var $t1 = 0; $t1 < cl.length; $t1++) {
                 var c = cl[$t1];
@@ -1317,8 +1266,8 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
 
                     sortColumns.sort(function (a, b) {
                         // sort holds two informations:
-                        // absoulte value: order of sorting
-                        // sign: positive = ascending, negativ = descending
+                        // absolute value: order of sorting
+                        // sign: positive = ascending, negative = descending
                         // so we have to compare absolute values here
                         return Math.abs(a.sort) - Math.abs(b.sort);
                     });
@@ -1354,9 +1303,9 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
 
             if (settings.includeDeleted != null &&
                 flags.includeDeleted !== false) {
-                var includeDeletedToggle = this.element.find('.s-IncludeDeletedToggle');
-                if (!!settings.includeDeleted !== includeDeletedToggle.hasClass('pressed')) {
-                    includeDeletedToggle.children('a').click();
+                var includeDeletedToggle = this.domNode.querySelector('.s-IncludeDeletedToggle');
+                if (includeDeletedToggle && !!settings.includeDeleted !== includeDeletedToggle.classList.contains('pressed')) {
+                    Fluent.trigger(includeDeletedToggle.querySelector('a'), "click");
                 }
             }
 
@@ -1364,21 +1313,21 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
                 flags.quickFilters !== false &&
                 this.quickFiltersDiv != null &&
                 this.quickFiltersDiv.length > 0) {
-                this.quickFiltersDiv.find('.quick-filter-item').each((i, e) => {
-                    var field = $(e).data('qffield');
+                this.quickFiltersDiv.findAll('.quick-filter-item').forEach(e => {
+                    var field = e.dataset.qffield;
 
-                    if (isEmptyOrNull(field)) {
+                    if (!field?.length) {
                         return;
                     }
 
-                    var widget = $('#' + this.uniqueName + '_QuickFilter_' + field).tryGetWidget(Widget);
+                    var widget = tryGetWidget('#' + this.uniqueName + '_QuickFilter_' + field, Widget);
                     if (widget == null) {
                         return;
                     }
 
                     var state = settings.quickFilters[field];
-                    var loadState = $(e).data('qfloadstate');
-                    if (loadState != null) {
+                    var loadState = (e as any).qfloadstate;
+                    if (typeof loadState === "function") {
                         loadState(widget, state);
                     }
                     else {
@@ -1388,9 +1337,9 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
             }
 
             if (flags.quickSearch === true && (settings.quickSearchField !== undefined || settings.quickSearchText !== undefined)) {
-                var qsInput = this.toolbar.element.find('.s-QuickSearchInput').first();
-                if (qsInput.length > 0) {
-                    var qsWidget = qsInput.tryGetWidget(QuickSearchInput);
+                var qsInput = this.toolbar?.domNode?.querySelector('.s-QuickSearchInput');
+                if (qsInput) {
+                    var qsWidget = tryGetWidget(qsInput, QuickSearchInput);
                     qsWidget && qsWidget.restoreState(settings.quickSearchText, settings.quickSearchField);
                 }
             }
@@ -1401,14 +1350,14 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         }
     }
 
-    protected persistSettings(flags?: GridPersistanceFlags): void {
+    protected persistSettings(flags?: GridPersistanceFlags): void | Promise<void> {
         var storage = this.getPersistanceStorage();
         if (!storage) {
             return;
         }
 
         var settings = this.getCurrentSettings(flags);
-        storage.setItem(this.getPersistanceKey(), JSON.stringify(settings));
+        return storage.setItem(this.getPersistanceKey(), JSON.stringify(settings));
     }
 
     protected getCurrentSettings(flags?: GridPersistanceFlags) {
@@ -1431,7 +1380,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
                 }
 
                 if (flags.sortColumns !== false) {
-                    var sort = indexOf(sortColumns, x => x.columnId == column.id);
+                    var sort = sortColumns.findIndex(x => x.columnId == column.id);
                     p.sort = ((sort >= 0) ? ((sortColumns[sort].sortAsc !== false) ? (sort + 1) : (-sort - 1)) : 0);
                 }
                 settings.columns.push(p);
@@ -1439,7 +1388,7 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         }
 
         if (flags.includeDeleted !== false) {
-            settings.includeDeleted = this.element.find('.s-IncludeDeletedToggle').hasClass('pressed');
+            settings.includeDeleted = !!this.domNode.querySelector(".s-IncludeDeletedToggle.pressed");
         }
 
         if (flags.filterItems !== false && (this.filterBar != null) && (this.filterBar.get_store() != null)) {
@@ -1447,47 +1396,47 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         }
 
         if (flags.quickSearch === true) {
-            var qsInput = this.toolbar.element.find('.s-QuickSearchInput').first();
-            if (qsInput.length > 0) {
-                var qsWidget = qsInput.tryGetWidget(QuickSearchInput);
-                if (qsWidget != null) {
+            var qsInput = this.toolbar?.domNode?.querySelector('.s-QuickSearchInput');
+            if (qsInput) {
+                var qsWidget = tryGetWidget(qsInput, QuickSearchInput);
+                if (qsWidget) {
                     settings.quickSearchField = qsWidget.get_field();
-                    settings.quickSearchText = qsWidget.element.val();
+                    settings.quickSearchText = qsWidget.domNode.value;
                 }
             }
         }
 
         if (flags.quickFilters !== false && (this.quickFiltersDiv != null) && this.quickFiltersDiv.length > 0) {
             settings.quickFilters = {};
-            this.quickFiltersDiv.find('.quick-filter-item').each((i, e) => {
-                var field = $(e).data('qffield');
-                if (isEmptyOrNull(field)) {
+            this.quickFiltersDiv.findAll('.quick-filter-item').forEach(e => {
+                var field = e.dataset.qffield;
+                if (!field?.length) {
                     return;
                 }
 
-                var widget = $('#' + this.uniqueName + '_QuickFilter_' + field).tryGetWidget(Widget);
-                if (widget == null) {
+                var widget = tryGetWidget('#' + this.uniqueName + '_QuickFilter_' + field, Widget);
+                if (!widget)
                     return;
-                }
 
-                var saveState = $(e).data('qfsavestate');
-                var state = (saveState != null) ? saveState(widget) : EditorUtils.getValue(widget);
+                var qfElement = e as any;
+                var saveState = qfElement.qfsavestate;
+                var state = typeof saveState === "function" ? saveState(widget) : EditorUtils.getValue(widget);
                 settings.quickFilters[field] = state;
-                if (flags.quickFilterText === true && $(e).hasClass('quick-filter-active')) {
+                if (flags.quickFilterText === true && e.classList.contains('quick-filter-active')) {
 
-                    var getDisplayText = $(e).data('qfdisplaytext');
-                    var filterLabel = $(e).find('.quick-filter-label').text();
+                    var getDisplayText = qfElement.qfdisplaytext;
+                    var filterLabel = e.querySelector('.quick-filter-label')?.textContent ?? '';
 
                     var displayText;
-                    if (getDisplayText != null) {
+                    if (typeof getDisplayText === "function") {
                         displayText = getDisplayText(widget, filterLabel);
                     }
                     else {
                         displayText = filterLabel + ' = ' + EditorUtils.getDisplayText(widget);
                     }
 
-                    if (!isEmptyOrNull(displayText)) {
-                        if (!isEmptyOrNull(settings.quickFilterText)) {
+                    if (displayText?.length) {
+                        if (settings.quickFilterText?.length) {
                             settings.quickFilterText += ' ' + (tryGetText('Controls.FilterPanel.And') ?? 'and') + ' ';
                             settings.quickFilterText += displayText;
                         }
@@ -1501,8 +1450,8 @@ export class DataGrid<TItem, TOptions> extends Widget<TOptions> implements IData
         return settings;
     }
 
-    getElement(): JQuery {
-        return this.element;
+    getElement(): HTMLElement {
+        return this.domNode;
     }
 
     getGrid(): Grid {

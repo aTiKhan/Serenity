@@ -20,14 +20,11 @@ public class DistinctValuesRegistration
     public static void RegisterDistinctValueScripts(IDynamicScriptManager scriptManager, 
         ITypeSource typeSource, IServiceProvider serviceProvider)
     {
-        if (scriptManager == null)
-            throw new ArgumentNullException(nameof(scriptManager));
+        ArgumentNullException.ThrowIfNull(scriptManager);
 
-        if (typeSource == null)
-            throw new ArgumentNullException(nameof(typeSource));
+        ArgumentNullException.ThrowIfNull(typeSource);
 
-        if (serviceProvider == null)
-            throw new ArgumentNullException(nameof(serviceProvider));
+        ArgumentNullException.ThrowIfNull(serviceProvider);
 
         var list = new List<DistinctValuesEditorAttribute>();
         foreach (var type in typeSource.GetTypes())
@@ -63,7 +60,7 @@ public class DistinctValuesRegistration
                             "on " + property.Name + " property of " + type.FullName);
                     }
 
-                    attr.PropertyName = attr.PropertyName.IsEmptyOrNull() ? property.Name :
+                    attr.PropertyName = string.IsNullOrEmpty(attr.PropertyName) ? property.Name :
                         attr.PropertyName;
                 }
                 else
@@ -86,7 +83,7 @@ public class DistinctValuesRegistration
                     else
                         attr.RowType = type;
 
-                    attr.PropertyName = attr.PropertyName.IsEmptyOrNull() ? property.Name :
+                    attr.PropertyName = string.IsNullOrEmpty(attr.PropertyName) ? property.Name :
                         attr.PropertyName;
                 }
 
@@ -102,7 +99,7 @@ public class DistinctValuesRegistration
 
             var script = (LookupScript)ActivatorUtilities.CreateInstance(serviceProvider,
                 typeof(DistinctValuesScript<>).MakeGenericType(key.Key.Item1), 
-                new object[] { key.Key.Item2 });
+                [key.Key.Item2]);
 
             script.LookupKey = "Distinct." + row.GetFields().LocalTextPrefix + "." +
                 key.Key.Item2;

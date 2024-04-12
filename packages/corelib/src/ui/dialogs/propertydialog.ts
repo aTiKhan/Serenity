@@ -1,42 +1,36 @@
-﻿import { Decorators, FormKeyAttribute } from "../../decorators";
-import { DialogButton, endsWith, getAttributes, getForm, getFormData, getFormDataAsync, getInstanceType, getTypeFullName, isEmptyOrNull, PropertyItem, PropertyItemsData, ScriptData, localText } from "@serenity-is/corelib/q";
+﻿import { PropertyItem, PropertyItemsData, cancelDialogButton, getInstanceType, getTypeFullName, okDialogButton } from "../../base";
+import { ScriptData, getFormData, getFormDataAsync } from "../../q";
+import { FormKeyAttribute, StaticPanelAttribute } from "../../types/attributes";
+import { Decorators } from "../../types/decorators";
 import { PropertyGrid, PropertyGridOptions } from "../widgets/propertygrid";
+import { WidgetProps } from "../widgets/widget";
 import { TemplatedDialog } from "./templateddialog";
 
 @Decorators.registerClass('Serenity.PropertyDialog')
-export class PropertyDialog<TItem, TOptions> extends TemplatedDialog<TOptions> {
+@Decorators.panel(false)
+export class PropertyDialog<TItem, P> extends TemplatedDialog<P> {
     protected entity: TItem;
     protected entityId: any;
     protected propertyItemsData: PropertyItemsData;
+    protected isClosable() { return !this.isStatic(); }
+    protected isStatic() { return false; }
 
-    constructor(opt?: TOptions) {
-        super(opt);
-
-        if (this.useAsync())
-            this.initAsync();
-        else 
-            this.initSync();        
+    constructor(props?: WidgetProps<P>) {
+        super(props);
+        this.syncOrAsyncThen(this.getPropertyItemsData, this.getPropertyItemsDataAsync, itemsData => {
+            this.propertyItemsReady(itemsData);
+            this.afterInit();
+        });
     }
 
-    internalInit() {
+    protected propertyItemsReady(itemsData: PropertyItemsData) {
+        this.propertyItemsData = itemsData;
         this.initPropertyGrid();
         this.loadInitialEntity();
     }
 
-    protected initSync() {
-        this.propertyItemsData = this.getPropertyItemsData();
-        this.internalInit();
-        this.afterInit();
-    }
-
-    protected async initAsync() {
-        this.propertyItemsData = await this.getPropertyItemsDataAsync();
-        this.internalInit();
-        this.afterInit();
-    }
-
     protected afterInit() {
-    }    
+    }
 
     protected useAsync() {
         return false;
@@ -63,15 +57,19 @@ export class PropertyDialog<TItem, TOptions> extends TemplatedDialog<TOptions> {
     }
 
     protected getDialogButtons() {
-        super.getDialogButtons();
-        return <DialogButton[]>[{
-            text: localText('Dialogs.OkButton'),
-            cssClass: "btn btn-primary",
-            click: () => this.okClick()
-        }, {
-            text: localText('Dialogs.CancelButton'),
-            click: () => this.cancelClick()
-        }];
+
+        if (this.getCustomAttribute(StaticPanelAttribute)?.value === true)
+            return [];
+
+        return [
+            okDialogButton({
+                click: (e) => {
+                    e.preventDefault();
+                    this.okClick();
+                }
+            }),
+            cancelDialogButton()
+        ];
     }
 
     protected okClick() {
@@ -83,30 +81,26 @@ export class PropertyDialog<TItem, TOptions> extends TemplatedDialog<TOptions> {
     }
 
     protected okClickValidated() {
-        this.dialogClose();
+        this.dialogClose("ok");
     }
 
     protected cancelClick() {
-        this.dialogClose();
+        this.dialogClose("cancel");
     }
 
     protected initPropertyGrid() {
-        var pgDiv = this.byId('PropertyGrid');
-        if (pgDiv.length <= 0) {
+        var pgDiv = this.findById('PropertyGrid');
+        if (!pgDiv) {
             return;
         }
         var pgOptions = this.getPropertyGridOptions();
-        this.propertyGrid = (new PropertyGrid(pgDiv, pgOptions)).init(null);
-        if (this.element.closest('.ui-dialog').hasClass('s-Flexify')) {
-            this.propertyGrid.element.children('.categories').flexHeightOnly(1);
-        }
+        this.propertyGrid = (new PropertyGrid({ element: pgDiv, ...pgOptions })).init();
     }
 
     protected getFormKey(): string {
-        var attributes = getAttributes(
-            getInstanceType(this), FormKeyAttribute, true);
-        if (attributes.length >= 1) {
-            return attributes[0].value;
+        var attr = this.getCustomAttribute(FormKeyAttribute);
+        if (attr) {
+            return attr.value;
         }
         else {
             var name = getTypeFullName(getInstanceType(this));
@@ -114,11 +108,11 @@ export class PropertyDialog<TItem, TOptions> extends TemplatedDialog<TOptions> {
             if (px >= 0) {
                 name = name.substring(px + 1);
             }
-            if (endsWith(name, 'Dialog')) {
-                name = name.substr(0, name.length - 6);
+            if (name.endsWith('Dialog')) {
+                name = name.substring(0, name.length - 6);
             }
-            else if (endsWith(name, 'Panel')) {
-                name = name.substr(0, name.length - 5);
+            else if (name.endsWith('Panel')) {
+                name = name.substring(0, name.length - 5);
             }
             return name;
         }
@@ -134,7 +128,7 @@ export class PropertyDialog<TItem, TOptions> extends TemplatedDialog<TOptions> {
         };
     }
 
-    protected getPropertyItems() {
+    protected getPropertyItems(): PropertyItem[] {
         return this.propertyItemsData?.items || [];
     }
 
@@ -150,7 +144,7 @@ export class PropertyDialog<TItem, TOptions> extends TemplatedDialog<TOptions> {
             }
         }
 
-        if (!isEmptyOrNull(formKey)) {
+        if (formKey) {
             return getFormData(formKey);
         }
 
@@ -159,7 +153,7 @@ export class PropertyDialog<TItem, TOptions> extends TemplatedDialog<TOptions> {
 
     protected async getPropertyItemsDataAsync(): Promise<PropertyItemsData> {
         var formKey = this.getFormKey();
-        if (!isEmptyOrNull(formKey)) {
+        if (formKey) {
             return await getFormDataAsync(formKey);
         }
 
@@ -203,16 +197,7 @@ export class PropertyDialog<TItem, TOptions> extends TemplatedDialog<TOptions> {
 
     protected propertyGrid: PropertyGrid;
 
-    protected getFallbackTemplate() {
-        return `<div>
-    <div class="s-Form">
-        <form id="~_Form" action="">
-            <div class="fieldset">
-                <div id="~_PropertyGrid"></div>
-                <div class="clear"></div>
-            </div>
-        </form> 
-    </div>
-</div>`;
+    protected getTemplate() {
+        return `<div class="s-Form"><form id="~_Form" action=""><div id="~_PropertyGrid"></div></form></div>`;
     }
 }

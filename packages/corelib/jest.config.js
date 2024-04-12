@@ -1,13 +1,15 @@
 export default {
-  testEnvironment: 'jsdom',
+  testEnvironment: './build/jsdom-global.js',
   testMatch: ['<rootDir>/test/**/*.spec.ts*', '<rootDir>/src/**/*.spec.ts*'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@serenity-is/corelib/(.*)$': '<rootDir>/src/$1',
-    '^@serenity-is/sleekgrid$': '<rootDir>/node_modules/@serenity-is/sleekgrid',
-    '^@optionaldeps/(.*)$': '<rootDir>/test/testutil/$1-testmodule',
-    '^jquery$': '<rootDir>/../../src/Serenity.Assets/wwwroot/jquery/jquery.min.js',
+    '^@serenity-is/sleekgrid$': '<rootDir>/node_modules/@serenity-is/sleekgrid/src/index.ts'
   },
+  "coveragePathIgnorePatterns": [
+    "<rootDir>/node_modules/",
+    "<rootDir>/src/mocks/",
+    "/src/Serenity.Assets/"
+  ],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   transformIgnorePatterns: [],
   transform: {
@@ -20,7 +22,7 @@ export default {
         },
         keepClassNames: true,
         experimental: {
-          plugins: [["jest_workaround", {}]]
+          plugins: [["swc_mut_cjs_exports", {}]]
         },
         transform: {
           react: {
@@ -33,5 +35,8 @@ export default {
         type: "commonjs"
       }
     }]
-  }
+  },
+  setupFiles: [
+    '<rootDir>/jest.setup.js'
+  ]  
 };

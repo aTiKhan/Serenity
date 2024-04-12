@@ -129,7 +129,7 @@ Task("Clean")
     CreateDirectory(nupkgDir);
     CleanDirectories(src + "/Serenity.*/**/bin/" + configuration);
     CleanDirectories(root + "tests/**/bin/");
-    CleanDirectories(src + "/Serenity.Scripts/dist");
+    CleanDirectories(root + "/packages/*/out");
 });
 
 Task("Restore")
@@ -147,13 +147,6 @@ Task("Compile")
     .IsDependentOn("Restore")
     .Does(context => 
 {
-
-    StartProcess("powershell", new ProcessSettings 
-    { 
-        Arguments = @"npx tsc -p ..\..\Serenity.Net.CodeGenerator\Resource\tsconfig.json", 
-        WorkingDirectory = System.IO.Path.Combine(root, "packages", "corelib") 
-    });
-
     writeHeader("Building Serenity.Net.sln");
     MSBuild(System.IO.Path.Combine(src, "Serenity.Net.sln"), s => {
         s.SetConfiguration(configuration);
@@ -180,7 +173,13 @@ Task("Test")
         
         StartProcess("powershell", new ProcessSettings 
         { 
-            Arguments = "npx jest", 
+            Arguments = "pnpm test", 
+            WorkingDirectory = System.IO.Path.Combine(root, "packages", "base") 
+        });
+        
+        StartProcess("powershell", new ProcessSettings 
+        { 
+            Arguments = "pnpm test", 
             WorkingDirectory = System.IO.Path.Combine(root, "packages", "corelib") 
         });
 
@@ -213,9 +212,9 @@ Task("Pack")
     myPack("Serenity.Net.Entity", null, null);
     myPack("Serenity.Net.Services", null, null);
     myPack("Serenity.Net.Web", null, null);
-    myPack("Serenity.Scripts", null, null);
     myPack("Serenity.Net.CodeGenerator", "sergen", null);
     myPack("Serenity.Assets", null, null);
+    myPack("../packages/corelib", "Serenity.Corelib", "Serenity.Corelib");
     
     fixNugetCache();
 });

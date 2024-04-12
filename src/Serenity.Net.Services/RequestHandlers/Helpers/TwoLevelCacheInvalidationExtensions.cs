@@ -5,16 +5,10 @@
 /// </summary>
 public static class TwoLevelCacheInvalidationExtensions
 {
-    private class GenerationUpdater
+    private class GenerationUpdater(ITwoLevelCache cache, string groupKey)
     {
-        private readonly string groupKey;
-        private readonly ITwoLevelCache cache;
-
-        public GenerationUpdater(ITwoLevelCache cache, string groupKey)
-        {
-            this.groupKey = groupKey ?? throw new ArgumentNullException(nameof(groupKey));
-            this.cache = cache ?? throw new ArgumentNullException(nameof(cache));
-        }
+        private readonly string groupKey = groupKey ?? throw new ArgumentNullException(nameof(groupKey));
+        private readonly ITwoLevelCache cache = cache ?? throw new ArgumentNullException(nameof(cache));
 
         public void Update()
         {
@@ -35,7 +29,7 @@ public static class TwoLevelCacheInvalidationExtensions
         if (cache is null)
             throw new ArgumentNullException(nameof(cache));
 
-        if (groupKey.IsNullOrEmpty())
+        if (string.IsNullOrEmpty(groupKey))
             throw new ArgumentNullException(nameof(groupKey));
 
         var updater = cache.Memory.Get("BatchGenerationUpdater:UpdaterInstance:" + groupKey, TimeSpan.Zero,

@@ -1,7 +1,9 @@
-﻿import { Culture, Enum, format, formatDate, formatNumber, getAttributes, getTypeFullName, htmlEncode, isEmptyOrNull, ISlickFormatter, parseDecimal, parseISODateTime, replaceAll, resolveUrl, safeCast, startsWith, tryGetText } from "@serenity-is/corelib/q";
-import { Formatter } from "@serenity-is/corelib/slick";
+﻿import { Culture, DialogTexts, Enum, faIcon, formatDate, formatNumber, getCustomAttribute, getTypeFullName, htmlEncode, iconClassName, localText, parseDecimal, parseISODateTime, resolveUrl, stringFormat, tryGetText } from "../../base";
 import { Column, FormatterContext } from "@serenity-is/sleekgrid";
-import { Decorators, EnumKeyAttribute } from "../../decorators";
+import { replaceAll } from "../../q";
+import { Formatter } from "../../slick";
+import { EnumKeyAttribute } from "../../types/attributes";
+import { Decorators } from "../../types/decorators";
 import { EnumTypeRegistry } from "../../types/enumtyperegistry";
 
 export interface IInitializeColumn {
@@ -14,44 +16,32 @@ export class IInitializeColumn {
 
 @Decorators.registerFormatter('Serenity.BooleanFormatter')
 export class BooleanFormatter implements Formatter {
-    format(ctx: FormatterContext) {
-
-        if (ctx.value == null) {
-            return '';
-        }
-
-        var text;
-        if (!!ctx.value) {
-            text = tryGetText(this.trueText);
-            if (text == null) {
-                text = this.trueText;
-                if (text == null) {
-                    text = tryGetText('Dialogs.YesButton') ?? 'Yes';
-                }
-            }
-        }
-        else {
-            text = tryGetText(this.falseText);
-            if (text == null) {
-                text = this.falseText;
-                if (text == null) {
-                    text = tryGetText('Dialogs.NoButton') ?? 'No';
-                }
-            }
-        }
-
-        return htmlEncode(text);
+    constructor(public readonly props: { falseText?: string, trueText?: string } = {}) {
+        this.props ??= {};
     }
 
-    @Decorators.option()
-    public falseText: string;
+    format(ctx: FormatterContext) {
 
-    @Decorators.option()
-    public trueText: string;
+        if (ctx.value == null)
+            return '';
+
+        if (!!ctx.value)
+            return ctx.escape(localText(this.trueText, this.trueText ?? DialogTexts.YesButton));
+
+        return ctx.escape(localText(this.falseText, this.falseText ?? DialogTexts.NoButton));
+    }
+
+    public get falseText() { return this.props.falseText; }
+    public set falseText(value) { this.props.falseText = value; }
+
+    public get trueText() { return this.props.trueText; }
+    public set trueText(value) { this.props.trueText = value; }
 }
 
-@Decorators.registerFormatter('Serenity.CheckboxFormatter')
+@Decorators.registerType()
 export class CheckboxFormatter implements Formatter {
+    static typeInfo = Decorators.formatterType("Serenity.CheckboxFormatter")
+
     format(ctx: FormatterContext) {
         return '<span class="check-box no-float readonly slick-edit-preclick ' + (!!ctx.value ? ' checked' : '') + '"></span>';
     }
@@ -59,8 +49,9 @@ export class CheckboxFormatter implements Formatter {
 
 @Decorators.registerFormatter('Serenity.DateFormatter')
 export class DateFormatter implements Formatter {
-    constructor() {
-        this.displayFormat = Culture.dateFormat;
+    constructor(public readonly props: { displayFormat?: string } = {}) {
+        this.props ??= {};
+        this.props.displayFormat ??= Culture.dateFormat;
     }
 
     static format(value: any, format?: string) {
@@ -76,7 +67,7 @@ export class DateFormatter implements Formatter {
         else if (typeof value === 'string') {
             date = parseISODateTime(value);
 
-            if (date == null) {
+            if (date == null || isNaN(date.valueOf())) {
                 return htmlEncode(value);
             }
         }
@@ -87,8 +78,8 @@ export class DateFormatter implements Formatter {
         return htmlEncode(formatDate(date, format));
     }
 
-    @Decorators.option()
-    public displayFormat: string;
+    public get displayFormat() { return this.props.displayFormat; }
+    public set displayFormat(value) { this.props.displayFormat = value; }
 
     format(ctx: FormatterContext): string {
         return DateFormatter.format(ctx.value, this.displayFormat);
@@ -106,12 +97,16 @@ export class DateTimeFormatter extends DateFormatter {
 @Decorators.registerFormatter('Serenity.EnumFormatter')
 export class EnumFormatter implements Formatter {
 
+    constructor(public readonly props: { enumKey?: string } = {}) {
+        this.props ??= {};
+    }
+
     format(ctx: FormatterContext): string {
         return EnumFormatter.format(EnumTypeRegistry.get(this.enumKey), ctx.value);
     }
 
-    @Decorators.option()
-    enumKey: string;
+    get enumKey() { return this.props.enumKey; }
+    set enumKey(value: string) { this.props.enumKey = value; }
 
     static format(enumType: any, value: any) {
 
@@ -120,15 +115,14 @@ export class EnumFormatter implements Formatter {
         }
 
         var name = Enum.toString(enumType, value);
-        var enumKeyAttr = getAttributes(enumType, EnumKeyAttribute, false);
-        var enumKey = ((enumKeyAttr.length > 0) ? enumKeyAttr[0].value : getTypeFullName(enumType));
+        var enumKeyAttr = getCustomAttribute(enumType, EnumKeyAttribute, false);
+        var enumKey = enumKeyAttr ? enumKeyAttr.value : getTypeFullName(enumType);
         return EnumFormatter.getText(enumKey, name);
     }
 
     static getText(enumKey: string, name: string) {
-        if (isEmptyOrNull(name)) {
+        if (!name)
             return '';
-        }
 
         return htmlEncode(tryGetText('Enums.' + enumKey + '.' + name) ?? name);
     }
@@ -141,27 +135,27 @@ export class EnumFormatter implements Formatter {
     }
 }
 
-@Decorators.registerFormatter('Serenity.FileDownloadFormatter', [ISlickFormatter, IInitializeColumn])
+@Decorators.registerFormatter('Serenity.FileDownloadFormatter', [IInitializeColumn])
 export class FileDownloadFormatter implements Formatter, IInitializeColumn {
 
+    constructor(public readonly props: { displayFormat?: string, originalNameProperty?: string, iconClass?: string } = {}) {
+        this.props ??= {};
+    }
+
     format(ctx: FormatterContext): string {
-        var dbFile = safeCast(ctx.value, String);
-        if (isEmptyOrNull(dbFile)) {
+        var dbFile = ctx.value as string;
+        if (!dbFile)
             return '';
-        }
 
         var downloadUrl = FileDownloadFormatter.dbFileUrl(dbFile);
-        var originalName = (!isEmptyOrNull(this.originalNameProperty) ?
-            safeCast(ctx.item[this.originalNameProperty], String) : null);
+        var originalName = this.originalNameProperty ?
+            ctx.item[this.originalNameProperty] as string : null;
 
         originalName = (originalName ?? '');
-        var text = format((this.displayFormat ?? '{0}'),
+        var text = stringFormat((this.displayFormat ?? '{0}'),
             originalName, dbFile, downloadUrl);
 
-        var iconClass = this.iconClass ?? "fa fa-download";
-
-        if (iconClass.startsWith("fa-"))
-            iconClass = "fa " + iconClass;
+        var iconClass = iconClassName(this.iconClass ?? faIcon("download"));
 
         return "<a class='file-download-link' target='_blank' href='" +
             htmlEncode(downloadUrl) + "'><i class='" + iconClass + "'></i> " + htmlEncode(text) + '</a>';
@@ -174,20 +168,20 @@ export class FileDownloadFormatter implements Formatter, IInitializeColumn {
 
     initializeColumn(column: Column): void {
         column.referencedFields = column.referencedFields || [];
-        if (!isEmptyOrNull(this.originalNameProperty)) {
+        if (this.originalNameProperty) {
             column.referencedFields.push(this.originalNameProperty);
             return;
         }
     }
 
-    @Decorators.option()
-    displayFormat: string;
+    get displayFormat() { return this.props.displayFormat; }
+    set displayFormat(value) { this.props.displayFormat = value; }
 
-    @Decorators.option()
-    originalNameProperty: string;
+    get originalNameProperty() { return this.props.originalNameProperty; }
+    set originalNameProperty(value) { this.props.originalNameProperty = value; }
 
-    @Decorators.option()
-    iconClass: string;
+    get iconClass() { return this.props.iconClass; }
+    set iconClass(value) { this.props.iconClass = value; }
 }
 
 @Decorators.registerFormatter('Serenity.MinuteFormatter')
@@ -215,12 +209,16 @@ export class MinuteFormatter implements Formatter {
         else
             minuteStr = minute.toString();
 
-        return format('{0}:{1}', hourStr, minuteStr);
+        return stringFormat('{0}:{1}', hourStr, minuteStr);
     }
 }
 
 @Decorators.registerFormatter('Serenity.NumberFormatter')
 export class NumberFormatter {
+    constructor(public readonly props: { displayFormat?: string } = {}) {
+        this.props ??= {};
+    }
+
     format(ctx: FormatterContext): string {
         return NumberFormatter.format(ctx.value, this.displayFormat);
     }
@@ -238,42 +236,45 @@ export class NumberFormatter {
         }
 
         var dbl = parseDecimal(value.toString());
-        if (dbl == null)
-            return '';
+        if (dbl == null || isNaN(dbl))
+            return value?.toString() ?? '';
 
-        return htmlEncode(value.toString());
+        return htmlEncode(formatNumber(dbl, format));
     }
 
-    @Decorators.option()
-    displayFormat: string;
+    get displayFormat() { return this.props.displayFormat; }
+    set displayFormat(value) { this.props.displayFormat = value; }
 }
 
-@Decorators.registerFormatter('Serenity.UrlFormatter', [ISlickFormatter, IInitializeColumn])
+@Decorators.registerFormatter('Serenity.UrlFormatter', [IInitializeColumn])
 export class UrlFormatter implements Formatter, IInitializeColumn {
 
+    constructor(readonly props: { displayProperty?: string, displayFormat?: string, urlProperty?: string, urlFormat?: string, target?: string } = {}) {
+        this.props ??= {};
+    }
+
     format(ctx: FormatterContext): string {
-        var url = (!isEmptyOrNull(this.urlProperty) ?
+        var url = (this.urlProperty ?
             (ctx.item[this.urlProperty] ?? '').toString() :
             (ctx.value ?? '').toString());
 
-        if (isEmptyOrNull(url))
+        if (!url)
             return '';
 
-        if (!isEmptyOrNull(this.urlFormat))
-            url = format(this.urlFormat, url);
+        if (this.urlFormat)
+            url = stringFormat(this.urlFormat, url);
 
-        if (url != null && startsWith(url, '~/'))
-            url = resolveUrl(url);
+        url = resolveUrl(url);
 
-        var display = (!isEmptyOrNull(this.displayProperty) ?
+        var display = (this.displayProperty ?
             (ctx.item[this.displayProperty] ?? '').toString() :
             (ctx.value ?? '').toString());
 
-        if (!isEmptyOrNull(this.displayFormat))
-            display = format(this.displayFormat, display);
+        if (this.displayFormat)
+            display = stringFormat(this.displayFormat, display);
 
         var s = "<a href='" + htmlEncode(url) + "'";
-        if (!isEmptyOrNull(this.target))
+        if (this.target)
             s += " target='" + this.target + "'";
 
         s += '>' + htmlEncode(display) + '</a>';
@@ -284,29 +285,27 @@ export class UrlFormatter implements Formatter, IInitializeColumn {
     initializeColumn(column: Column): void {
         column.referencedFields = column.referencedFields || [];
 
-        if (!isEmptyOrNull(this.displayProperty)) {
+        if (this.displayProperty) {
             column.referencedFields.push(this.displayProperty);
-            return;
         }
 
-        if (!isEmptyOrNull(this.urlProperty)) {
+        if (this.urlProperty) {
             column.referencedFields.push(this.urlProperty);
-            return;
         }
     }
 
-    @Decorators.option()
-    displayProperty: string;
+    get displayProperty() { return this.props.displayProperty }
+    set displayProperty(value) { this.props.displayProperty = value }
 
-    @Decorators.option()
-    displayFormat: string;
+    get displayFormat() { return this.props.displayFormat }
+    set displayFormat(value) { this.props.displayFormat = value }
 
-    @Decorators.option()
-    urlProperty: string;
+    get urlProperty() { return this.props.urlProperty }
+    set urlProperty(value) { this.props.urlProperty = value }
 
-    @Decorators.option()
-    urlFormat: string;
+    get urlFormat() { return this.props.urlFormat }
+    set urlFormat(value) { this.props.urlFormat = value }
 
-    @Decorators.option()
-    target: string;
+    get target() { return this.props.target }
+    set target(value) { this.props.target = value }
 }

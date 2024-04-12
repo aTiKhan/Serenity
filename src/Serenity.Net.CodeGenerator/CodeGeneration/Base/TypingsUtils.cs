@@ -1,4 +1,4 @@
-﻿global using Serenity.Reflection;
+global using Serenity.Reflection;
 #if ISSOURCEGENERATOR
 global using CustomAttribute = Microsoft.CodeAnalysis.AttributeData;
 global using FieldDefinition = Microsoft.CodeAnalysis.IFieldSymbol;
@@ -268,6 +268,13 @@ public static class TypingsUtils
         return type.IsGenericInstance;
     }
 
+    public static IEnumerable<CustomAttribute> GetAttributes(this PropertyDefinition prop, string ns, string name, bool subAttributes = false)
+    {
+        return prop.CustomAttributes.Where(x => (x.AttributeType?.Namespace == ns &&
+            x.AttributeType.Name == name) ||
+            (subAttributes && TypingsUtils.IsSubclassOf(x.AttributeType, ns, name)));
+    }
+
     public static IEnumerable<CustomAttribute> GetAttributes(this FieldDefinition field)
     {
         return field.CustomAttributes;
@@ -464,19 +471,14 @@ public static class TypingsUtils
     }
 #endif
 
-    public static bool IsOrSubClassOf(TypeReference childTypeDef, string ns, string name)
-    {
-        return FindIsOrSubClassOf(childTypeDef, ns, name) != null;
-    }
-
-    private static TypeReference FindIsOrSubClassOf(TypeReference typeRef, string ns, string name)
+    public static bool IsOrSubClassOf(TypeReference typeRef, string ns, string name)
     {
         if (typeRef.Name == name &&
             typeRef.NamespaceOf() == ns)
-            return typeRef;
+            return true;
 
         return EnumerateBaseClasses(typeRef)
-            .FirstOrDefault(b => b.Name == name &&
+            .Any(b => b.Name == name &&
                 b.NamespaceOf() == ns);
     }
 
@@ -490,16 +492,6 @@ public static class TypingsUtils
             type = ((Mono.Cecil.TypeSpecification)type).ElementType;
         return type.MetadataType == Mono.Cecil.MetadataType.Void;
 #endif
-    }
-
-    public static TypeReference FindIsOrSubClassOf(TypeReference typeRef, TypeReference[] baseClasses, string ns, string name)
-    {
-        if (typeRef.Name == name &&
-            typeRef.NamespaceOf() == ns)
-            return typeRef;
-
-        return baseClasses.FirstOrDefault(b => b.Name == name &&
-            b.NamespaceOf() == ns);
     }
 
     public static bool Contains(TypeReference[] classes, string ns, string name)
@@ -539,29 +531,29 @@ public static class TypingsUtils
             return (type.FullName, type.Scope.Name);
     }
 
-    private static readonly Dictionary<(string, string), List<TypeReference>> BaseClassCache = new();
+    private static readonly Dictionary<(string, string), List<TypeReference>> BaseClassCache = [];
 #endif
 
 
     public static IEnumerable<TypeReference> EnumerateBaseClasses(TypeReference typeRef)
     {
+#if ISSOURCEGENERATOR
+        if (typeRef == null)
+            yield break;
+        while ((typeRef = typeRef.BaseType) != null)
+            yield return typeRef;
+#else
         if (typeRef is null)
-            return Array.Empty<TypeReference>();
+            return [];
 
-#if !ISSOURCEGENERATOR
         var key = GetCacheKey(typeRef);
         if (BaseClassCache.TryGetValue(key, out var cached))
             return cached;
-#endif
 
         var list = new List<TypeReference>();
 
-#if ISSOURCEGENERATOR
-        var typeDef = typeRef;
-#else
         if (typeRef is not TypeDefinition typeDef)
             typeDef = typeRef.Resolve();
-#endif
 
         var baseType = typeDef?.BaseType;
         if (baseType != null)
@@ -570,10 +562,9 @@ public static class TypingsUtils
             list.AddRange(EnumerateBaseClasses(baseType));
         }
 
-#if !ISSOURCEGENERATOR
         BaseClassCache[key] = list;
-#endif
         return list;
+#endif
     }
 
     public static bool IsSubclassOf(TypeReference type, string ns, string name)
@@ -588,11 +579,11 @@ public static class TypingsUtils
     }
 
 #if !ISSOURCEGENERATOR
-    public static Mono.Cecil.AssemblyDefinition[] ToDefinitions(IGeneratorFileSystem fileSystem,
+    public static Mono.Cecil.AssemblyDefinition[] ToDefinitions(IFileSystem fileSystem,
         IEnumerable<string> assemblyLocations)
     {
         if (assemblyLocations == null || !assemblyLocations.Any())
-            return System.Array.Empty<Mono.Cecil.AssemblyDefinition>();
+            return [];
 
         assemblyLocations = assemblyLocations.Select(x =>
         {
@@ -624,7 +615,7 @@ public static class TypingsUtils
             .LoadMainModule(assemblyLocations.First(), inMemory: true);
 
         if (assemblyLocations.Count() == 1)
-            return new[] { module.Assembly };
+            return [module.Assembly];
 
         var resolver = module.AssemblyResolver as ICSharpCode.Decompiler.UniversalAssemblyResolver;
 
@@ -641,7 +632,7 @@ public static class TypingsUtils
                     MetadataResolver = module.MetadataResolver
                 }));
 
-        return assemblyDefinitions.ToArray();
+        return [.. assemblyDefinitions];
     }
 #endif
 
@@ -723,7 +714,16 @@ public static class TypingsUtils
     public static bool IsAssignableFrom(TypeReference baseType, TypeReference type)
     {
 #if ISSOURCEGENERATOR
-        return IsAssignableFrom(baseType.FullNameOf(), type);
+        if (baseType == null || type == null)
+            return false;
+        
+        if (baseType.TypeKind == TypeKind.Interface)
+            return type.AllInterfaces.Any(t => SymbolEqualityComparer.Default.Equals(t, baseType));
+
+        if (SymbolEqualityComparer.Default.Equals(type, baseType))
+            return true;
+
+        return EnumerateBaseClasses(type).Any(t => SymbolEqualityComparer.Default.Equals(t, baseType));
 #else
         return IsAssignableFrom(baseType.FullName, type.Resolve());
 #endif
@@ -734,7 +734,7 @@ public static class TypingsUtils
         Queue<TypeDefinition> queue = new();
         queue.Enqueue(type);
 
-        while (queue.Any())
+        while (queue.Count != 0)
         {
             var current = queue.Dequeue();
 

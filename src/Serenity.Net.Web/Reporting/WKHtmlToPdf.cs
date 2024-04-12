@@ -1,4 +1,4 @@
-﻿using Serenity.IO;
+using Serenity.IO;
 using System.Diagnostics;
 using System.IO;
 
@@ -7,24 +7,19 @@ namespace Serenity.Reporting;
 /// <summary>
 /// HTML to PDF converter class using WKHTMLToPdf
 /// </summary>
-public class WKHtmlToPdf : IHtmlToPdfOptions
+/// <remarks>
+/// WKHtmlToPdf converter class
+/// </remarks>
+/// <param name="options">List of options</param>
+public class WKHtmlToPdf(IHtmlToPdfOptions options = null) : IHtmlToPdfOptions
 {
-    private readonly IHtmlToPdfOptions options;
-
-    /// <summary>
-    /// WKHtmlToPdf converter class
-    /// </summary>
-    /// <param name="options">List of options</param>
-    public WKHtmlToPdf(IHtmlToPdfOptions options = null)
-    {
-        this.options = options ?? new HtmlToPdfOptions();
-    }
+    private readonly IHtmlToPdfOptions options = options ?? new HtmlToPdfOptions();
 
     /// <summary>
     /// Executes the converter process and returns the PDF bytes
     /// </summary>
     /// <exception cref="ArgumentNullException">UtilityExePath or URL is null</exception>
-    /// <exception cref="InvalidOperationException">An error occureed during process execution</exception>
+    /// <exception cref="InvalidOperationException">An error occurred during process execution</exception>
     public byte[] Execute()
     {
         var exePath = ExecutablePath ?? throw new ArgumentNullException(nameof(ExecutablePath));
@@ -162,7 +157,7 @@ public class WKHtmlToPdf : IHtmlToPdfOptions
         {
             args.Add(tempFile);
 
-            var commandLineArgs = CommandLineTools.EscapeArguments(args.ToArray());
+            var commandLineArgs = CommandLineTools.EscapeArguments([.. args]);
 
             var process = new Process 
             { 
@@ -192,7 +187,7 @@ public class WKHtmlToPdf : IHtmlToPdfOptions
                     "PDF generator returned error code {0}!", process.ExitCode));
 
             if (!File.Exists(tempFile))
-                throw invalidOperation("Can't find generatored PDF file!");
+                throw invalidOperation("Can't find generated PDF file!");
 
             var bytes = File.ReadAllBytes(tempFile);
             if (bytes.Length == 0)

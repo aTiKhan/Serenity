@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Serenity.Navigation;
 
@@ -35,8 +35,7 @@ public class NavigationHelper
     public static List<NavigationItem> ConvertToNavigationItems(IPermissionService permissions, 
         ILookup<string, NavigationItemAttribute> attrByCategory, Func<string, string> resolveUrl)
     {
-        if (permissions == null)
-            throw new ArgumentNullException(nameof(permissions));
+        ArgumentNullException.ThrowIfNull(permissions);
 
         var result = new List<NavigationItem>();
 
@@ -44,10 +43,10 @@ public class NavigationHelper
         {
             var item = new NavigationItem();
 
-            bool isAuthorizedSection = !attr.Url.IsEmptyOrNull() &&
-                (attr.Permission.IsEmptyOrNull() || permissions.HasPermission(attr.Permission));
+            bool isAuthorizedSection = !string.IsNullOrEmpty(attr.Url) &&
+                (string.IsNullOrEmpty(attr.Permission) || permissions.HasPermission(attr.Permission));
 
-            var path = attr.Category.IsEmptyOrNull() ? "" : (attr.Category + "/");
+            var path = string.IsNullOrEmpty(attr.Category) ? "" : (attr.Category + "/");
             path += attr.Title ?? "";
 
             var children = attrByCategory[path];
@@ -118,8 +117,7 @@ public class NavigationHelper
     public static ILookup<string, NavigationItemAttribute> ByCategory(
         IEnumerable<NavigationItemAttribute> list)
     {
-        if (list is null)
-            throw new ArgumentNullException(nameof(list));
+        ArgumentNullException.ThrowIfNull(list);
 
         var byCategory = Sort(list, x => x.Category)
             .ToLookup(x => x.Category ?? "", StringComparer.OrdinalIgnoreCase);
@@ -244,7 +242,7 @@ public class NavigationHelper
                 group.Order = minOrder;
         }
 
-        if (!newCategory.Any())
+        if (newCategory.Count == 0)
             return byCategory;
 
         var usedGroupPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

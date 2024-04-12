@@ -1,11 +1,10 @@
-﻿import { Decorators } from "../../decorators";
+﻿import { Fluent } from "../../base";
+import { Decorators } from "../../types/decorators";
 import { StringEditor } from "./stringeditor";
 
-@Decorators.registerEditor('Serenity.PasswordEditor')
-export class PasswordEditor extends StringEditor {
-    constructor(input: JQuery) {
-        super(input);
+@Decorators.registerType()
+export class PasswordEditor<TOptions = {}> extends StringEditor<TOptions> {
+    static override typeInfo = Decorators.editorType("Serenity.PasswordEditor")
 
-        input.attr('type', 'password');
-    }
+    static override createDefaultElement() { return Fluent("input").attr("type", "password").getNode(); }
 }

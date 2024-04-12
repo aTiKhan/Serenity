@@ -104,7 +104,7 @@ public partial class ServerTypingsGenerator : TypingsGeneratorBase
         return -1;
     }
 
-    private IEnumerable<string> GetDialogTypeKeyRefs(CustomAttribute editorTypeAttr)
+    private static IEnumerable<string> GetDialogTypeKeyRefs(CustomAttribute editorTypeAttr)
     {
         if (editorTypeAttr != null)
         {
@@ -143,8 +143,8 @@ public partial class ServerTypingsGenerator : TypingsGeneratorBase
     {
         var type = lookup[key].FirstOrDefault() ??
             lookup[key + suffix].FirstOrDefault() ??
-            lookup["Serenity." + key].FirstOrDefault() ??
-            lookup["Serenity." + key + suffix].FirstOrDefault();
+            lookup["Serenity." + key + suffix].FirstOrDefault() ??
+            lookup["Serenity." + key].FirstOrDefault();
 
         if (type is not null)
             return type;
@@ -158,7 +158,7 @@ public partial class ServerTypingsGenerator : TypingsGeneratorBase
                 return type;
         }
 
-        if (type is null && key.IndexOfAny(new char[] { '.', ':' }) >= 0)
+        if (type is null && key.IndexOfAny(['.', ':']) >= 0)
             type = TryFindModuleType(key, containingAssembly);
 
         return type;
@@ -180,14 +180,14 @@ public partial class ServerTypingsGenerator : TypingsGeneratorBase
         basedOnByName = null;
         if (basedOnRowAttr != null)
         {
-            basedOnByName = basedOnRow.PropertiesOf().Where(x => TypingsUtils.IsPublicInstanceProperty(x))
+            basedOnByName = EnumerateProperties(basedOnRow).Where(TypingsUtils.IsPublicInstanceProperty)
                 .ToLookup(x => x.Name);
         }
 
         return basedOnRow;
     }
 
-    private CustomAttribute GetAttribute(PropertyDefinition item, PropertyDefinition basedOnField,
+    private static CustomAttribute GetAttribute(PropertyDefinition item, PropertyDefinition basedOnField,
                 IEnumerable<AnnotationTypeInfo> rowAnnotations, string ns, string name)
     {
         var attr = TypingsUtils.FindAttr(item.GetAttributes(), ns, name);
@@ -301,6 +301,11 @@ public partial class ServerTypingsGenerator : TypingsGeneratorBase
                     foreach (var rootNamespace in RootNamespaces)
                     {
                         string wn = rootNamespace + "." + editorTypeKey;
+
+                        if (rootNamespace == "Serenity" &&
+                            (editorScriptType = (GetScriptType(wn + "Editor") ?? GetScriptType(wn))) != null)
+                            break;
+
                         if ((editorScriptType = (GetScriptType(wn) ?? GetScriptType(wn + "Editor"))) != null)
                             break;
                     }
@@ -345,7 +350,7 @@ public partial class ServerTypingsGenerator : TypingsGeneratorBase
         }
         cw.InBrace(delegate
         {
-            cw.Indented("static formKey = '");
+            cw.Indented("static readonly formKey = '");
             var key = formScriptAttribute.ConstructorArguments() != null &&
                 formScriptAttribute.ConstructorArguments().Count > 0 ? formScriptAttribute.ConstructorArguments[0].Value as string : null;
             key ??= type.FullNameOf();
@@ -429,7 +434,7 @@ public partial class ServerTypingsGenerator : TypingsGeneratorBase
             }
         });
 
-        if (module && referencedTypeAliases.Any())
+        if (module && referencedTypeAliases.Count != 0)
         {
             sb.AppendLine();
             sb.AppendLine($"[" + string.Join(", ", referencedTypeAliases.Select(x => x.alias)) + "]; // referenced types");

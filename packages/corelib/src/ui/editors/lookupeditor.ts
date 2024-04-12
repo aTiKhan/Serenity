@@ -1,25 +1,26 @@
-﻿import { Decorators } from "../../decorators";
-import { endsWith, getInstanceType, getLookup, getLookupAsync, getTypeFullName, Lookup, reloadLookup, ScriptData } from "@serenity-is/corelib/q";
-import { Select2Editor, Select2EditorOptions, Select2SearchPromise, Select2SearchQuery, Select2SearchResult } from "./select2editor";
+﻿import { getInstanceType, getLookupAsync, getTypeFullName, type Lookup } from "../../base";
+import { getLookup, reloadLookup, ScriptData } from "../../q";
+import { Decorators } from "../../types/decorators";
+import { EditorProps } from "../widgets/widget";
+import { ComboboxItem, ComboboxSearchQuery, ComboboxSearchResult } from "./combobox";
+import { ComboboxEditor, ComboboxEditorOptions } from "./comboboxeditor";
 
-export interface LookupEditorOptions extends Select2EditorOptions {
+export interface LookupEditorOptions extends ComboboxEditorOptions {
     lookupKey?: string;
     async?: boolean;
 }
 
 @Decorators.registerEditor("Serenity.LookupEditorBase")
-export abstract class LookupEditorBase<TOptions extends LookupEditorOptions, TItem> extends Select2Editor<TOptions, TItem> {
+export abstract class LookupEditorBase<P extends LookupEditorOptions, TItem> extends ComboboxEditor<P, TItem> {
 
-    constructor(input: JQuery, opt?: TOptions) {
-        super(input, opt);
+    private lookupChangeUnbind: any; 
+
+    constructor(props: EditorProps<P>) {
+        super(props);
 
         if (!this.hasAsyncSource()) {
             this.updateItems();
-            var self = this;
-            ScriptData.bindToChange('Lookup.' + this.getLookupKey(), this.uniqueName, function () {
-                if (!self.hasAsyncSource())
-                    self.updateItems();
-            });
+            this.lookupChangeUnbind = ScriptData.bindToChange('Lookup.' + this.getLookupKey(), this.updateItems.bind(this));
         }
     }
 
@@ -28,8 +29,10 @@ export abstract class LookupEditorBase<TOptions extends LookupEditorOptions, TIt
     }
 
     destroy(): void {
-        if (!this.hasAsyncSource())
-            ScriptData.unbindFromChange(this.uniqueName);
+        if (this.lookupChangeUnbind) {
+            this.lookupChangeUnbind();
+            this.lookupChangeUnbind = null;
+        }
 
         super.destroy();
     }
@@ -46,8 +49,8 @@ export abstract class LookupEditorBase<TOptions extends LookupEditorOptions, TIt
             key = key.substring(idx + 1);
         }
 
-        if (endsWith(key, 'Editor')) {
-            key = key.substr(0, key.length - 6);
+        if (key.endsWith('Editor')) {
+            key = key.substring(0, key.length - 6);
         }
 
         return key;
@@ -75,11 +78,11 @@ export abstract class LookupEditorBase<TOptions extends LookupEditorOptions, TIt
         if (lookup == null)
             return super.itemText(item);
 
-        var textValue = lookup.textFormatter ? lookup.textFormatter(item) : (item as any)[lookup.textField];
+        var textValue = (item as any)[lookup.textField];
         return textValue == null ? '' : textValue.toString();
     }
 
-    protected mapItem(item: TItem): Select2Item {
+    protected mapItem(item: TItem): ComboboxItem<TItem> {
         return {
             id: this.itemId(item),
             text: this.getItemText(item, this.lookup),
@@ -103,27 +106,24 @@ export abstract class LookupEditorBase<TOptions extends LookupEditorOptions, TIt
             this.addItem(this.mapItem(item));
     }
 
-    protected asyncSearch(query: Select2SearchQuery, results: (result: Select2SearchResult<TItem>) => void): Select2SearchPromise {
-        return this.getLookupAsync().then(lookup => {
-            this.lookup = lookup;
+    protected override async asyncSearch(query: ComboboxSearchQuery): Promise<ComboboxSearchResult<TItem>> {
+        this.lookup = await this.getLookupAsync();
+        var items = this.getItems(this.lookup);
 
-            var items = this.getItems(this.lookup);
+        if (query.idList != null) {
+            items = items.filter(x => query.idList.indexOf(this.itemId(x)) >= 0);
+        }
 
-            if (query.idList != null) {
-                items = items.filter(x => query.idList.indexOf(this.itemId(x)) >= 0);
-            }
+        function getText(item: TItem) {
+            return this.getItemText(item, this.lookup);
+        }
 
-            function getText(item: TItem) {
-                return this.getItemText(item, this.lookup);
-            }
+        items = ComboboxEditor.filterByText(items, getText.bind(this), query.searchTerm);
 
-            items = Select2Editor.filterByText(items, getText.bind(this), query.searchTerm);
-
-            results({
-                items: items.slice(query.skip, query.take),
-                more: items.length >= query.take
-            });
-        }) as any;
+        return {
+            items: items.slice(query.skip, query.take ? (query.skip + query.take) : items.length),
+            more: query.take && items.length > 0 && items.length > query.skip + query.take
+        };
     }
 
     protected getDialogTypeKey() {
@@ -144,8 +144,9 @@ export abstract class LookupEditorBase<TOptions extends LookupEditorOptions, TIt
 }
 
 @Decorators.registerEditor("Serenity.LookupEditor")
-export class LookupEditor extends LookupEditorBase<LookupEditorOptions, any> {
-    constructor(hidden: JQuery, opt?: LookupEditorOptions) {
-        super(hidden, opt);
+export class LookupEditor<P extends LookupEditorOptions = LookupEditorOptions> extends LookupEditorBase<P, {}> {
+    
+    constructor(props: EditorProps<P>) {
+        super(props);
     }
 }

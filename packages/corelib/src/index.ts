@@ -1,43 +1,41 @@
 ﻿/** 
+ * ## Serenity Core Library
  * 
- * This is the main entry point for `@serenity-is/corelib` package.
+ * This is the package containing core TypeScript classes and functions used in Serenity applications. 
  * 
- * The types from this module are available by importing from "@serenity-is/corelib":
+ * It should be installed by default in your projects created from `Serene` or `StartSharp` template:
  * 
- * ```ts
- * import { EntityGrid } from "serenity-is/corelib"
- * 
- * export class MyGrid extends EntityGrid<MyRow, any> {
+ * ```json
+ * {
+ *   "dependencies": {
+ *     // ...
+ *     "@serenity-is/corelib": "latest"
+ *   }
  * }
  * ```
- *   
- * > When using classic namespaces instead of the ESM modules, the types and functions in this module are directly available from the global `Serenity` namespace.
+ * 
+ * The version number for this package should be equal or as close as possible to Serenity NuGet package versions in your project file.
+ * 
+ * > When using classic namespaces instead of the ESM modules, the types and functions in this module are directly available from the global `Serenity` and `Q` namespaces.
  * > e.g. `Serenity.EntityGrid`
  * @packageDocumentation
- * @module corelib
  */
 
-export * from "./globals/select2-globals"
-export * from "./globals/jquery-globals"
-export * from "./globals/jquery.validation-globals"
-
-export type { ServiceError, ServiceResponse, ServiceRequest, ServiceOptions, SaveRequest, SaveRequestWithAttachment, SaveResponse, SaveWithLocalizationRequest, DeleteRequest, DeleteResponse, UndeleteRequest, UndeleteResponse, ListRequest, ListResponse, RetrieveRequest, RetrieveResponse, RetrieveLocalizationRequest, RetrieveLocalizationResponse, PropertyItem, PropertyItemsData } from "@serenity-is/corelib/q";
-export { ColumnSelection, RetrieveColumnSelection, SummaryType, Criteria } from "@serenity-is/corelib/q";
-
+export * from "./base";
+export * from "./q";
+export * from "./slick";
 export * from "./interfaces";
 export * from "./types";
 export * from "./ui/datagrid/irowdefinition";
 export * from "./ui/datagrid/islickformatter";
-export * from "./decorators";
 export * from "./ui/helpers/lazyloadhelper";
 export * from "./ui/widgets/prefixedcontext";
+export * from "./ui/widgets/widgetutils";
 export * from "./ui/widgets/widget";
-export * from "./ui/widgets/jquerywidgetfn";
 export * from "./ui/widgets/toolbar";
 export * from "./ui/widgets/templatedwidget";
 export * from "./ui/dialogs/templateddialog";
 export * from "./ui/widgets/templatedpanel";
-export * from "./ui/helpers/validationhelper";
 export * from "./ui/editors/cascadedwidgetlink";
 export * from "./ui/helpers/tabsextensions";
 export * from "./ui/widgets/reflectionoptionssetter";
@@ -51,6 +49,7 @@ export * from "./ui/editors/stringeditor";
 export * from "./ui/editors/passwordeditor";
 export * from "./ui/editors/textareaeditor";
 export * from "./ui/editors/booleaneditor";
+export * from "./ui/editors/autonumeric";
 export * from "./ui/editors/decimaleditor";
 export * from "./ui/editors/integereditor";
 export * from "./ui/editors/dateeditor";
@@ -60,8 +59,10 @@ export * from "./ui/editors/emaileditor";
 export * from "./ui/editors/emailaddresseditor";
 export * from "./ui/editors/urleditor";
 export * from "./ui/editors/radiobuttoneditor";
-export * from "./ui/editors/select2editor";
+export * from "./ui/editors/combobox"
+export * from "./ui/editors/comboboxeditor";
 export * from "./ui/editors/selecteditor";
+export * from "./ui/editors/select2";
 export * from "./ui/editors/dateyeareditor";
 export * from "./ui/editors/enumeditor";
 export * from "./ui/editors/lookupeditor";
@@ -93,15 +94,5 @@ export * from "./ui/datagrid/treegridmixin";
 export * from "./ui/editors/checktreeeditor";
 export * from "./ui/datagrid/entitygrid";
 export * from "./ui/dialogs/entitydialog";
-export * from "./ui/widgets/jsx";
-
-// legacy
-export * from "./ui/widgets/reporting";
-export * from "./ui/widgets/scriptcontext";
-export * from "./interfaces/iasyncinit";
-export * from "./ui/widgets/wx";
-export * from "./ui/widgets/flexify";
-export * from "./ui/widgets/googlemap";
-export * from "./ui/editors/select2ajaxeditor";
 
 export type Constructor<T> = new (...args: any[]) => T;

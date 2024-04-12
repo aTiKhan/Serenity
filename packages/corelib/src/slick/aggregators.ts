@@ -1,7 +1,7 @@
-﻿import { escape, Column, GroupTotals, NonDataRow, convertCompatFormatter } from "@serenity-is/sleekgrid";
-import { formatNumber, htmlEncode, tryGetText } from "@serenity-is/corelib/q";
+﻿import { formatNumber, htmlEncode, tryGetText } from "../base";
+import { Column, GroupTotals, NonDataRow, convertCompatFormatter, escapeHtml } from "@serenity-is/sleekgrid";
 
-export {}
+export { };
 
 export namespace Aggregators
 {
@@ -163,7 +163,12 @@ export namespace AggregateFormatting {
             var item = new NonDataRow();
             (item as any)[column.field] = value;
             try {
-                return formatter({ column, escape, item, value });
+                var result = formatter({ column, escape: escapeHtml, item, value });
+                if (result instanceof Element)
+                    return result.outerHTML;
+                else if (result instanceof DocumentFragment)
+                    return Array.from((result as any as DocumentFragment).children).map(x => x.outerHTML).join("")
+                return result;
             }
             catch (e) {
             }

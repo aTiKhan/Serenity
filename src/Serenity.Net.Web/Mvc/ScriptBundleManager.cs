@@ -78,10 +78,10 @@ public class ScriptBundleManager : IScriptBundleManager
         {
             isEnabled = false;
             var settings = options.Value;
-            var bundles = settings.Bundles ?? new Dictionary<string, string[]>();
+            var bundles = settings.Bundles ?? [];
 
             bundles = bundles.Keys.ToDictionary(k => k,
-                k => (bundles[k] ?? Array.Empty<string>())
+                k => (bundles[k] ?? [])
                     .Select(u => BundleUtils.DoReplacements(u, settings.Replacements))
                     .Where(u => !string.IsNullOrEmpty(u))
                     .ToArray());
@@ -126,7 +126,7 @@ public class ScriptBundleManager : IScriptBundleManager
                     if (!bundleKeysBySourceUrl.TryGetValue(sourceFile, out HashSet<string> bundleKeys))
                     {
                         bundleKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                        bundleKeysBySourceUrl[sourceFile] = new HashSet<string>();
+                        bundleKeysBySourceUrl[sourceFile] = [];
                     }
 
                     bundleKeys.Add(bundleKey);
@@ -134,7 +134,7 @@ public class ScriptBundleManager : IScriptBundleManager
 
                 foreach (var sourceFile in sourceFiles)
                 {
-                    if (sourceFile.IsNullOrEmpty())
+                    if (string.IsNullOrEmpty(sourceFile))
                         continue;
 
                     if (sourceFile.StartsWith("dynamic://", StringComparison.OrdinalIgnoreCase))
@@ -196,7 +196,7 @@ public class ScriptBundleManager : IScriptBundleManager
                     sourceUrl = VirtualPathUtility.ToAbsolute(contextAccessor, sourceUrl);
                     var rootUrl = VirtualPathUtility.ToAbsolute(contextAccessor, "~/");
 
-                    if (sourceUrl.IsNullOrEmpty() || !sourceUrl.StartsWith(rootUrl, StringComparison.Ordinal))
+                    if (string.IsNullOrEmpty(sourceUrl) || !sourceUrl.StartsWith(rootUrl, StringComparison.Ordinal))
                         continue;
 
                     registerInBundle(sourceUrl);
@@ -321,7 +321,7 @@ public class ScriptBundleManager : IScriptBundleManager
             if (bi != null && bi.TryGetValue(bundleKey, out List<string> includes) && includes != null)
                 return includes;
 
-            return Array.Empty<string>();
+            return [];
         }
     }
 

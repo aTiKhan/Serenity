@@ -1,8 +1,10 @@
-﻿import { Decorators, EnumKeyAttribute } from "../../decorators";
+﻿import { Enum, Fluent, getCustomAttribute, tryGetText } from "../../base";
 import { IReadOnly, IStringValue } from "../../interfaces";
-import { Enum, getAttributes, getLookup, isEmptyOrNull, tryGetText } from "@serenity-is/corelib/q";
+import { getLookup } from "../../q";
+import { EnumKeyAttribute } from "../../types/attributes";
+import { Decorators } from "../../types/decorators";
 import { EnumTypeRegistry } from "../../types/enumtyperegistry";
-import { Widget } from "../widgets/widget";
+import { EditorProps, EditorWidget } from "../widgets/widget";
 
 export interface RadioButtonEditorOptions {
     enumKey?: string;
@@ -11,20 +13,19 @@ export interface RadioButtonEditorOptions {
 }
 
 @Decorators.registerEditor('Serenity.RadioButtonEditor', [IStringValue, IReadOnly])
-@Decorators.element('<div/>')
-export class RadioButtonEditor extends Widget<RadioButtonEditorOptions>
+export class RadioButtonEditor<P extends RadioButtonEditorOptions = RadioButtonEditorOptions> extends EditorWidget<P>
     implements IReadOnly {
 
-    constructor(input: JQuery, opt: RadioButtonEditorOptions) {
-        super(input, opt);
+    constructor(props: EditorProps<P>) {
+        super(props);
 
-        if (isEmptyOrNull(this.options.enumKey) &&
+        if (!this.options.enumKey &&
             this.options.enumType == null &&
-            isEmptyOrNull(this.options.lookupKey)) {
+            !this.options.lookupKey) {
             return;
         }
 
-        if (!isEmptyOrNull(this.options.lookupKey)) {
+        if (this.options.lookupKey) {
             var lookup = getLookup(this.options.lookupKey);
             for (var item of lookup.items) {
                 var textValue = (item as any)[lookup.textField];
@@ -38,9 +39,9 @@ export class RadioButtonEditor extends Widget<RadioButtonEditorOptions>
             var enumType = this.options.enumType || EnumTypeRegistry.get(this.options.enumKey);
             var enumKey = this.options.enumKey;
             if (enumKey == null && enumType != null) {
-                var enumKeyAttr = getAttributes(enumType, EnumKeyAttribute, false);
-                if (enumKeyAttr.length > 0) {
-                    enumKey = enumKeyAttr[0].value;
+                var enumKeyAttr = getCustomAttribute(enumType, EnumKeyAttribute, false);
+                if (enumKeyAttr) {
+                    enumKey = enumKeyAttr.value;
                 }
             }
 
@@ -54,15 +55,15 @@ export class RadioButtonEditor extends Widget<RadioButtonEditorOptions>
     }
 
     protected addRadio(value: string, text: string) {
-        var label = $('<label/>').text(text);
-        $('<input type="radio"/>').attr('name', this.uniqueName)
+        var label = Fluent("label").text(text);
+        Fluent("input").attr("type", "radio").attr('name', this.uniqueName)
             .attr('id', this.uniqueName + '_' + value)
             .attr('value', value).prependTo(label);
-        label.appendTo(this.element);
+        label.appendTo(this.domNode);
     }
 
     get_value(): string {
-        return this.element.find('input:checked').first().val();
+        return this.element.findFirst('input:checked').val();
     }
 
     get value(): string {
@@ -71,13 +72,13 @@ export class RadioButtonEditor extends Widget<RadioButtonEditorOptions>
 
     set_value(value: string): void {
         if (value !== this.get_value()) {
-            var inputs = this.element.find('input');
-            var checks = inputs.filter(':checked');
+            var inputs = this.element.findAll<HTMLInputElement>('input');
+            var checks = inputs.filter(x => x.checked);
             if (checks.length > 0) {
                 (checks[0] as HTMLInputElement).checked = false;
             }
-            if (!isEmptyOrNull(value)) {
-                checks = inputs.filter('[value=' + value + ']');
+            if (value) {
+                checks = inputs.filter(x => (x as HTMLInputElement).value === value);
                 if (checks.length > 0) {
                     (checks[0] as HTMLInputElement).checked = true;
                 }
@@ -90,18 +91,18 @@ export class RadioButtonEditor extends Widget<RadioButtonEditorOptions>
     }
 
     get_readOnly(): boolean {
-        return this.element.attr('disabled') != null;
+        return this.domNode.getAttribute("disabled") != null;
     }
 
     set_readOnly(value: boolean): void {
         if (this.get_readOnly() !== value) {
             if (value) {
                 this.element.attr('disabled', 'disabled')
-                    .find('input').attr('disabled', 'disabled');
+                    .findFirst('input').attr('disabled', 'disabled');
             }
             else {
                 this.element.removeAttr('disabled')
-                    .find('input').removeAttr('disabled');
+                    .findFirst('input').removeAttr('disabled');
             }
         }
     }

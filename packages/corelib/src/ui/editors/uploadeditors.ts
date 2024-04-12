@@ -1,9 +1,10 @@
-﻿import { Decorators } from "../../decorators";
+﻿import { Fluent, PropertyItem, getjQuery, localText } from "../../base";
 import { IGetEditValue, IReadOnly, ISetEditValue, IValidateRequired } from "../../interfaces";
-import { endsWith, extend, isEmptyOrNull, isInstanceOfType, isTrimmedEmpty, PropertyItem, replaceAll, startsWith, localText, trimToNull } from "@serenity-is/corelib/q";
-import { FileUploadConstraints, UploadedFile, UploadHelper, UploadInputOptions } from "../helpers/uploadhelper";
-import { Toolbar, ToolButton } from "../widgets/toolbar";
-import { Widget } from "../widgets/widget";
+import { ValidationHelper, extend, isTrimmedEmpty, replaceAll } from "../../q";
+import { Decorators } from "../../types/decorators";
+import { FileUploadConstraints, UploadHelper, UploadInputOptions, UploadedFile } from "../helpers/uploadhelper";
+import { ToolButton, Toolbar } from "../widgets/toolbar";
+import { EditorProps, EditorWidget } from "../widgets/widget";
 
 export interface FileUploadEditorOptions extends FileUploadConstraints {
     displayFileName?: boolean;
@@ -16,40 +17,46 @@ export interface ImageUploadEditorOptions extends FileUploadEditorOptions {
 }
 
 @Decorators.registerEditor('Serenity.FileUploadEditor', [IReadOnly, IGetEditValue, ISetEditValue, IValidateRequired])
-@Decorators.element('<div/>')
-export class FileUploadEditor extends Widget<FileUploadEditorOptions>
+export class FileUploadEditor<P extends FileUploadEditorOptions = FileUploadEditorOptions> extends EditorWidget<P>
     implements IReadOnly, IGetEditValue, ISetEditValue, IValidateRequired {
 
-    constructor(div: JQuery, opt: FileUploadEditorOptions) {
-        super(div, opt);
+    constructor(props: EditorProps<P>) {
+        super(props);
 
-        if (!opt || opt.allowNonImage == null)
+        if (!this.options || this.options.allowNonImage == null)
             this.options.allowNonImage = true;
 
-        div.addClass('s-FileUploadEditor');
-        
-        if (isEmptyOrNull(this.options.originalNameProperty))
-            div.addClass('hide-original-name');
+        this.domNode.classList.add('s-FileUploadEditor');
 
-        this.toolbar = new Toolbar($('<div/>').appendTo(this.element), {
-            buttons: this.getToolButtons()
+        if (!this.options.originalNameProperty)
+            this.domNode.classList.add('hide-original-name');
+
+        this.toolbar = new Toolbar({
+            buttons: this.getToolButtons(),
+            element: el => this.domNode.appendChild(el)
         });
 
-        this.progress = $('<div><div></div></div>')
-            .addClass('upload-progress')
-            .prependTo(this.toolbar.element);
+        this.progress = Fluent("div")
+            .class('upload-progress')
+            .append(Fluent("div"))
+            .prependTo(this.toolbar.domNode);
 
         var uio = this.getUploadInputOptions();
         this.uploadInput = UploadHelper.addUploadInput(uio);
+        if (this.options.readOnly)
+            this.set_readOnly(true);
 
-        this.fileSymbols = $('<ul/>').appendTo(this.element);
+        this.fileSymbols = Fluent("ul").appendTo(this.domNode);
 
-        if (!this.element.attr('id'))
-            this.element.attr('id', this.uniqueName);
+        if (!this.domNode.getAttribute("id"))
+            this.domNode.setAttribute('id', this.uniqueName);
 
-        this.hiddenInput = $('<input type="text" class="s-offscreen" name="' + this.uniqueName +
-            '_Validator" data-vx-highlight="' + this.element.attr('id') + '"/>')
-            .appendTo(this.element);
+        this.hiddenInput = Fluent("input")
+            .class("s-offscreen")
+            .attr("type", "text")
+            .attr("name", this.uniqueName + "_Validator")
+            .data("vx-highlight", this.domNode.getAttribute("id"))
+            .appendTo(this.domNode);
 
         this.updateInterface();
     }
@@ -57,7 +64,7 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
     protected getUploadInputOptions(): UploadInputOptions {
         return {
             container: this.toolbar.findButton('add-file-button'),
-            zone: this.element,
+            zone: this.domNode,
             inputName: this.uniqueName,
             progress: this.progress,
             uploadIntent: this.options.uploadIntent,
@@ -76,10 +83,7 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
                 this.populate();
                 this.updateInterface();
 
-                var validator = this.hiddenInput.closest('form').data('validator');
-                if (validator != null) {
-                    validator.element(this.hiddenInput);
-                }
+                ValidationHelper.validateElement(this.hiddenInput);
             }
         }
     }
@@ -107,10 +111,7 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
                     this.populate();
                     this.updateInterface();
 
-                    var validator = this.hiddenInput.closest('form').data('validator');
-                    if (validator != null) {
-                        validator.element(this.hiddenInput);
-                    }
+                    ValidationHelper.validateElement(this.hiddenInput);
                 }
             }
         ];
@@ -130,7 +131,7 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
                 this.options.urlPrefix);
         }
 
-        this.hiddenInput.val(trimToNull((this.get_value() || {}).Filename));
+        this.hiddenInput.val(((this.get_value() || {}).Filename)?.trim() || null);
     }
 
     protected updateInterface(): void {
@@ -147,10 +148,11 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
 
     set_readOnly(value: boolean): void {
         if (this.get_readOnly() !== value) {
+            let $ = getjQuery();
             if (value) {
                 this.uploadInput.attr('disabled', 'disabled');
                 try {
-                    (this.uploadInput as any).fileupload('disable');
+                    $ && $(this.uploadInput).fileupload?.('disable');
                 }
                 catch {
                 }
@@ -158,7 +160,7 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
             else {
                 this.uploadInput.removeAttr('disabled');
                 try {
-                    (this.uploadInput as any).fileupload('enable');
+                    $ && $(this.uploadInput).fileupload?.('enable');
                 } catch {
                 }
             }
@@ -187,10 +189,9 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
     }
 
     set_value(value: UploadedFile): void {
-        var stringValue = value as string;
-        if (typeof stringValue === "string") {
-            var stringValue = trimToNull(stringValue);
-            if (value != null) {
+        if (typeof value === "string") {
+            var stringValue = (value as string).trim();
+            if (stringValue) {
                 var idx = stringValue.indexOf('/');
                 if (idx < 0)
                     idx = stringValue.indexOf('\\');
@@ -199,8 +200,10 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
                     OriginalName: stringValue.substring(idx + 1)
                 }
             }
+            else
+                value = null;
         }
-        else if (value != null && isTrimmedEmpty(value.Filename))
+        else if (!value?.Filename?.trim())
             value = null;
 
         if (value != null) {
@@ -216,11 +219,7 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
         }
         this.populate();
 
-        var validator = this.hiddenInput.closest('form').data('validator');
-        if (validator != null) {
-            validator.element(this.hiddenInput);
-        }
-
+        ValidationHelper.validateElement(this.hiddenInput);
         this.updateInterface();
     }
 
@@ -229,14 +228,13 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
     }
 
     getEditValue(property: PropertyItem, target: any) {
-        target[property.name] = this.entity == null ? null :
-            trimToNull(this.entity.Filename);
+        target[property.name] = this.entity?.Filename?.trim() || null;
     }
 
     setEditValue(source: any, property: PropertyItem) {
         var value: UploadedFile = {};
         value.Filename = source[property.name];
-        if (isEmptyOrNull(this.options.originalNameProperty)) {
+        if (!this.options.originalNameProperty) {
 
             if (this.options.displayFileName) {
                 var s = (value.Filename ?? '');
@@ -258,59 +256,67 @@ export class FileUploadEditor extends Widget<FileUploadEditorOptions>
 
     protected entity: UploadedFile;
     protected toolbar: Toolbar;
-    protected progress: JQuery;
-    protected fileSymbols: JQuery;
-    protected uploadInput: JQuery;
-    protected hiddenInput: JQuery;
+    protected progress: Fluent;
+    protected fileSymbols: Fluent;
+    protected uploadInput: Fluent;
+    protected hiddenInput: Fluent;
 }
 
 @Decorators.registerEditor('Serenity.ImageUploadEditor')
-export class ImageUploadEditor extends FileUploadEditor {
-    constructor(div: JQuery, opt: ImageUploadEditorOptions) {
-        super(div, opt);
+export class ImageUploadEditor<P extends ImageUploadEditorOptions = ImageUploadEditorOptions> extends FileUploadEditor<P> {
+    constructor(props: EditorProps<P>) {
+        super(props);
 
-        if (opt && opt.allowNonImage == null)
+        if (this.options.allowNonImage == null)
             this.options.allowNonImage = false;
 
-        div.addClass('s-ImageUploadEditor');
+        this.domNode.classList.add("s-ImageUploadEditor'")
     }
 }
 
+export interface MultipleFileUploadEditorOptions extends FileUploadEditorOptions {
+    jsonEncodeValue?: boolean;
+}
+
 @Decorators.registerEditor('Serenity.MultipleFileUploadEditor', [IReadOnly, IGetEditValue, ISetEditValue, IValidateRequired])
-@Decorators.element('<div/>')
-export class MultipleFileUploadEditor extends Widget<FileUploadEditorOptions>
+export class MultipleFileUploadEditor<P extends MultipleFileUploadEditorOptions = MultipleFileUploadEditorOptions> extends EditorWidget<P>
     implements IReadOnly, IGetEditValue, ISetEditValue, IValidateRequired {
 
     private entities: UploadedFile[];
     private toolbar: Toolbar;
-    private fileSymbols: JQuery;
-    private uploadInput: JQuery;
-    protected progress: JQuery;
-    protected hiddenInput: JQuery;
+    private fileSymbols: Fluent;
+    private uploadInput: Fluent;
+    protected progress: Fluent;
+    protected hiddenInput: Fluent;
 
-    constructor(div: JQuery, opt: ImageUploadEditorOptions) {
-        super(div, opt);
+    constructor(props: EditorProps<P>) {
+        super(props);
 
         this.entities = [];
-        div.addClass('s-MultipleFileUploadEditor');
-        var self = this;
-        this.toolbar = new Toolbar($('<div/>').appendTo(this.element), {
-            buttons: this.getToolButtons()
+        this.domNode.classList.add('s-MultipleFileUploadEditor');
+        this.toolbar = new Toolbar({
+            buttons: this.getToolButtons(),
+            element: el => this.domNode.append(el)
         });
 
-        this.progress = $('<div><div></div></div>')
-            .addClass('upload-progress')
-            .prependTo(this.toolbar.element);
+        this.progress = Fluent("div")
+            .append(Fluent("div"))
+            .class('upload-progress')
+            .prependTo(this.toolbar.domNode);
 
         this.uploadInput = UploadHelper.addUploadInput(this.getUploadInputOptions());
 
-        this.fileSymbols = $('<ul/>').appendTo(this.element);
-        if (!this.element.attr('id')) {
-            this.element.attr('id', this.uniqueName);
+        this.fileSymbols = Fluent("ul").appendTo(this.domNode);
+        if (!this.domNode.getAttribute("id")) {
+            this.domNode.setAttribute('id', this.uniqueName);
         }
 
-        this.hiddenInput = $('<input type="text" class="s-offscreen" name="' + this.uniqueName +
-            '_Validator" data-vx-highlight="' + this.element.attr('id') + '" multiple="multiple"></input>').appendTo(this.element);
+        this.hiddenInput = Fluent("input")
+            .class("s-offscreen")
+            .attr("type", "text")
+            .attr("name", this.uniqueName + "_Validator")
+            .data("vx-highlight", this.domNode.getAttribute("id"))
+            .attr("multiple", "multiple").appendTo(this.domNode);
 
         this.updateInterface();
     }
@@ -320,7 +326,7 @@ export class MultipleFileUploadEditor extends Widget<FileUploadEditorOptions>
 
         return {
             container: addFileButton,
-            zone: this.element,
+            zone: this.domNode,
             inputName: this.uniqueName,
             progress: this.progress,
             uploadIntent: this.options.uploadIntent,
@@ -334,10 +340,7 @@ export class MultipleFileUploadEditor extends Widget<FileUploadEditorOptions>
                 this.entities.push(newEntity);
                 this.populate();
 
-                var validator = this.hiddenInput.closest('form').data('validator');
-                if (validator != null) {
-                    validator.element(this.hiddenInput);
-                }
+                ValidationHelper.validateElement(this.hiddenInput);
 
                 this.updateInterface();
             }
@@ -362,28 +365,25 @@ export class MultipleFileUploadEditor extends Widget<FileUploadEditorOptions>
         UploadHelper.populateFileSymbols(this.fileSymbols, this.entities,
             true, this.options.urlPrefix);
 
-        this.fileSymbols.children().each((i, e) => {
+        this.fileSymbols.children().forEach((e, i) => {
             var x = i;
-            $("<a class='delete'></a>").appendTo($(e).children('.filename'))
-                .click(ev => {
+            Fluent("a").class("delete").appendTo(Fluent(e).children().find(x => x.matches('.filename')))
+                .on("click", ev => {
                     ev.preventDefault();
                     this.entities.splice(x, 1);
                     this.populate();
 
-                    var validator = this.hiddenInput.closest('form').data('validator');
-                    if (validator != null) {
-                        validator.element(this.hiddenInput);
-                    }
+                    ValidationHelper.validateElement(this.hiddenInput);
                 });
         });
 
-        this.hiddenInput.val(trimToNull((this.get_value()[0] || {}).Filename));
+        this.hiddenInput.val(this.get_value()[0]?.Filename || null);
     }
 
     protected updateInterface(): void {
         var addButton = this.toolbar.findButton('add-file-button');
         addButton.toggleClass('disabled', this.get_readOnly());
-        this.fileSymbols.find('a.delete').toggle(!this.get_readOnly());
+        this.fileSymbols.findEach('a.delete', x => x.toggle(!this.get_readOnly()));
     }
 
     get_readOnly(): boolean {
@@ -392,10 +392,11 @@ export class MultipleFileUploadEditor extends Widget<FileUploadEditorOptions>
 
     set_readOnly(value: boolean): void {
         if (this.get_readOnly() !== value) {
+            let $ = getjQuery();
             if (value) {
                 this.uploadInput.attr('disabled', 'disabled');
                 try {
-                    (this.uploadInput as any).fileupload('disable');
+                    $ && $(this.uploadInput).fileupload?.('disable');
                 }
                 catch {
                 }
@@ -403,7 +404,7 @@ export class MultipleFileUploadEditor extends Widget<FileUploadEditorOptions>
             else {
                 this.uploadInput.removeAttr('disabled');
                 try {
-                    (this.uploadInput as any).fileupload('enable');
+                    $ && $(this.uploadInput)?.fileupload('enable');
                 } catch {
                 }
             }
@@ -452,10 +453,10 @@ export class MultipleFileUploadEditor extends Widget<FileUploadEditorOptions>
 
     setEditValue(source: any, property: PropertyItem) {
         var val = source[property.name];
-        if (isInstanceOfType(val, String)) {
-            var json = trimToNull(val) ?? '[]';
-            if (startsWith(json, '[') && endsWith(json, ']')) {
-                this.set_value($.parseJSON(json));
+        if (typeof val == "string") {
+            var json = val.trim();
+            if (json.startsWith('[') && json.endsWith(']')) {
+                this.set_value(JSON.parse(json));
             }
             else {
                 this.set_value([{
@@ -469,15 +470,14 @@ export class MultipleFileUploadEditor extends Widget<FileUploadEditorOptions>
         }
     }
 
-    @Decorators.option()
-    public jsonEncodeValue: boolean;
+    public get jsonEncodeValue() { return this.options.jsonEncodeValue }
+    public set jsonEncodeValue(value) { this.options.jsonEncodeValue = value }
 }
 
 @Decorators.registerEditor('Serenity.MultipleImageUploadEditor')
-export class MultipleImageUploadEditor extends MultipleFileUploadEditor {
-    constructor(div: JQuery, opt: ImageUploadEditorOptions) {
-        super(div, opt);
-
-        div.addClass('s-MultipleImageUploadEditor');
+export class MultipleImageUploadEditor<P extends ImageUploadEditorOptions = ImageUploadEditorOptions> extends MultipleFileUploadEditor<P> {
+    constructor(props: EditorProps<P>) {
+        super(props);
+        this.domNode.classList.add("s-MultipleImageUploadEditor'")
     }
 }

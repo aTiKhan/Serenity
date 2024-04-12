@@ -1,7 +1,8 @@
-﻿import { Decorators } from "../../decorators";
+﻿import { Culture, Fluent, formatNumber, parseDecimal } from "../../base";
 import { IDoubleValue } from "../../interfaces";
-import { Culture, extend, formatNumber, parseDecimal } from "@serenity-is/corelib/q";
-import { Widget } from "../widgets/widget";
+import { Decorators } from "../../types/decorators";
+import { EditorProps, EditorWidget } from "../widgets/widget";
+import { AutoNumeric, AutoNumericOptions } from "./autonumeric";
 
 export interface DecimalEditorOptions {
     minValue?: string;
@@ -12,16 +13,31 @@ export interface DecimalEditorOptions {
 }
 
 @Decorators.registerEditor('Serenity.DecimalEditor', [IDoubleValue])
-@Decorators.element('<input type="text"/>')
-export class DecimalEditor extends Widget<DecimalEditorOptions> implements IDoubleValue {
+export class DecimalEditor<P extends DecimalEditorOptions = DecimalEditorOptions> extends EditorWidget<P> implements IDoubleValue {
 
-    constructor(input: JQuery, opt?: DecimalEditorOptions) {
-        super(input, opt);
+    static override createDefaultElement() { return Fluent("input").attr("type", "text").getNode(); }
+    declare readonly domNode: HTMLInputElement;
 
-        input.addClass('decimalQ');
-        var numericOptions = extend(DecimalEditor.defaultAutoNumericOptions(), {
-            vMin: (this.options.minValue ?? (this.options.allowNegatives ? (this.options.maxValue != null ? ("-" + this.options.maxValue) : '-999999999999.99') : '0.00')),
-            vMax: (this.options.maxValue ?? '999999999999.99')
+    constructor(props: EditorProps<P>) {
+        super(props);
+
+        this.domNode.classList.add('decimalQ');
+        this.initAutoNumeric();
+    }
+
+    destroy() {
+        AutoNumeric.destroy(this.domNode);
+        super.destroy();
+    }
+
+    protected initAutoNumeric() {
+        AutoNumeric.init(this.domNode, this.getAutoNumericOptions());
+    }
+
+    protected getAutoNumericOptions(): any {
+        var numericOptions = Object.assign({}, DecimalEditor.defaultAutoNumericOptions(), {
+            vMin: this.options.minValue ?? (this.options.allowNegatives ? (this.options.maxValue != null ? ("-" + this.options.maxValue) : '-999999999999.99') : '0.00'),
+            vMax: this.options.maxValue ?? '999999999999.99'
         });
 
         if (this.options.decimals != null) {
@@ -32,13 +48,13 @@ export class DecimalEditor extends Widget<DecimalEditorOptions> implements IDoub
             numericOptions.aPad = this.options.padDecimals;
         }
 
-        if (($.fn as any).autoNumeric)
-            (input as any).autoNumeric(numericOptions);
+        return numericOptions;
     }
 
     get_value(): number {
-        if (($.fn as any).autoNumeric) {
-            var val = (this.element as any).autoNumeric('get');
+        var val;
+        if (AutoNumeric.hasInstance(this.domNode)) {
+            val = AutoNumeric.getValue(this.domNode);
 
             if (!!(val == null || val === ''))
                 return null;
@@ -46,7 +62,7 @@ export class DecimalEditor extends Widget<DecimalEditorOptions> implements IDoub
             return parseFloat(val);
         }
 
-        var val = this.element.val();
+        val = this.domNode.value;
         return parseDecimal(val);
     }
 
@@ -56,13 +72,13 @@ export class DecimalEditor extends Widget<DecimalEditorOptions> implements IDoub
 
     set_value(value: number) {
         if (value == null || (value as any) === '') {
-            this.element.val('');
+            this.domNode.value = '';
         }
-        else if (($.fn as any).autoNumeric) {
-            (this.element as any).autoNumeric('set', value);
+        else if (AutoNumeric.hasInstance(this.domNode)) {
+            AutoNumeric.setValue(this.domNode, value);
         }
         else
-            this.element.val(formatNumber(value));
+            this.domNode.value = formatNumber(value);
     }
 
     set value(v: number) {
@@ -73,7 +89,7 @@ export class DecimalEditor extends Widget<DecimalEditorOptions> implements IDoub
         return !isNaN(this.get_value());
     }
 
-    static defaultAutoNumericOptions(): any {
+    static defaultAutoNumericOptions(): AutoNumericOptions {
         return {
             aDec: Culture.decimalSeparator,
             altDec: ((Culture.decimalSeparator === '.') ? ',' : '.'),

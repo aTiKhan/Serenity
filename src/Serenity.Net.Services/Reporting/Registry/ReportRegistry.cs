@@ -1,4 +1,4 @@
-﻿namespace Serenity.Reporting;
+namespace Serenity.Reporting;
 
 /// <summary>
 /// Default report registry implementation
@@ -34,7 +34,7 @@ public class ReportRegistry : IReportRegistry
     public static string GetReportKey(Type type)
     {
         var attr = type.GetCustomAttribute<ReportAttribute>(false);
-        if (attr == null || attr.ReportKey.IsNullOrEmpty())
+        if (attr == null || string.IsNullOrEmpty(attr.ReportKey))
             return type.FullName;
 
         return attr.ReportKey;
@@ -80,23 +80,24 @@ public class ReportRegistry : IReportRegistry
         foreach (var type in types)
         {
             var attr = type.GetCustomAttribute<ReportAttribute>(false);
-            if (attr != null)
+            // reports without a ReportAttribute should not be executed for security reasons
+            if (attr == null)
+                continue;
+
+            var report = new Report(type, localizer);
+            var key = report.Key.TrimToNull() ?? type.FullName;
+
+            reportByKeyNew[key] = report;
+
+            var category = report.Category.Key;
+
+            if (!reportsByCategoryNew.TryGetValue(category, out List<Report> reports))
             {
-                var report = new Report(type, localizer);
-                var key = report.Key.TrimToNull() ?? type.FullName;
-
-                reportByKeyNew[key] = report;
-
-                var category = report.Category.Key;
-
-                if (!reportsByCategoryNew.TryGetValue(category, out List<Report> reports))
-                {
-                    reports = new List<Report>();
-                    reportsByCategoryNew[category] = reports;
-                }
-
-                reports.Add(report);
+                reports = [];
+                reportsByCategoryNew[category] = reports;
             }
+
+            reports.Add(report);
         }
 
         reportsByCategory = reportsByCategoryNew;
@@ -126,7 +127,7 @@ public class ReportRegistry : IReportRegistry
         var list = new List<Report>();
 
         foreach (var k in reportsByCategory)
-            if (categoryKey.IsNullOrEmpty() ||
+            if (string.IsNullOrEmpty(categoryKey) ||
                 string.Compare(k.Key, categoryKey, StringComparison.OrdinalIgnoreCase) == 0 ||
                 (k.Key + "/").StartsWith((categoryKey ?? ""), StringComparison.OrdinalIgnoreCase))
             {
@@ -225,27 +226,21 @@ public class ReportRegistry : IReportRegistry
     /// <summary>
     /// Model for a report category
     /// </summary>
-    public class Category
+    /// <remarks>
+    /// Creates an instance of the class
+    /// </remarks>
+    /// <param name="key">Category key</param>
+    /// <param name="title">Category title</param>
+    public class Category(string key, string title)
     {
         /// <summary>
         /// Key for the category
         /// </summary>
-        public string Key { get; private set; }
+        public string Key { get; private set; } = key;
 
         /// <summary>
         /// Category title
         /// </summary>
-        public string Title { get; private set; }
-
-        /// <summary>
-        /// Creates an instance of the class
-        /// </summary>
-        /// <param name="key">Category key</param>
-        /// <param name="title">Category title</param>
-        public Category(string key, string title)
-        {
-            Key = key;
-            Title = title;
-        }
+        public string Title { get; private set; } = title;
     }
 }

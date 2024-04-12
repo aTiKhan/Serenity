@@ -1,14 +1,16 @@
-﻿import { Decorators } from "../../decorators";
-import { ColumnSelection, Criteria, isEmptyOrNull, ListRequest, ListResponse, resolveUrl, serviceCall, ServiceOptions, startsWith } from "@serenity-is/corelib/q";
-import { Select2Editor, Select2EditorOptions, Select2SearchPromise, Select2SearchQuery, Select2SearchResult } from "./select2editor";
+﻿import { ColumnSelection, Criteria, ListRequest, ListResponse, ServiceOptions, resolveServiceUrl, serviceCall } from "../../base";
+import { Decorators } from "../../types/decorators";
+import { EditorProps } from "../widgets/widget";
+import { ComboboxSearchQuery, ComboboxSearchResult } from "./combobox";
+import { ComboboxEditor, ComboboxEditorOptions } from "./comboboxeditor";
 
-export interface ServiceLookupEditorOptions extends Select2EditorOptions {
+export interface ServiceLookupEditorOptions extends ComboboxEditorOptions {
     service?: string;
-    idField: string;
-    textField: string;
+    idField?: string;
+    textField?: string;
     pageSize?: number;
     minimumResultsForSearch?: any;
-    sort: string[];
+    sort?: string[];
     columnSelection?: ColumnSelection;
     includeColumns?: string[];
     excludeColumns?: string[];
@@ -19,11 +21,7 @@ export interface ServiceLookupEditorOptions extends Select2EditorOptions {
 }
 
 @Decorators.registerEditor("Serenity.ServiceLookupEditorBase")
-export abstract class ServiceLookupEditorBase<TOptions extends ServiceLookupEditorOptions, TItem> extends Select2Editor<TOptions, TItem> {
-
-    constructor(input: JQuery, opt?: TOptions) {
-        super(input, opt);
-    }
+export abstract class ServiceLookupEditorBase<P extends ServiceLookupEditorOptions, TItem> extends ComboboxEditor<P, TItem> {
 
     protected getDialogTypeKey() {
         var dialogTypeKey = super.getDialogTypeKey();
@@ -31,11 +29,11 @@ export abstract class ServiceLookupEditorBase<TOptions extends ServiceLookupEdit
             return dialogTypeKey;
 
         var service = this.getService();
-        if (startsWith(service, "~/Services/"))
-            service = service.substr("~/Services/".length);
+        if (service.startsWith("~/Services/"))
+            service = service.substring("~/Services/".length);
 
         if (service.split('/').length == 3)
-            service = service.substr(0, service.lastIndexOf('/'));
+            service = service.substring(0, service.lastIndexOf('/'));
 
         return service.replace("/", ".");
     }
@@ -49,13 +47,7 @@ export abstract class ServiceLookupEditorBase<TOptions extends ServiceLookupEdit
         if (url == null)
             throw new Error("ServiceLookupEditor requires 'service' option to be configured!");
 
-        if (!startsWith(url, "~") && !startsWith(url, "/") && url.indexOf('://') < 0)
-            url = "~/Services/" + url;
-
-        if (startsWith(url, "~"))
-            url = resolveUrl(url);
-
-        return url;
+        return resolveServiceUrl(url);
     }
 
     protected getIncludeColumns() {
@@ -82,7 +74,7 @@ export abstract class ServiceLookupEditorBase<TOptions extends ServiceLookupEdit
 
         if (val == null || val === '') {
 
-            if (!isEmptyOrNull(this.get_cascadeField())) {
+            if (this.get_cascadeField()) {
                 return ['0', '=', '1'];
             }
 
@@ -119,13 +111,13 @@ export abstract class ServiceLookupEditorBase<TOptions extends ServiceLookupEdit
         return Criteria(idField).in(idList);
     }
 
-    protected getCriteria(query: Select2SearchQuery): any[] {
+    protected getCriteria(query: ComboboxSearchQuery): any[] {
         return Criteria.and(
             Criteria.and(this.getIdListCriteria(query.idList), this.options.criteria),
             Criteria.and(this.getCascadeCriteria(), this.getFilterCriteria()));
     }
 
-    protected getListRequest(query: Select2SearchQuery): ListRequest {
+    protected getListRequest(query: ComboboxSearchQuery): ListRequest {
 
         var request: ListRequest = {};
 
@@ -147,38 +139,55 @@ export abstract class ServiceLookupEditorBase<TOptions extends ServiceLookupEdit
         return request;
     }
 
-    protected getServiceCallOptions(query: Select2SearchQuery, results: (result: Select2SearchResult<TItem>) => void): ServiceOptions<ListResponse<TItem>> {
+    protected getServiceCallOptions(query: ComboboxSearchQuery): ServiceOptions<ListResponse<TItem>> {
         return {
             blockUI: false,
-            url: this.getServiceUrl(),
+            service: this.getServiceUrl(),
             request: this.getListRequest(query),
-            onSuccess: response => {
-                var items = response.Entities || [];
-
-                if (items && query.take && query.checkMore && response.Entities.length > items.length)
-                    items = items.slice(0, query.take);
-
-                results({
-                    items: items.slice(0, query.take),
-                    more: query.checkMore && query.take && items.length > query.take
-                });
-            }
-        };
+            signal: query.signal
+        }
     }
 
     protected hasAsyncSource() {
         return true;
     }
 
-    protected asyncSearch(query: Select2SearchQuery, results: (result: Select2SearchResult<TItem>) => void): Select2SearchPromise {
-        var opt = this.getServiceCallOptions(query, results);
-        return serviceCall(opt);
+    protected canSearch(byId: boolean) {
+        if (!byId && this.get_cascadeField()) {
+            var val = this.get_cascadeValue();
+            if (val == null || val === '')
+                return false;
+        }
+
+        return true;
+    }
+
+    protected override async asyncSearch(query: ComboboxSearchQuery): Promise<ComboboxSearchResult<TItem>> {
+        if (!this.canSearch(query.idList != null)) {
+            return Promise.resolve({
+                items: [],
+                more: false
+            });
+        }
+
+        var opt = this.getServiceCallOptions(query);
+        var response = await serviceCall(opt);
+        var itemsPlus1 = response.Entities || [];
+        var items = itemsPlus1;
+
+        if (query.take && query.checkMore)
+            items = items.slice(0, query.take);
+
+        return {
+            items: items,
+            more: query.checkMore && query.take && itemsPlus1.length > query.take
+        };
     }
 }
 
 @Decorators.registerEditor('Serenity.ServiceLookupEditor')
-export class ServiceLookupEditor extends ServiceLookupEditorBase<ServiceLookupEditorOptions, any> {
-    constructor(hidden: JQuery, opt?: ServiceLookupEditorOptions) {
-        super(hidden, opt);
+export class ServiceLookupEditor<P extends ServiceLookupEditorOptions = ServiceLookupEditorOptions, TItem = any> extends ServiceLookupEditorBase<ServiceLookupEditorOptions, TItem> {
+    constructor(props: EditorProps<P>) {
+        super(props);
     }
 }

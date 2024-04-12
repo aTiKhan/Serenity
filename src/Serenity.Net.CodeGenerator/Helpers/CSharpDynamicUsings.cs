@@ -15,21 +15,18 @@ public class CSharpDynamicUsings
     {
         var scriptObject = new ScriptObject();
 
-        scriptObject.Import("TYPEREF", new TypeDelegate((fullName) =>
-        {
-            return cw.ShortTypeName(cw, fullName);
-        }));
+        scriptObject.Import("TYPEREF", new TypeDelegate(cw.ShortTypeRef));
 
         scriptObject.Import("TYPEREFLIST", new TypeListDelegate((fullNames) =>
         {
             if (fullNames == null)
                 return "";
 
-            HashSet<string> result = new();
+            HashSet<string> result = [];
 
             foreach (var fullName in fullNames)
             {
-                result.Add(cw.ShortTypeName(cw, fullName));
+                result.Add(cw.ShortTypeRef(fullName));
             }
 
             return string.Join(", ", result);
@@ -40,14 +37,30 @@ public class CSharpDynamicUsings
             if (models == null)
                 return "";
 
-            HashSet<string> result = new();
-
-            foreach (var model in models)
+            var sb = new StringBuilder();
+            var lineLength = 0;
+            for (var i = 0; i < models.Count; i++)
             {
-                result.Add(cw.ShortTypeName(cw, model.TypeName) + (string.IsNullOrEmpty(model.Arguments) ? "" : "(" + model.Arguments + ")"));
+                var str = models[i].ToString(cw);
+                if (lineLength == 0 || lineLength + str.Length + 3 < 130)
+                {
+                    if (lineLength > 0)
+                        sb.Append(", ");
+                    sb.Append(str);
+                    lineLength += str.Length;
+                }
+                else
+                {
+                    sb.AppendLine("]");
+                    sb.Append(cw.FileScopedNamespaces ? "    " : "        ");
+                    sb.Append('[');
+                    lineLength = str.Length + 1;
+                    sb.Append(str);
+                }
             }
 
-            return string.Join(", ", result);
+            return sb.ToString();
+            
         }));
 
         scriptObject.Import("USING", new UsingDelegate((requestedNamespace) =>

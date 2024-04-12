@@ -1,18 +1,23 @@
-﻿import { IBooleanValue, IDoubleValue, IGetEditValue, IReadOnly, ISetEditValue, IStringValue, IValidateRequired } from "../../interfaces";
-import { cast, isInstanceOfType, isTrimmedEmpty, parseDecimal, PropertyItem, safeCast, localText, tryGetText } from "@serenity-is/corelib/q";
-import { Widget } from "../widgets/widget";
+﻿import { Fluent, PropertyItem, isArrayLike, isInstanceOfType, localText, parseDecimal, tryGetText } from "../../base";
+import { IBooleanValue, IDoubleValue, IGetEditValue, IReadOnly, ISetEditValue, IStringValue, IValidateRequired } from "../../interfaces";
+import { cast, isTrimmedEmpty, safeCast } from "../../q";
+import { type Widget } from "../widgets/widget";
+import { tryGetWidget } from "../widgets/widgetutils";
+import { Combobox } from "./combobox";
+
 
 export namespace EditorUtils {
+
     export function getDisplayText(editor: Widget<any>): string {
 
-        var select2 = editor.element.data('select2');
+        var combobox = Combobox.getInstance(editor.domNode);
 
-        if (select2 != null) {
-            var data = editor.element.select2('data');
-            if (data == null)
+        if (combobox) {
+            var data = combobox.getSelectedItems();
+            if (!data)
                 return '';
 
-            return data.text ?? '';
+            return data.map(x => x.text).join(", ");
         }
 
         var value = getValue(editor);
@@ -71,8 +76,8 @@ export namespace EditorUtils {
             return;
         }
 
-        if (editor.element.is(':input')) {
-            target[item.name] = editor.element.val();
+        if (Fluent.isInputLike(editor.domNode)) {
+            target[item.name] = editor.domNode.value;
             return;
         }
     }
@@ -135,39 +140,37 @@ export namespace EditorUtils {
             return;
         }
 
-        if (editor.element.is(':input')) {
+        if (Fluent.isInputLike(editor.domNode)) {
             var v = source[item.name];
-            if (v == null) {
-                editor.element.val('');
-            }
-            else {
-                editor.element.val(v);
-            }
+            editor.domNode.value = v ?? '';
             return;
         }
     }
 
-    export function setReadonly(elements: JQuery, isReadOnly: boolean): JQuery {
-        elements.each(function (index, el) {
-            var elx = $(el);
-            var type = elx.attr('type');
-            if (elx.is('select') || type === 'radio' || type === 'checkbox') {
+    export function setReadonly(elements: Element | ArrayLike<Element>, isReadOnly: boolean) {
+        elements = isArrayLike(elements) ? elements : [elements];
+        for (var i = 0; i < elements.length; i++) {
+            let el = elements[i];
+            var type = el.getAttribute('type');
+            if (el.tagName == 'SELECT' || type === 'radio' || type === 'checkbox') {
                 if (isReadOnly) {
-                    elx.addClass('readonly').attr('disabled', 'disabled');
+                    el.classList.add('readonly');
+                    el.setAttribute('disabled', 'disabled');
                 }
                 else {
-                    elx.removeClass('readonly').removeAttr('disabled');
+                    el.classList.remove('readonly');
+                    el.removeAttribute('disabled');
                 }
             }
             else if (isReadOnly) {
-                elx.addClass('readonly').attr('readonly', 'readonly');
+                el.classList.add('readonly');
+                el.setAttribute('readonly', 'readonly');
             }
             else {
-                elx.removeClass('readonly').removeAttr('readonly');
+                el.classList.remove('readonly');
+                el.removeAttribute('readonly');
             }
-            return true;
-        });
-        return elements;
+        }
     }
 
     export function setReadOnly(widget: Widget<any>, isReadOnly: boolean): void {
@@ -177,8 +180,8 @@ export namespace EditorUtils {
         if (readOnly != null) {
             readOnly.set_readOnly(isReadOnly);
         }
-        else if (widget.element.is(':input')) {
-            setReadonly(widget.element, isReadOnly);
+        else if (Fluent.isInputLike(widget.domNode)) {
+            setReadonly(widget.domNode, isReadOnly);
         }
     }
 
@@ -187,62 +190,63 @@ export namespace EditorUtils {
         if (req != null) {
             req.set_required(isRequired);
         }
-        else if (widget.element.is(':input')) {
-            widget.element.toggleClass('required', !!isRequired);
+        else if (Fluent.isInputLike(widget.domNode)) {
+            widget.domNode.classList.toggle('required', !!isRequired);
         }
-        var gridField = widget.element.closest('.field');
-        var hasSupItem = gridField.find('sup').get().length > 0;
-        if (isRequired && !hasSupItem) {
-            $('<sup>*</sup>').attr('title', localText('Controls.PropertyGrid.RequiredHint'))
-                .prependTo(gridField.find('.caption')[0]);
+        var gridField = widget.domNode.closest('.field');
+        var hasSupItem = gridField?.querySelector('sup');
+        if (isRequired && !hasSupItem && gridField) {
+            Fluent("sup").text("*").attr('title', localText('Controls.PropertyGrid.RequiredHint'))
+                .prependTo(gridField.querySelector('.caption'));
         }
         else if (!isRequired && hasSupItem) {
-            $(gridField.find('sup')[0]).remove();
+            Fluent(hasSupItem).remove();
         }
     }
 
-    export function setContainerReadOnly(container: JQuery, readOnly: boolean) {
+    export function setContainerReadOnly(container: ArrayLike<HTMLElement> | HTMLElement, readOnly: boolean) {
 
+        container = isArrayLike(container) ? container[0] : container;
         if (!readOnly) {
 
-            if (!container.hasClass('readonly-container'))
+            if (!container.classList.contains('readonly-container'))
                 return;
 
-            container.removeClass('readonly-container').find(".editor.container-readonly")
-                .removeClass('container-readonly').each((i, e) => {
-                    var w = $(e).tryGetWidget(Widget);
-                    if (w != null)
-                        EditorUtils.setReadOnly(w, false);
-                    else
-                        EditorUtils.setReadonly($(e), false);
-                });
+            container.classList.remove('readonly-container');
+            container.querySelectorAll(".editor.container-readonly").forEach(el => {
+                el.classList.remove('container-readonly');
+                var w = tryGetWidget(el) as any;
+                if (w != null)
+                    EditorUtils.setReadOnly(w, false);
+                else
+                    EditorUtils.setReadonly(el, false);
+            });
 
             return;
         }
 
-        container.addClass('readonly-container').find(".editor")
-            .not('.container-readonly')
-            .each((i, e) => {
-                var w = $(e).tryGetWidget(Widget) as any;
-                if (w != null) {
-
-                    if (w['get_readOnly']) {
-                        if (w['get_readOnly']())
-                            return;
-                    }
-                    else if ($(e).is('[readonly]') || $(e).is('[disabled]') || $(e).is('.readonly') || $(e).is('.disabled'))
+        container.classList.add('readonly-container');
+        container.querySelectorAll(".editor:not(.container-readonly)").forEach((el: HTMLElement) => {
+            var w = tryGetWidget(el) as any;
+            if (w != null) {
+                if (w['get_readOnly']) {
+                    if (w['get_readOnly']())
                         return;
-
-                    $(e).addClass('container-readonly');
-                    EditorUtils.setReadOnly(w, true);
-
                 }
-                else {
-                    if ($(e).is('[readonly]') || $(e).is('[disabled]') || $(e).is('.readonly') || $(e).is('.disabled'))
-                        return;
+                else if (el.matches('[readonly]') || el.matches('[disabled]') || el.matches('.readonly') || el.matches('.disabled'))
+                    return;
 
-                    EditorUtils.setReadonly($(e).addClass('container-readonly'), true);
-                }
-            });
+                el.classList.add('container-readonly');
+                EditorUtils.setReadOnly(w, true);
+
+            }
+            else {
+                if (el.matches('[readonly]') || el.matches('[disabled]') || el.matches('.readonly') || el.matches('.disabled'))
+                    return;
+
+                el.classList.add('container-readonly');
+                EditorUtils.setReadonly(el, true);
+            }
+        });
     }
 }

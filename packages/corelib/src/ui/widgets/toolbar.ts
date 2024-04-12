@@ -1,15 +1,14 @@
-﻿import { Decorators } from "../../decorators";
-import { htmlEncode, isEmptyOrNull, startsWith } from "@serenity-is/corelib/q";
+﻿import { Fluent, IconClassName, iconClassName } from "../../base";
+import { Decorators } from "../../types/decorators";
 import { Widget } from "./widget";
 
-export interface ToolButton {
+export interface ToolButtonProps {
     action?: string;
     title?: string;
     hint?: string;
     cssClass?: string;
-    icon?: string;
+    icon?: IconClassName;
     onClick?: any;
-    htmlEncode?: any;
     hotkey?: string;
     hotkeyAllowDefault?: boolean;
     hotkeyContext?: any;
@@ -18,65 +17,65 @@ export interface ToolButton {
     disabled?: boolean | (() => boolean);
 }
 
-export interface PopupMenuButtonOptions {
-    menu?: JQuery;
-    onPopup?: () => void;
-    positionMy?: string;
-    positionAt?: string;
+
+export interface ToolButton extends ToolButtonProps {
+    hotkey?: string;
+    hotkeyAllowDefault?: boolean;
+    hotkeyContext?: any;
+    separator?: (false | true | 'left' | 'right' | 'both');
 }
 
-@Decorators.registerEditor('Serenity.PopupMenuButton')
-export class PopupMenuButton extends Widget<PopupMenuButtonOptions> {
-    constructor(div: JQuery, opt: PopupMenuButtonOptions) {
-        super(div, opt);
+export function ToolbarButton(tb: ToolButtonProps): HTMLElement {
+    var cssClass = tb.cssClass ?? '';
 
-        div.addClass('s-PopupMenuButton');
-        div.click(e => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (this.options.onPopup != null) {
-                this.options.onPopup();
-            }
+    let span = Fluent("span").class("button-inner");
+    let btn = Fluent("div")
+        .class("tool-button")
+        .append(span);
 
-            var menu = this.options.menu;
-            (menu.show() as any).position?.({
-                my: this.options.positionMy ?? 'left top',
-                at: this.options.positionAt ?? 'left bottom',
-                of: this.element
-            });
+    if (tb.action != null)
+        btn.attr('data-action', tb.action);
 
-            var uq = this.uniqueName;
-            $(document).one('click.' + uq, function (x) {
-                menu.hide();
-            });
+    if (cssClass.length > 0)
+        btn.addClass(cssClass);
+
+    if (tb.hint)
+        btn.attr('title', tb.hint);
+
+    btn.on("click", e => {
+        if (btn.hasClass('disabled'))
+            return;
+        tb.onClick(e);
+    });
+
+    if (tb.icon) {
+        btn.addClass('icon-tool-button');
+        span.append(Fluent("i").class(iconClassName(tb.icon)));
+        tb.title && span.append(" ").append(tb.title);
+    }
+    else if (tb.title)
+        span.append(tb.title);
+    
+    if (!tb.title)
+        btn.addClass('no-text');
+
+    if (tb.visible === false)
+        btn.getNode().style.display = "none";
+
+    if (tb.disabled != null && typeof tb.disabled !== "function")
+        btn.toggleClass('disabled', !!tb.disabled);
+
+    if (typeof tb.visible === "function" || typeof tb.disabled == "function") {
+        btn.on('updateInterface', () => {
+            if (typeof tb.visible === "function")
+                btn.toggle(tb.visible());
+
+            if (typeof tb.disabled === "function")
+                btn.toggleClass("disabled", !!tb.disabled());
         });
-
-        (this.options.menu.hide().appendTo(document.body)
-            .addClass('s-PopupMenu') as any).menu?.();
     }
 
-    destroy() {
-        if (this.options.menu != null) { 
-            this.options.menu.remove();
-            this.options.menu = null;
-        }
-
-        super.destroy();
-    }
-}
-
-
-export interface PopupToolButtonOptions extends PopupMenuButtonOptions {
-}
-
-@Decorators.registerEditor('Serenity.PopupToolButton')
-export class PopupToolButton extends PopupMenuButton {
-    constructor(div: JQuery, opt: PopupToolButtonOptions) {
-        super(div, opt);
-
-        div.addClass('s-PopupToolButton');
-        $('<b/>').appendTo(div.children('.button-outer').children('span'));
-    }
+    return btn.getNode();
 }
 
 export interface ToolbarOptions {
@@ -85,19 +84,35 @@ export interface ToolbarOptions {
 }
 
 @Decorators.registerClass('Serenity.Toolbar')
-export class Toolbar extends Widget<ToolbarOptions> {
-    constructor(div: JQuery, options: ToolbarOptions) {
-        super(div, options);
+export class Toolbar<P extends ToolbarOptions = ToolbarOptions> extends Widget<P> {
 
-        this.element.addClass('s-Toolbar clearfix')
-            .html('<div class="tool-buttons"><div class="buttons-outer">' +
-                '<div class="buttons-inner"></div></div></div>');
+    protected renderContents() {
 
-        this.createButtons();
+        let group = Fluent("div").class("tool-group");
+
+        this.element
+            .addClass("s-Toolbar clearfix")
+            .append(group);
+
+        var buttons = this.options.buttons || [];
+        var currentCount = 0;
+        for (var i = 0; i < buttons.length; i++) {
+            var button = buttons[i];
+            if (button.separator && currentCount > 0) {
+                group = Fluent("div")
+                    .class("tool-group")
+                    .appendTo(group.parent());
+                currentCount = 0;
+            }
+            this.createButton(group, button);
+            currentCount++;
+        }
+
+        return group.getNode();
     }
 
     destroy() {
-        this.element.find('div.tool-button').unbind('click');
+        this.domNode.querySelectorAll('div.tool-button').forEach(el => Fluent.off(el, 'click'));
         if (this.mouseTrap) {
             if (!!this.mouseTrap.destroy) {
                 this.mouseTrap.destroy();
@@ -113,112 +128,39 @@ export class Toolbar extends Widget<ToolbarOptions> {
 
     protected mouseTrap: any;
 
-    protected createButtons() {
-        var container: JQuery = $('div.buttons-inner', this.element).last();
-        var buttons = this.options.buttons;
-        var currentCount = 0;
-        for (var i = 0; i < buttons.length; i++) {
-            var button = buttons[i];
-            if (button.separator && currentCount > 0) {
-                container = $('<div class="buttons-inner"></div>').appendTo(container.parent());
-                currentCount = 0;
-            }
-            this.createButton(container, button);
-            currentCount++;
-        }
-    }
+    createButton(container: Fluent, tb: ToolButton) {
 
-    protected createButton(container: JQuery, b: ToolButton) {
-        var cssClass = b.cssClass ?? '';
-
-        var btn = $('<div class="tool-button"><div class="button-outer">' +
-            '<span class="button-inner"></span></div></div>')
-            .appendTo(container);
-
-        if (b.action != null)
-            btn.attr('data-action', b.action);
-
-        if (b.separator === 'right' || b.separator === 'both') {
-            $('<div class="separator"></div>').appendTo(container);
+        if (tb.separator === 'right' || tb.separator === 'both') {
+            container.append(Fluent("div").class("separator"));
         }
 
-        if (cssClass.length > 0) {
-            btn.addClass(cssClass);
-        }
+        let button = ToolbarButton(tb);
+        container.append(button);
 
-        if (!isEmptyOrNull(b.hint)) {
-            btn.attr('title', b.hint);
-        }
-
-        btn.click(function (e) {
-            if (btn.hasClass('disabled')) {
-                return;
-            }
-            b.onClick(e);
-        });
-
-        var text = b.title;
-        if (b.htmlEncode !== false) {
-            text = htmlEncode(b.title);
-        }
-
-        if (!isEmptyOrNull(b.icon)) {
-            btn.addClass('icon-tool-button');
-            var klass = b.icon;
-            if (startsWith(klass, 'fa-')) {
-                klass = 'fa ' + klass;
-            }
-            else if (startsWith(klass, 'glyphicon-')) {
-                klass = 'glyphicon ' + klass;
-            }
-            text = "<i class='" + htmlEncode(klass) + "'></i> " + text;
-        }
-        if (text == null || text.length === 0) {
-            btn.addClass('no-text');
-        }
-        else {
-            btn.find('span').html(text);
-        }
-
-        if (b.visible === false)
-            btn.hide();
-
-        if (b.disabled != null && typeof b.disabled !== "function")
-            btn.toggleClass('disabled', !!b.disabled);
-
-        if (typeof b.visible === "function" || typeof b.disabled == "function") {
-            btn.on('updateInterface', () => {
-                if (typeof b.visible === "function")
-                    btn.toggle(!!b.visible());
-
-                if (typeof b.disabled === "function")
-                    btn.toggleClass("disabled", !!b.disabled());
-            });
-        }
-
-        if (!!(!isEmptyOrNull(b.hotkey) && window['Mousetrap' as any] != null)) {
+        if (tb.hotkey && window['Mousetrap' as any] != null) {
             this.mouseTrap = this.mouseTrap || (window['Mousetrap' as any] as any)(
-                b.hotkeyContext || this.options.hotkeyContext || window.document.documentElement);
+                tb.hotkeyContext || this.options.hotkeyContext || window.document.documentElement);
 
-            this.mouseTrap.bind(b.hotkey, function (e1: BaseJQueryEventObject, action: any) {
-                if (btn.is(':visible')) {
-                    btn.triggerHandler('click');
+            this.mouseTrap.bind(tb.hotkey, function () {
+                if (button.style.display != "none") {
+                    Fluent.trigger(button, "click");
                 }
-                return b.hotkeyAllowDefault;
+                return tb.hotkeyAllowDefault;
             });
         }
     }
 
-    findButton(className: string): JQuery {
-        if (className != null && startsWith(className, '.')) {
-            className = className.substr(1);
+    findButton(className: string) {
+        if (className != null && className.startsWith('.')) {
+            className = className.substring(1);
         }
-        return $('div.tool-button.' + className, this.element);
+
+        return Fluent(this.domNode.querySelector<HTMLElement>('div.tool-button.' + className));
     }
 
     updateInterface() {
-        this.element.find('.tool-button').each(function (i: number, el: Element) {
-            $(el).triggerHandler('updateInterface')
+        this.domNode.querySelectorAll('.tool-button').forEach(function (el: Element) {
+            Fluent.trigger(el, 'updateInterface', { bubbles: false });
         });
     }
 }

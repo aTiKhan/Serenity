@@ -1,4 +1,4 @@
-﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
@@ -262,14 +262,12 @@ public partial class FileUploadBehaviorTests
         };
 
         Assert.NotEmpty(mockFileSystem.AllFiles);
-        Assert.Collection(mockFileSystem.AllFiles.Select(mockFileSystem.GetFileName),
-            x1 => Assert.Equal("new.jpg", x1));
+        Assert.Equal("new.jpg", Assert.Single(mockFileSystem.AllFiles.Select(mockFileSystem.GetFileName)));
 
         sut.OnBeforeSave(requestHandler);
         uow.Commit();
 
-        Assert.Collection(mockFileSystem.AllFiles.Select(mockFileSystem.GetFileName),
-            x1 => Assert.Equal("new.jpg", x1));
+        Assert.Equal("new.jpg", Assert.Single(mockFileSystem.AllFiles.Select(mockFileSystem.GetFileName)));
     }
 
     [Fact]
@@ -305,8 +303,7 @@ public partial class FileUploadBehaviorTests
         };
 
         Assert.NotEmpty(mockFileSystem.AllFiles);
-        Assert.Collection(mockFileSystem.AllFiles.Select(mockFileSystem.GetFileName),
-            x1 => Assert.Equal("old.jpg", x1));
+        Assert.Equal("old.jpg", Assert.Single(mockFileSystem.AllFiles.Select(mockFileSystem.GetFileName)));
 
         sut.OnBeforeSave(requestHandler);
         uow.Commit();
@@ -1124,7 +1121,10 @@ public partial class FileUploadBehaviorTests
         Assert.Equal("x/a/b/c/d/y.jpg", processResult);
     }
 
-    private string TestProcessReplaceFields(string fileNameFormat, IDictionary<string, object> foreignFieldQueryResults = null, TestIIdRow  row = null, bool? isUpdate = null,
+    private static string TestProcessReplaceFields(string fileNameFormat, 
+        Dictionary<string, object> foreignFieldQueryResults = null, 
+        TestIIdRow row = null, 
+        bool? isUpdate = null,
         IFilenameFormatSanitizer sanitizer = null)
     {
         isUpdate ??= foreignFieldQueryResults == null;

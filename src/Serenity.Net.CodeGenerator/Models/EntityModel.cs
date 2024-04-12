@@ -1,4 +1,4 @@
-﻿namespace Serenity.CodeGenerator;
+namespace Serenity.CodeGenerator;
 
 public class EntityModel
 {
@@ -11,23 +11,25 @@ public class EntityModel
     public string Schema { get; set; }
     public string Tablename { get; set; }
     public string Title { get; set; }
-    public string Identity { get; set; }
+    public string IdField { get; set; }
     public string RowBaseClass { get; set; } = "Serenity.Data.Row";
-    public List<EntityField> RowBaseFields { get; } = new();
+    public List<EntityField> RowBaseFields { get; } = [];
     public string FieldsBaseClass { get; set; } = "Serenity.Data.RowFieldsBase";
-    public bool IsLookup { get; set; }
-    public List<EntityField> Fields { get; } = new();
-    public List<EntityJoin> Joins { get; } = new();
+    public string ServiceLookupPermission { get; set; }
+    public List<EntityField> Fields { get; } = [];
+    public List<EntityJoin> Joins { get; } = [];
     public string NameField { get; set; }
     public string FieldPrefix { get; set; }
     public bool AspNetCore { get; set; } = true;
     public bool NET5Plus { get; set; } = true;
     public bool DeclareJoinConstants { get; set; }
+    public bool EnableGenerateFields { get; set; }
     public bool EnableRowTemplates { get; set; }
     public bool FileScopedNamespaces { get; set; }
-    public HashSet<string> GlobalUsings { get; } = new();
+    public bool GenerateListExcel { get; set; }
+    public HashSet<string> GlobalUsings { get; } = [];
 
-    public string IdField => Identity;
+    public string Identity => IdField;
     public Dictionary<string, object> CustomSettings { get; set; }
 
     public IEnumerable<EntityField> FormFields => Fields.Where(f => !f.OmitInForm);
@@ -99,7 +101,7 @@ public class EntityModel
     public string ViewPageModulePath => "@/" + Module + "/" + ClassName + "/" + ClassName + "Page";
     public string ServiceClassName => ClassName + "Service";
     public string ServiceBaseUrl => ModuleSlash + ClassName;
-    public string EntityPluralTextKey => "Db" + DotModule + ClassName + ".EntityPlural";
+    public string EntityPluralTextKey => "Db" + DotModule + "." + ClassName + ".EntityPlural";
 
     public IEnumerable<EntityField> AllFields => Fields.Concat(JoinFields);
     public IEnumerable<EntityField> JoinFields => Joins.SelectMany(x => x.Fields);
@@ -111,7 +113,7 @@ public class EntityModel
 
     public string SchemaAndTable
     {
-        get { return string.IsNullOrEmpty(Schema)? Tablename : "[" + Schema + "].[" + Tablename + "]"; }
+        get { return string.IsNullOrEmpty(Schema) ? Tablename : "[" + Schema + "].[" + Tablename + "]"; }
     }
 
     public string RowBaseClassAndInterfaces
@@ -139,7 +141,7 @@ public class EntityModel
         {
             var result = new List<string> { RowBaseClass ?? "Serenity.Data.Row" };
 
-            if (!string.IsNullOrEmpty(Identity))
+            if (!string.IsNullOrEmpty(IdField))
                 result.Add("Serenity.Data.IIdRow");
             if (!string.IsNullOrEmpty(NameField))
                 result.Add("Serenity.Data.INameRow");

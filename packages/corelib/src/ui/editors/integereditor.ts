@@ -1,7 +1,9 @@
-﻿import { Decorators } from "../../decorators";
+import { Fluent, formatNumber, parseInteger } from "../../base";
 import { IDoubleValue } from "../../interfaces";
-import { extend, formatNumber, isTrimmedEmpty, parseInteger, trimToNull } from "@serenity-is/corelib/q";
-import { Widget } from "../widgets/widget";
+import { isTrimmedEmpty } from "../../q";
+import { Decorators } from "../../types/decorators";
+import { EditorProps, EditorWidget } from "../widgets/widget";
+import { AutoNumeric } from "./autonumeric";
 import { DecimalEditor } from "./decimaleditor";
 
 export interface IntegerEditorOptions {
@@ -11,39 +13,52 @@ export interface IntegerEditorOptions {
 }
 
 @Decorators.registerEditor('Serenity.IntegerEditor', [IDoubleValue])
-@Decorators.element('<input type="text"/>')
-export class IntegerEditor extends Widget<IntegerEditorOptions> implements IDoubleValue {
+export class IntegerEditor<P extends IntegerEditorOptions = IntegerEditorOptions> extends EditorWidget<P> implements IDoubleValue {
 
-    constructor(input: JQuery, opt?: IntegerEditorOptions) {
-        super(input, opt);
+    static override createDefaultElement() { return Fluent("input").attr("type", "text").getNode(); }
+    declare readonly domNode: HTMLInputElement;
 
-        input.addClass('integerQ');
-        var numericOptions = extend(DecimalEditor.defaultAutoNumericOptions(),
-            {
-                vMin: (this.options.minValue ?? this.options.allowNegatives ? (this.options.maxValue != null ? ("-" + this.options.maxValue) : '-2147483647') : '0'),
-                vMax: (this.options.maxValue ?? 2147483647),
-                aSep: null
-            });
+    constructor(props: EditorProps<P>) {
+        super(props);
 
-        if (($.fn as any).autoNumeric)
-            (input as any).autoNumeric(numericOptions);
+        this.domNode.classList.add('integerQ');
+        this.initAutoNumeric();
+    }
+
+    destroy() {
+        AutoNumeric.destroy(this.domNode);
+        super.destroy();
+    }
+
+    protected initAutoNumeric() {
+        AutoNumeric.init(this.domNode, this.getAutoNumericOptions());
+    }
+
+    protected getAutoNumericOptions(): any {
+        var numericOptions = Object.assign({}, DecimalEditor.defaultAutoNumericOptions(), {
+            vMin: this.options.minValue ?? (this.options.allowNegatives ? (this.options.maxValue != null ? ("-" + this.options.maxValue) : '-2147483647') : '0'),
+            vMax: this.options.maxValue ?? 2147483647,
+            aSep: null
+        });
+
+        return numericOptions;
     }
 
     get_value(): number {
-        if (($.fn as any).autoNumeric) {
-            var val = (this.element as any).autoNumeric('get') as string;
-            if (!!isTrimmedEmpty(val))
+        var val: string;
+        if (AutoNumeric.hasInstance(this.domNode)) {
+            val = AutoNumeric.getValue(this.domNode);
+            if (isTrimmedEmpty(val))
                 return null;
-            else 
+            else
                 return parseInt(val, 10);
-        } 
+        }
         else {
-            var val = trimToNull(this.element.val());
-            if (val == null)
+            val = this.domNode.value?.trim();
+            if (!val)
                 return null;
             return parseInteger(val)
         }
-
     }
 
     get value(): number {
@@ -52,11 +67,11 @@ export class IntegerEditor extends Widget<IntegerEditorOptions> implements IDoub
 
     set_value(value: number) {
         if (value == null || (value as any) === '')
-            this.element.val('');
-        else if (($.fn as any).autoNumeric)
-            (this.element as any).autoNumeric('set', value);
+            this.domNode.value = '';
+        else if (AutoNumeric.hasInstance(this.domNode))
+            AutoNumeric.setValue(this.domNode, value);
         else
-            this.element.val(formatNumber(value));
+            this.domNode.value = formatNumber(value);
     }
 
     set value(v: number) {

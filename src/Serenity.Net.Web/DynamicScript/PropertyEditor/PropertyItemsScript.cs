@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Serenity.PropertyGrid;
 
 namespace Serenity.Web;
@@ -6,31 +6,22 @@ namespace Serenity.Web;
 /// <summary>
 /// Abstract base class for <see cref="ColumnsScript"/> and <see cref="FormScript"/>
 /// </summary>
-public abstract class PropertyItemsScript : INamedDynamicScript, IGetScriptData
+/// <remarks>
+/// Creates a new instance of the class
+/// </remarks>
+/// <param name="scriptName">Script name</param>
+/// <param name="type">Columns or form type</param>
+/// <param name="propertyProvider">Property item provider</param>
+/// <param name="serviceProvider">Service provider</param>
+public abstract partial class PropertyItemsScript(string scriptName, Type type,
+    IPropertyItemProvider propertyProvider, IServiceProvider serviceProvider) : INamedDynamicScript, IGetScriptData
 {
-    private readonly string scriptName;
-    private readonly Type type;
-    private readonly IServiceProvider serviceProvider;
-    private readonly IPropertyItemProvider propertyProvider;
-    private EventHandler scriptChanged;
-
-    /// <summary>
-    /// Creates a new instance of the class
-    /// </summary>
-    /// <param name="scriptName">Script name</param>
-    /// <param name="type">Columns or form type</param>
-    /// <param name="propertyProvider">Property item provider</param>
-    /// <param name="serviceProvider">Service provider</param>
-    protected PropertyItemsScript(string scriptName, Type type, 
-        IPropertyItemProvider propertyProvider, IServiceProvider serviceProvider)
-    {
-        this.type = type ?? throw new ArgumentNullException(nameof(type));
-        this.serviceProvider = serviceProvider ?? 
+    private readonly Type type = type ?? throw new ArgumentNullException(nameof(type));
+    private readonly IServiceProvider serviceProvider = serviceProvider ??
             throw new ArgumentNullException(nameof(serviceProvider));
-        this.propertyProvider = propertyProvider ?? 
+    private readonly IPropertyItemProvider propertyProvider = propertyProvider ??
             throw new ArgumentNullException(nameof(PropertyItemsScript.propertyProvider));
-        this.scriptName = scriptName;
-    }
+    private EventHandler scriptChanged;
 
     /// <summary>
     /// Checks the name if its empty or null
@@ -40,7 +31,7 @@ public abstract class PropertyItemsScript : INamedDynamicScript, IGetScriptData
     /// <exception cref="ArgumentNullException"></exception>
     protected static string CheckName(string name)
     {
-        if (name.IsEmptyOrNull())
+        if (string.IsNullOrEmpty(name))
             throw new ArgumentNullException(nameof(name));
 
         return name;
@@ -70,8 +61,9 @@ public abstract class PropertyItemsScript : INamedDynamicScript, IGetScriptData
     public string GetScript()
     {
         var data = GetScriptData();
-        return string.Format(CultureInfo.InvariantCulture, "Q.ScriptData.set({0}, {1});", 
-            scriptName.ToSingleQuoted(), data.ToJson());
+        return string.Format(CultureInfo.InvariantCulture, DataScript.SetScriptDataFormat,
+            scriptName.ToSingleQuoted(),
+            JSON.Stringify(data, writeNulls: false));
     }
 
     /// <inheritdoc/>
@@ -80,7 +72,7 @@ public abstract class PropertyItemsScript : INamedDynamicScript, IGetScriptData
         var data = new PropertyItemsData
         {
             Items = propertyProvider.GetPropertyItemsFor(type).ToList(),
-            AdditionalItems = new()
+            AdditionalItems = []
         };
 
         if (typeof(ICustomizePropertyItems).IsAssignableFrom(type))

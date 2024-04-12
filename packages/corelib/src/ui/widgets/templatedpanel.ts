@@ -1,23 +1,24 @@
-﻿import { validateOptions } from "@serenity-is/corelib/q";
-import { Decorators } from "../../decorators";
+﻿import { Fluent, Validator } from "../../base";
+import { validateOptions } from "../../q";
+import { Decorators } from "../../types/decorators";
+import { TabsExtensions } from "../helpers/tabsextensions";
 import { TemplatedWidget } from "./templatedwidget";
-import { Toolbar, ToolButton } from "./toolbar";
+import { ToolButton, Toolbar } from "./toolbar";
+import { WidgetProps } from "./widget";
 
 @Decorators.registerClass("Serenity.TemplatedPanel")
-export class TemplatedPanel<TOptions> extends TemplatedWidget<TOptions> {
-    constructor(container: JQuery, options?: TOptions) {
-        super(container, options);
-
+export class TemplatedPanel<P={}> extends TemplatedWidget<P> {
+    constructor(props: WidgetProps<P>) {
+        super(props);
+        
         this.initValidator();
         this.initTabs();
         this.initToolbar();
     }
 
     destroy() {
-        if (this.tabs) {
-            (this.tabs as any).tabs?.('destroy');
-            this.tabs = null;
-        }
+        TabsExtensions.destroy(this.tabs);
+        this.tabs = null;
 
         if (this.toolbar) {
             this.toolbar.destroy();
@@ -25,22 +26,25 @@ export class TemplatedPanel<TOptions> extends TemplatedWidget<TOptions> {
         }
 
         if (this.validator) {
-            this.byId('Form').remove();
+            this.validator.destroy();
+            let form = this.findById('Form');
+            if (form)
+                Fluent.remove(form);
             this.validator = null;
         }
 
         super.destroy();
     }
 
-    protected tabs: JQuery;
+    protected tabs: Fluent;
     protected toolbar: Toolbar;
-    protected validator: JQueryValidation.Validator;
+    protected validator: Validator;
     protected isPanel: boolean;
     protected responsive: boolean;
 
     public arrange(): void {
-        this.element.find('.require-layout').filter(':visible').each(function (i, e) {
-            $(e).triggerHandler('layout');
+        this.element.findAll('.require-layout').forEach(el => {
+            Fluent.isVisibleLike(el) && Fluent.trigger(el, "layout");
         });
     }
 
@@ -48,38 +52,35 @@ export class TemplatedPanel<TOptions> extends TemplatedWidget<TOptions> {
         return [];
     }
 
-    protected getValidatorOptions(): JQueryValidation.ValidationOptions {
+    protected getValidatorOptions(): any {
         return {};
     }
 
     protected initTabs(): void {
-        var tabsDiv = this.byId('Tabs');
-        if (tabsDiv.length === 0) {
+        var tabsDiv = this.findById('Tabs');
+        if (!tabsDiv)
             return;
-        }
-        this.tabs = (tabsDiv as any).tabs?.({});
+        this.tabs = TabsExtensions.initialize(tabsDiv, null);
     }
 
     protected initToolbar(): void {
-        var toolbarDiv = this.byId('Toolbar');
-        if (toolbarDiv.length === 0) {
+        var toolbarDiv = this.findById('Toolbar');
+        if (!toolbarDiv)
             return;
-        }
-        var opt = { buttons: this.getToolbarButtons() };
-        this.toolbar = new Toolbar(toolbarDiv, opt);
+        this.toolbar = new Toolbar({ buttons: this.getToolbarButtons(), element: toolbarDiv });
     }
 
     protected initValidator(): void {
-        var form = this.byId('Form');
-        if (form.length > 0) {
+        var form = this.findById<HTMLFormElement>('Form');
+        if (form) {
             var valOptions = this.getValidatorOptions();
-            this.validator = form.validate(validateOptions(valOptions));
+            this.validator = new Validator(form, validateOptions(valOptions));
         }
     }
 
     protected resetValidation(): void {
         if (this.validator) {
-            (this.validator as any).resetAll();
+            this.validator.resetAll();
         }
     }
 

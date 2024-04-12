@@ -1,74 +1,80 @@
-﻿import { Decorators } from "../../decorators";
-import { cast, isEmptyOrNull, PropertyItem, localText, tryGetText } from "@serenity-is/corelib/q";
-import { Select2Editor } from "../editors/select2editor";
+﻿import { Fluent, PropertyItem, localText, tryGetText } from "../../base";
+import { Decorators } from "../../types/decorators";
+import { Combobox } from "../editors/combobox";
+import { ComboboxEditor } from "../editors/comboboxeditor";
 import { ReflectionOptionsSetter } from "../widgets/reflectionoptionssetter";
+import { WidgetProps, getWidgetFrom } from "../widgets/widget";
 import { FilteringTypeRegistry, IFiltering } from "./filtering";
 import { FilterLine } from "./filterline";
 import { FilterOperator } from "./filteroperator";
 import { FilterWidgetBase } from "./filterwidgetbase";
 
-@Decorators.registerClass('Serenity.FilterFieldSelect')
-class FilterFieldSelect extends Select2Editor<any, PropertyItem> {
-    constructor(hidden: JQuery, fields: PropertyItem[]) {
-        super(hidden);
+export interface FilterFieldSelectOptions {
+    fields: PropertyItem[];
+}
 
-        for (var field of fields) {
+@Decorators.registerClass('Serenity.FilterFieldSelect')
+class FilterFieldSelect<P extends FilterFieldSelectOptions = FilterFieldSelectOptions> extends ComboboxEditor<P, PropertyItem> {
+    constructor(props: WidgetProps<P>) {
+        super(props);
+
+        for (var field of this.options.fields) {
             this.addOption(field.name, (tryGetText(field.title) ??
                 field.title ?? field.name), field);
         }
     }
 
     emptyItemText() {
-        if (isEmptyOrNull(this.value)) {
+        if (!this.value) {
             return localText('Controls.FilterPanel.SelectField');
         }
 
         return null;
     }
 
-    getSelect2Options() {
-        var opt = super.getSelect2Options();
+    getComboboxOptions() {
+        var opt = super.getComboboxOptions();
         opt.allowClear = false;
         return opt;
     }
 }
 
 @Decorators.registerClass('Serenity.FilterOperatorSelect')
-class FilterOperatorSelect extends Select2Editor<any, FilterOperator> {
-    constructor(hidden: JQuery, source: FilterOperator[]) {
-        super(hidden);
+class FilterOperatorSelect extends ComboboxEditor<any, FilterOperator> {
+    constructor(props: WidgetProps<{ source: FilterOperator[] }>) {
+        super(props);
 
-        for (var op of source) {
+        for (var op of this.options.source) {
             var title = (op.title ?? (
                 tryGetText("Controls.FilterPanel.OperatorNames." + op.key) ?? op.key));
             this.addOption(op.key, title, op);
         }
 
-        if (source.length && source[0])
-            this.value = source[0].key;
+        if (this.options.source.length && this.options.source[0])
+            this.value = this.options.source[0].key;
     }
 
     emptyItemText(): string {
         return null;
     }
 
-    getSelect2Options() {
-        var opt = super.getSelect2Options();
+    getComboboxOptions() {
+        var opt = super.getComboboxOptions();
         opt.allowClear = false;
         return opt;
     }
 }
 
 @Decorators.registerClass("Serenity.FilterPanel")
-export class FilterPanel extends FilterWidgetBase<any> {
+export class FilterPanel<P = {}> extends FilterWidgetBase<P> {
 
-    private rowsDiv: JQuery;
+    private rowsDiv: HTMLElement;
 
-    constructor(div: JQuery) {
-        super(div);
+    constructor(props: WidgetProps<P>) {
+        super(props);
 
-        this.element.addClass('s-FilterPanel');
-        this.rowsDiv = this.byId('Rows');
+        this.domNode.classList.add("s-FilterPanel'")
+        this.rowsDiv = this.findById('Rows');
         this.initButtons();
         this.updateButtons();
     }
@@ -82,7 +88,7 @@ export class FilterPanel extends FilterWidgetBase<any> {
     set_showInitialLine(value: boolean) {
         if (this.showInitialLine !== value) {
             this.showInitialLine = value;
-            if (this.showInitialLine && this.rowsDiv.children().length === 0) {
+            if (this.showInitialLine && !this.rowsDiv.lastElementChild) {
                 this.addEmptyRow(false);
             }
         }
@@ -94,40 +100,39 @@ export class FilterPanel extends FilterWidgetBase<any> {
     }
 
     updateRowsFromStore() {
-        this.rowsDiv.empty();
+        Fluent(this.rowsDiv).empty();
 
         var items = this.get_store().get_items();
         for (var item of items) {
             this.addEmptyRow(false);
 
-            var row = this.rowsDiv.children().last();
+            var rowDiv = this.rowsDiv.lastElementChild as HTMLElement;
 
-            var divl = row.children('div.l');
-            divl.children('.leftparen').toggleClass('active', !!item.leftParen);
-            divl.children('.rightparen').toggleClass('active', !!item.rightParen);
-            divl.children('.andor').toggleClass('or', !!item.isOr)
-                .text(localText((!!item.isOr ? 'Controls.FilterPanel.Or' :
-                    'Controls.FilterPanel.And')));
+            var divl = rowDiv.querySelector("div.l");
+            divl.querySelector('.leftparen').classList.toggle('active', !!item.leftParen);
+            divl.querySelector('.rightparen').classList.toggle('active', !!item.rightParen);
+            var andor = divl.querySelector('.andor');
+            andor.classList.toggle('or', !!item.isOr);
+            andor.textContent = localText((!!item.isOr ? 'Controls.FilterPanel.Or' :
+                'Controls.FilterPanel.And'));
 
-            var fieldSelect = row.children('div.f')
-                .find('input.field-select').getWidget(FilterFieldSelect);
+            var fieldSelect = getWidgetFrom(rowDiv.querySelector('div.f input.field-select'), FilterFieldSelect);
 
             fieldSelect.value = item.field;
-            this.rowFieldChange(row);
-            var operatorSelect = row.children('div.o')
-                .find('input.op-select').getWidget(FilterOperatorSelect);
+            this.rowFieldChange(rowDiv);
+            var operatorSelect = getWidgetFrom(rowDiv.querySelector(':scope div.o > input.op-select'), FilterOperatorSelect);
 
             operatorSelect.set_value(item.operator);
-            this.rowOperatorChange(row);
+            this.rowOperatorChange(rowDiv);
 
-            var filtering = this.getFilteringFor(row);
+            var filtering = this.getFilteringFor(rowDiv);
             if (filtering != null) {
                 filtering.set_operator({ key: item.operator });
                 filtering.loadState(item.state);
             }
         }
 
-        if (this.get_showInitialLine() && this.rowsDiv.children().length === 0) {
+        if (this.get_showInitialLine() && !this.rowsDiv.childElementCount) {
             this.addEmptyRow(false);
         }
 
@@ -173,42 +178,38 @@ export class FilterPanel extends FilterWidgetBase<any> {
 
     protected initButtons(): void {
         this.byId('AddButton').text(localText('Controls.FilterPanel.AddFilter'))
-            .click((e) => this.addButtonClick(e));
+            .on("click", (e) => this.addButtonClick(e as any));
 
         this.byId('SearchButton').text(localText('Controls.FilterPanel.SearchButton'))
-            .click((e) => this.searchButtonClick(e));
+            .on("click", (e) => this.searchButtonClick(e as any));
 
         this.byId('ResetButton').text(localText('Controls.FilterPanel.ResetButton'))
-            .click((e) => this.resetButtonClick(e));
+            .on("click", (e) => this.resetButtonClick(e as any));
     }
 
-    protected searchButtonClick(e: JQueryEventObject) {
+    protected searchButtonClick(e: Event) {
         e.preventDefault();
         this.search();
     }
 
     get_hasErrors(): boolean {
-        return this.rowsDiv.children().children('div.v')
-            .children('span.error').length > 0;
+        return !!this.rowsDiv.querySelector(":scope > div.v > span.error");
     }
 
     search() {
-        this.rowsDiv.children().children('div.v')
-            .children('span.error').remove();
+        this.rowsDiv.querySelectorAll(":scope > div.v > span.error").forEach(x => x.remove());
 
         var filterLines = [];
         var errorText = null;
-        var row = null;
-        for (var i = 0; i < this.rowsDiv.children().length; i++) {
-            row = this.rowsDiv.children().eq(i);
+        for (var i = 0; i < this.rowsDiv.children.length; i++) {
+            var row = this.rowsDiv.children[i] as HTMLElement;
             var filtering = this.getFilteringFor(row);
             if (filtering == null) {
                 continue;
             }
 
             var field = this.getFieldFor(row);
-            var op = row.children('div.o').find('input.op-select')
-                .getWidget(FilterOperatorSelect).value;
+            var op = getWidgetFrom(row.querySelector('div.o input.op-select'), FilterOperatorSelect).value;
 
             if (op == null || op.length === 0) {
                 errorText = localText('Controls.FilterPanel.InvalidOperator');
@@ -218,14 +219,19 @@ export class FilterPanel extends FilterWidgetBase<any> {
             var line: FilterLine = {};
             line.field = field.name;
             line.operator = op;
-            line.isOr = row.children('div.l')
-                .children('a.andor').hasClass('or');
-            line.leftParen = row.children('div.l')
-                .children('a.leftparen').hasClass('active');
-            line.rightParen = row.children('div.l')
-                .children('a.rightparen').hasClass('active');
+            var divL = row.querySelector("div.l");
+            line.isOr = !!divL.querySelector('a.andor.or');
+            line.leftParen = !!row.querySelector('div.l a.leftparen.active');
+            line.rightParen = !!row.querySelector('div.l a.rightparen.active');
             filtering.set_operator({ key: op });
-            var criteria = filtering.getCriteria();
+            var criteria;
+            try {
+                criteria = filtering.getCriteria();
+            }
+            catch (ex) {
+                errorText = ex.message ?? ex.toString();
+                break;
+            }
             line.criteria = criteria.criteria;
             line.state = filtering.saveState();
             line.displayText = criteria.displayText;
@@ -234,9 +240,9 @@ export class FilterPanel extends FilterWidgetBase<any> {
 
         // if an error occurred, display it, otherwise set current filters
         if (errorText != null) {
-            $('<span/>').addClass('error')
-                .attr('title', errorText).appendTo(row.children('div.v'));
-            row.children('div.v').find('input:first').focus();
+            Fluent("span").class('error')
+                .attr('title', errorText).appendTo(row.querySelector<HTMLElement>('div.v'));
+            row.querySelector<HTMLElement>('div.v input')?.focus();
             return;
         }
 
@@ -246,12 +252,12 @@ export class FilterPanel extends FilterWidgetBase<any> {
         this.get_store().raiseChanged();
     }
 
-    protected addButtonClick(e: JQueryEventObject) {
+    protected addButtonClick(e: Event) {
         this.addEmptyRow(true);
         e.preventDefault();
     }
 
-    protected resetButtonClick(e: JQueryEventObject) {
+    protected resetButtonClick(e: Event) {
         e.preventDefault();
 
         if (this.get_updateStoreOnReset()) {
@@ -261,50 +267,46 @@ export class FilterPanel extends FilterWidgetBase<any> {
             }
         }
 
-        this.rowsDiv.empty();
+        Fluent(this.rowsDiv).empty();
         this.updateButtons();
         if (this.get_showInitialLine()) {
             this.addEmptyRow(false);
         }
     }
 
-    protected findEmptyRow(): JQuery {
-        var result: JQuery = null;
+    protected findEmptyRow(): HTMLElement {
+        var result: HTMLElement = null;
 
-        this.rowsDiv.children().each(function (index, row) {
-            var fieldInput = $(row).children('div.f')
-                .children('input.field-select').first();
-            if (fieldInput.length === 0) {
-                return true;
-            }
-            var val = fieldInput.val();
-            if (val == null || val.length === 0) {
-                result = $(row);
+        Array.from(this.rowsDiv.children).forEach(function (row: HTMLElement) {
+            var fieldInput = row.querySelector<HTMLInputElement>('div.f input.field-select');
+            if (!fieldInput)
+                return;
+            var val = fieldInput.value;
+            if (!val) {
+                result = row;
                 return false;
             }
-            return true;
         });
 
         return result;
     }
 
-    protected addEmptyRow(popupField: boolean): JQuery {
+    protected addEmptyRow(popupField: boolean): HTMLElement {
         var emptyRow = this.findEmptyRow();
 
         if (emptyRow != null) {
-            emptyRow.find('input.field-select').select2('focus');
+            emptyRow.querySelector<HTMLInputElement>('input.field-select')?.focus();
             if (popupField) {
-                emptyRow.find('input.field-select').select2('open');
+                Combobox.getInstance(emptyRow?.querySelector("input.field-select"))?.openDropdown();
             }
             return emptyRow;
         }
 
-        var isLastRowOr = this.rowsDiv.children().last()
-            .children('a.andor').hasClass('or');
+        var isLastRowOr = !!this.rowsDiv.lastElementChild?.querySelector('a.andor.or');
 
-        var row = $(
-            "<div class='filter-line'>" +
-            "<a class='delete'><span></span></a>" +
+        var row = this.rowsDiv.appendChild(document.createElement("div"));
+        row.classList.add("filter-line");
+        row.innerHTML = "<a class='delete'><span></span></a>" +
             "<div class='l'>" +
             "<a class='rightparen' href='#'>)</a>" +
             "<a class='andor' href='#'></a>" +
@@ -315,57 +317,54 @@ export class FilterPanel extends FilterWidgetBase<any> {
             "</div>" +
             "<div class='o'></div>" +
             "<div class='v'></div>" +
-            "<div style='clear: both'></div>" +
-            "</div>").appendTo(this.rowsDiv);
+            "<div style='clear: both'></div>";
 
-        var parenDiv = row.children('div.l').hide();
+        var parenDiv = row.querySelector<HTMLElement>('div.l');
+        parenDiv.style.display = "none";
 
-        parenDiv.children('a.leftparen, a.rightparen')
-            .click((e) => this.leftRightParenClick(e));
+        parenDiv.querySelectorAll('a.leftparen, a.rightparen').forEach(el =>
+            Fluent.on(el, "click", this.leftRightParenClick.bind(this)));
 
-        var andor = parenDiv.children('a.andor').attr('title', localText('Controls.FilterPanel.ChangeAndOr'));
+        var andor = parenDiv.querySelector<HTMLElement>('a.andor');
+        andor.setAttribute('title', localText('Controls.FilterPanel.ChangeAndOr'));
         if (isLastRowOr) {
-            andor.addClass('or').text(localText('Controls.FilterPanel.Or'));
+            andor.classList.add('or');
+            andor.textContent = localText('Controls.FilterPanel.Or');
         }
         else {
-            andor.text(localText('Controls.FilterPanel.And'));
+            andor.textContent = localText('Controls.FilterPanel.And');
         }
 
-        andor.click((e) => this.andOrClick(e));
+        Fluent.on(andor, "click", this.andOrClick.bind(this));
+        var del = row.querySelector('a.delete');
+        del.setAttribute('title', localText('Controls.FilterPanel.RemoveField'));
+        Fluent.on(del, "click", this.deleteRowClick.bind(this));
 
-        row.children('a.delete')
-            .attr('title', localText('Controls.FilterPanel.RemoveField'))
-            .click((e) => this.deleteRowClick(e));
-
-        var fieldSel = new FilterFieldSelect(row.children('div.f')
-            .children('input'), this.get_store().get_fields())
-            .changeSelect2(e => this.onRowFieldChange(e));
+        new FilterFieldSelect({
+            fields: this.get_store().get_fields(),
+            element: row.querySelector<HTMLInputElement>('div.f input')
+        }).changeSelect2(e => this.onRowFieldChange(e));
 
         this.updateParens();
         this.updateButtons();
 
-        row.find('input.field-select').select2('focus');
+        row.querySelector<HTMLInputElement>('input.field-select')?.focus();
 
         if (popupField) {
-            row.find('input.field-select').select2('open');
+            Combobox.getInstance(row.querySelector("input.field-select"))?.openDropdown();
         }
 
         return row;
     }
 
-    protected onRowFieldChange(e: JQueryEventObject) {
-        var row = $(e.target).closest('div.filter-line');
-        this.rowFieldChange(row);
-        var opSelect = row.children('div.o').find('input.op-select');
-        opSelect.select2('focus');
+    protected onRowFieldChange(e: Event) {
+        var row = (e.target as HTMLElement).closest('div.filter-line');
+        this.rowFieldChange(row as any);
+        row.querySelector<HTMLInputElement>('div.o input.op-select')?.focus();
     }
 
-    protected rowFieldChange(row: JQuery) {
-        row.removeData('Filtering');
-        var select = row.children('div.f').find('input.field-select')
-            .getWidget(FilterFieldSelect);
-        var fieldName = select.get_value();
-        var isEmpty = fieldName == null || fieldName === '';
+    protected rowFieldChange(row: HTMLElement) {
+        delete (row as any).__Filtering;
         this.removeFiltering(row);
         this.populateOperatorList(row);
         this.rowOperatorChange(row);
@@ -373,47 +372,46 @@ export class FilterPanel extends FilterWidgetBase<any> {
         this.updateButtons();
     }
 
-    protected removeFiltering(row: JQuery): void {
-        row.data('Filtering', null);
-        row.data('FilteringField', null);
+    protected removeFiltering(row: HTMLElement): void {
+        delete (row as any).__Filtering;
+        delete (row as any).__FilteringField;
     }
 
-    protected populateOperatorList(row: JQuery): void {
-        row.children('div.o').html('');
+    protected populateOperatorList(row: HTMLElement): void {
+        var opDiv = row.querySelector<HTMLElement>('div.o');
+        Fluent(opDiv).empty();
 
         var filtering = this.getFilteringFor(row);
         if (filtering == null)
             return;
 
-        var hidden = row.children('div.o').html('<input/>')
-            .children().attr('type', 'hidden').addClass('op-select');
+        var hidden = Fluent("input").attr("type", 'hidden').class('op-select').appendTo(opDiv);
 
         var operators = filtering.getOperators();
-        var opSelect = new FilterOperatorSelect(hidden, operators);
-        opSelect.changeSelect2(e => this.onRowOperatorChange(e));
+        var opSelect = new FilterOperatorSelect({ element: hidden, source: operators });
+        opSelect.changeSelect2(this.onRowOperatorChange.bind(this));
     }
 
-    protected getFieldFor(row: JQuery) {
-        if (row.length === 0) {
+    protected getFieldFor(row: HTMLElement) {
+        if (!row) {
             return null;
         }
-        var select = row.children('div.f').find('input.field-select')
-            .getWidget(FilterFieldSelect);
+        var select = getWidgetFrom(row.querySelector('div.f input.field-select'), FilterFieldSelect);
 
-        if (isEmptyOrNull(select.value)) {
+        if (!select || !select.value) {
             return null;
         }
 
         return this.get_store().get_fieldByName()[select.get_value()];
     }
 
-    protected getFilteringFor(row: JQuery): IFiltering {
+    protected getFilteringFor(row: HTMLElement): IFiltering {
         var field = this.getFieldFor(row);
 
         if (field == null)
             return null;
 
-        var filtering = cast(row.data('Filtering'), IFiltering);
+        var filtering = (row as any).__Filtering as IFiltering;
 
         if (filtering != null)
             return filtering;
@@ -421,44 +419,43 @@ export class FilterPanel extends FilterWidgetBase<any> {
         var filteringType = FilteringTypeRegistry.get(
             (field.filteringType ?? 'String'));
 
-        var editorDiv = row.children('div.v');
-        filtering = new (filteringType as any)() as IFiltering;
+        var editorDiv = row.querySelector<HTMLElement>('div.v');
+        filtering = new (filteringType as any)(field.filteringParams ?? {}) as IFiltering;
         ReflectionOptionsSetter.set(filtering, field.filteringParams);
         filtering.set_container(editorDiv);
         filtering.set_field(field);
-        row.data('Filtering', filtering);
+        (row as any).__Filtering = filtering;
         return filtering;
     }
 
-    protected onRowOperatorChange(e: JQueryEventObject) {
-        var row = $(e.target).closest('div.filter-line');
-        this.rowOperatorChange(row);
-        var firstInput = row.children('div.v').find(':input:visible').first();
-        try {
-            firstInput.focus();
-        }
-        catch ($t1) {
-        }
+    protected onRowOperatorChange(e: Event) {
+        var row = (e.target as HTMLElement).closest('div.filter-line');
+        this.rowOperatorChange(row as any);
+        row.querySelectorAll<HTMLElement>('div.v input, div.v textarea, div.v select').forEach(el => {
+            if (Fluent.isVisibleLike(el)) {
+                try { el.focus(); } catch { }
+            }
+            return false;
+        });
     }
 
-    protected rowOperatorChange(row: JQuery): void {
+    protected rowOperatorChange(row: HTMLElement): void {
 
-        if (row.length === 0) {
+        if (!row) {
             return;
         }
 
-        var editorDiv = row.children('div.v');
-        editorDiv.html('');
+        var editorDiv = row.querySelector<HTMLElement>('div.v');
+        Fluent(editorDiv).empty();
         var filtering = this.getFilteringFor(row);
         if (filtering == null)
             return;
-        
-        var operatorSelect = row.children('div.o').find('input.op-select')
-            .getWidget(FilterOperatorSelect);
 
-        if (isEmptyOrNull(operatorSelect.get_value()))
+        var operatorSelect = getWidgetFrom(row.querySelector('div.o input.op-select'), FilterOperatorSelect);
+
+        if (!operatorSelect.get_value())
             return;
-        
+
         var ops = filtering.getOperators().filter(function (x) {
             return x.key === operatorSelect.value;
         });
@@ -471,12 +468,12 @@ export class FilterPanel extends FilterWidgetBase<any> {
         filtering.createEditor();
     }
 
-    protected deleteRowClick(e: JQueryEventObject): void {
+    protected deleteRowClick(e: Event): void {
         e.preventDefault();
-        var row = $(e.target).closest('div.filter-line');
+        var row = (e.target as HTMLElement).closest('div.filter-line');
         row.remove();
 
-        if (this.rowsDiv.children().length === 0) {
+        if (!this.rowsDiv.childElementCount) {
             this.search();
         }
 
@@ -486,59 +483,57 @@ export class FilterPanel extends FilterWidgetBase<any> {
 
     protected updateButtons(): void {
         this.byId('SearchButton').toggle(
-            this.rowsDiv.children().length >= 1 && this.showSearchButton);
+            this.rowsDiv.childElementCount >= 1 && this.showSearchButton);
         this.byId('ResetButton').toggle(
-            this.rowsDiv.children().length >= 1);
+            this.rowsDiv.childElementCount >= 1);
     }
 
-    protected andOrClick(e: JQueryEventObject): void {
+    protected andOrClick(e: Event): void {
         e.preventDefault();
-        var andor = $(e.target).toggleClass('or');
-        andor.text(localText('Controls.FilterPanel.' +
-            (andor.hasClass('or') ? 'Or' : 'And')));
+        var andor = e.target as HTMLElement;
+        andor.classList.toggle('or');
+        andor.textContent = localText('Controls.FilterPanel.' +
+            andor.classList.contains('or') ? 'Or' : 'And');
     }
 
-    protected leftRightParenClick(e: JQueryEventObject): void {
+    protected leftRightParenClick(e: Event): void {
         e.preventDefault();
-        $(e.target).toggleClass('active');
+        (e.target as HTMLElement).classList.toggle('active');
         this.updateParens();
     }
 
     protected updateParens() {
-        var rows = this.rowsDiv.children();
-        if (rows.length === 0) {
-            return;
-        }
-        rows.removeClass('paren-start');
-        rows.removeClass('paren-end');
-        rows.children('div.l').css('display', ((rows.length === 1) ? 'none' : 'block'));
-        rows.first().children('div.l').children('a.rightparen, a.andor')
-            .css('visibility', 'hidden');
-
-        for (var i = 1; i < rows.length; i++) {
-            var row = rows.eq(i);
-            row.children('div.l').css('display', 'block')
-                .children('a.lefparen, a.andor').css('visibility', 'visible');
-        }
-
+        var rows = Array.from(this.rowsDiv.children)
         var inParen = false;
-        for (var i1 = 0; i1 < rows.length; i1++) {
-            var row1 = rows.eq(i1);
-            var divParen = row1.children('div.l');
-            var lp = divParen.children('a.leftparen');
-            var rp = divParen.children('a.rightparen');
-            if (rp.hasClass('active') && inParen) {
+        rows.forEach((row: HTMLElement, index) => {
+
+            row.classList.remove('paren-start');
+            row.classList.remove('paren-end');
+            var divL = row.querySelector<HTMLElement>('div.l');
+            if (!divL)
+                return;
+            divL.style.display = ((rows.length === 1) ? 'none' : 'block');
+            if (index === 0)
+                divL.querySelectorAll<HTMLElement>('a.rightparen, a.andor').forEach(el => el.style.visibility = "hidden");
+            else {
+                divL.style.display = "block";
+                divL.querySelectorAll<HTMLElement>('a.lefparen, a.andor').forEach(el => el.style.visibility = 'visible');
+            }
+
+            var lp = divL.querySelector('a.leftparen');
+            var rp = divL.querySelector('a.rightparen');
+            if (rp.classList.contains('active') && inParen) {
                 inParen = false;
-                if (i1 > 0) {
-                    rows.eq(i1 - 1).addClass('paren-end');
+                if (index > 0) {
+                    rows[index - 1].classList.add('paren-end');
                 }
             }
-            if (lp.hasClass('active')) {
+            if (lp.classList.contains('active')) {
                 inParen = true;
-                if (i1 > 0) {
-                    row1.addClass('paren-start');
+                if (index > 0) {
+                    rows[index - 1].classList.add('paren-start');
                 }
             }
-        }
+        });
     }
 }

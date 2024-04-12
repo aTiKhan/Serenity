@@ -1,65 +1,71 @@
-﻿import { Decorators } from "../../decorators";
+﻿import { Fluent, localText, resolveUrl } from "../../base";
 import { IReadOnly, IStringValue } from "../../interfaces";
-import { endsWith, isEmptyOrNull, isTrimmedEmpty, resolveUrl, localText, trimToNull } from "@serenity-is/corelib/q";
+import { isTrimmedEmpty } from "../../q";
+import { Decorators } from "../../types/decorators";
 import { LazyLoadHelper } from "../helpers/lazyloadhelper";
-import { Widget } from "../widgets/widget";
+import { EditorProps, EditorWidget } from "../widgets/widget";
 
 export interface HtmlContentEditorOptions {
-    cols?: any;
-    rows?: any;
+    cols?: number;
+    rows?: number;
 }
 
 export interface CKEditorConfig {
 }    
 
 @Decorators.registerEditor('Serenity.HtmlContentEditor', [IStringValue, IReadOnly])
-@Decorators.element('<textarea/>')
-export class HtmlContentEditor extends Widget<HtmlContentEditorOptions>
+export class HtmlContentEditor<P extends HtmlContentEditorOptions = HtmlContentEditorOptions> extends EditorWidget<P>
     implements IStringValue, IReadOnly {
 
     private _instanceReady: boolean;
+    declare readonly domNode: HTMLTextAreaElement;
 
-    constructor(textArea: JQuery, opt?: HtmlContentEditorOptions) {
-        super(textArea, opt)
+    static override createDefaultElement() { return document.createElement("textarea"); }
+
+    constructor(props: EditorProps<P>) {
+        super(props);
 
         this._instanceReady = false;
-        HtmlContentEditor.includeCKEditor();
 
-        var id = textArea.attr('id');
+        let textArea = this.domNode;
+        var id = textArea.getAttribute('id');
         if (isTrimmedEmpty(id)) {
-            textArea.attr('id', this.uniqueName);
+            textArea.setAttribute('id', this.uniqueName);
             id = this.uniqueName;
         }
 
         if (this.options.cols != null)
-            textArea.attr('cols', this.options.cols);
+            textArea.setAttribute('cols', "" + (this.options.cols ?? 0));
 
         if (this.options.rows != null)
-            textArea.attr('rows', this.options.rows);
+            textArea.setAttribute('rows', "" + (this.options.rows ?? 0));
 
-        this.addValidationRule(this.uniqueName, e => {
-            if (e.hasClass('required')) {
-                var value = trimToNull(this.get_value());
-                if (value == null)
+        this.addValidationRule(this.uniqueName, input => {
+            if (input.classList.contains('required')) {
+                if (!this.get_value()?.trim())
                     return localText('Validation.Required');
             }
 
             return null;
         });
 
-        LazyLoadHelper.executeOnceWhenShown(this.element, () => {
-            var config = this.getConfig();
-            (window as any)['CKEDITOR'] && (window as any)['CKEDITOR'].replace(id, config);
+        HtmlContentEditor.includeCKEditor(() => {
+            LazyLoadHelper.executeOnceWhenShown(this.domNode, () => {
+                var config = this.getConfig();
+                (window as any)['CKEDITOR'] && (window as any)['CKEDITOR'].replace(id, config);
+            });
         });
     }
 
     protected instanceReady(x: any): void {
         this._instanceReady = true;
-        $(x.editor.container.$).addClass(this.element.attr('class'));
-        this.element.addClass('select2-offscreen').css('display', 'block');
+
+        this.domNode.classList.forEach((clss) => { x.editor.container.$?.classList.add(clss); });
+        this.domNode.classList.add('select2-offscreen');
+        this.domNode.style.display = 'block';
 
         // for validation to work
-        x.editor.setData(this.element.val());
+        x.editor.setData(this.domNode.value);
         x.editor.setReadOnly(this.get_readOnly());
     }
 
@@ -69,7 +75,7 @@ export class HtmlContentEditor extends Widget<HtmlContentEditorOptions>
 
         var CKEDITOR = (window as any)['CKEDITOR'];
 
-        var lang = (trimToNull($('html').attr('lang')) ?? 'en');
+        var lang = document.documentElement.getAttribute('lang')?.trim() || 'en';
         if (!!CKEDITOR.lang.languages[lang]) {
             return lang;
         }
@@ -87,11 +93,12 @@ export class HtmlContentEditor extends Widget<HtmlContentEditorOptions>
             customConfig: '',
             language: this.getLanguage(),
             bodyClass: 's-HtmlContentBody',
+            versionCheck: false,
             on: {
                 instanceReady: (x: any) => this.instanceReady(x),
                 change: (x1: any) => {
                     x1.editor.updateElement();
-                    this.element.triggerHandler('change');
+                    Fluent.trigger(this.domNode, "change");
                 }
             },
             toolbarGroups: [
@@ -132,8 +139,8 @@ export class HtmlContentEditor extends Widget<HtmlContentEditorOptions>
     }
 
     protected getEditorInstance() {
-        var id = this.element.attr('id');
-        return (window as any)['CKEDITOR'].instances[id];
+        var id = this.domNode.getAttribute("id");
+        return (window as any)['CKEDITOR']?.instances?.[id];
     }
 
     destroy(): void {
@@ -148,7 +155,7 @@ export class HtmlContentEditor extends Widget<HtmlContentEditorOptions>
             return instance.getData();
         }
         else {
-            return this.element.val();
+            return this.domNode.value;
         }
     }
 
@@ -158,9 +165,9 @@ export class HtmlContentEditor extends Widget<HtmlContentEditorOptions>
 
     set_value(value: string): void {
         var instance = this.getEditorInstance();
-        this.element.val(value);
+        this.domNode.value = value ?? '';
         if (this._instanceReady && instance)
-            instance.setData(value);
+            instance.setData(value ?? '');
     }
 
     set value(v: string) {
@@ -168,17 +175,17 @@ export class HtmlContentEditor extends Widget<HtmlContentEditorOptions>
     }
 
     get_readOnly(): boolean {
-        return !isEmptyOrNull(this.element.attr('disabled'));
+        return !!this.domNode.getAttribute("disabled");
     }
 
     set_readOnly(value: boolean) {
 
         if (this.get_readOnly() !== value) {
             if (value) {
-                this.element.attr('disabled', 'disabled');
+                this.domNode.setAttribute('disabled', 'disabled');
             }
             else {
-                this.element.removeAttr('disabled');
+                this.domNode.removeAttribute('disabled');
             }
 
             var instance = this.getEditorInstance();
@@ -187,7 +194,7 @@ export class HtmlContentEditor extends Widget<HtmlContentEditorOptions>
         }
     }
 
-    static CKEditorVer = "4.7.1";
+    static CKEditorVer = "4.22.1";
     static CKEditorBasePath: string;
 
     static getCKEditorBasePath(): string {
@@ -200,34 +207,33 @@ export class HtmlContentEditor extends Widget<HtmlContentEditorOptions>
             else
                 return "~/Serenity.Assets/Scripts/ckeditor/";
         }
-        if (endsWith(path, '/'))
+        if (path.endsWith('/'))
             return path;
         return path + '/';
     }
 
-    static includeCKEditor(): void {
+    static includeCKEditor(then: () => void): void {
         if ((window as any)['CKEDITOR']) {
-            return;
+            return then();
         }
 
-        var script = $('#CKEditorScript');
-        if (script.length > 0) {
-            return;
+        var script = document.querySelector('#CKEditorScript');
+        if (script) {
+            return script.addEventListener("load", then);
         }
 
-        $('<script/>').attr('type', 'text/javascript')
+        Fluent("script").attr('type', 'text/javascript')
             .attr('id', 'CKEditorScript')
+            .on("load", then)
+            .attr("async", "false")
             .attr('src', resolveUrl(HtmlContentEditor.getCKEditorBasePath() + 'ckeditor.js?v=' +
                 HtmlContentEditor.CKEditorVer))
-            .appendTo(window.document.head);
+            .appendTo(document.head);
     };
 }
 
 @Decorators.registerEditor('Serenity.HtmlNoteContentEditor')
-export class HtmlNoteContentEditor extends HtmlContentEditor {
-    constructor(textArea: JQuery, opt?: HtmlContentEditorOptions) {
-        super(textArea, opt);
-    }
+export class HtmlNoteContentEditor<P extends HtmlContentEditorOptions = HtmlContentEditorOptions> extends HtmlContentEditor<P> {
 
     protected getConfig(): CKEditorConfig {
         var config = super.getConfig();
@@ -244,10 +250,7 @@ export class HtmlNoteContentEditor extends HtmlContentEditor {
 }
 
 @Decorators.registerEditor('Serenity.HtmlReportContentEditor')
-export class HtmlReportContentEditor extends HtmlContentEditor {
-    constructor(textArea: JQuery, opt?: HtmlContentEditorOptions) {
-        super(textArea, opt);
-    }
+export class HtmlReportContentEditor <P extends HtmlContentEditorOptions = HtmlContentEditorOptions> extends HtmlContentEditor<P> {
 
     protected getConfig(): CKEditorConfig {
         var config = super.getConfig();

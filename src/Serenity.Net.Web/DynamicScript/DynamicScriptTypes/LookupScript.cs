@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 
 namespace Serenity.Web;
 
@@ -21,7 +21,7 @@ public abstract class LookupScript : DynamicScript, INamedDynamicScript, IGetScr
     /// </summary>
     protected LookupScript()
     {
-        lookupParams = new Dictionary<string, object>();
+        lookupParams = [];
     }
 
     /// <inheritdoc/>
@@ -38,9 +38,27 @@ public abstract class LookupScript : DynamicScript, INamedDynamicScript, IGetScr
     {
         IEnumerable items = GetItems();
 
-        return string.Format(CultureInfo.InvariantCulture, "Q.ScriptData.set({0}, new Q.Lookup({1}, \n{2}\n));",
-            ("Lookup." + LookupKey).ToSingleQuoted(), LookupParams.ToJson(), items.ToJson());
+        return string.Format(CultureInfo.InvariantCulture, DataScript.SetScriptDataFormat,
+            ("Lookup." + LookupKey).ToSingleQuoted(), 
+            string.Format(NewLookupFormat,
+                JSON.Stringify(LookupParams, writeNulls: false), 
+                JSON.Stringify(items, writeNulls: false)));
     }
+
+    /// <summary>
+    /// Format string for new Lookup({0}, {1})
+    /// </summary>
+    public const string NewLookupFormat =
+        "new ((typeof Serenity!=='undefined'&&Serenity.Lookup)||" +
+        "(class Lookup{{" + 
+            "constructor(o,a){{" + 
+                "o&&Object.assign(this,o);a&&this.update(a)" + 
+            "}}" + 
+            "update(a){{" + 
+                "var f=this.idField,v;this.itemById={{}};this.items=a||[];" + 
+                "this.items.forEach(r=>{{if((v=r[f])!=null)this.itemById[v] = r}})" + 
+            "}}" +
+        "}}))({0},{1})";
 
     /// <summary>
     /// Gets lookup parameters dictionary

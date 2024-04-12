@@ -1,7 +1,7 @@
+import { FC } from 'jsx-dom';
 import { StringEditor } from '../editors/stringeditor';
-import { type FC } from 'jsx-dom';
-import $ from "@optionaldeps/jquery";
-import { jsxDomWidget } from './jsx';
+import { FileUploadEditor } from '../editors/uploadeditors';
+import { PropertyGrid } from './propertygrid';
 
 test('render childless element', function () {
     const element = <br />;
@@ -574,21 +574,49 @@ describe('jsx: interpolation', () => {
     ).toBe('true'));
 
     it('can render Date objects', () => expect(
-        (<div>{date.toUTCString()}</div>).textContent!).toBe(date.toUTCString()));
+        (<div ref={el => el}>{date.toUTCString()}</div>).textContent!).toBe(date.toUTCString()));
 });
 
-const StringEditor_ = jsxDomWidget(StringEditor);
+//const StringEditor_ = jsxDomWidget(StringEditor);
 
 describe('jsx: widget integration', () => {
 
-    it('can create input', () => {
+    it('can create input directly', () => {
         var ed: StringEditor;
-        window.$ = window.jQuery = $;
-        var el = <StringEditor_ ref={x => ed = x} readOnly={true} />;
+        var el = <StringEditor ref={x => ed = x} readOnly={true} />;
         expect(el.tagName).toBe('INPUT');
         expect(el.classList.contains('s-StringEditor')).toBe(true);
         expect(ed).toBeDefined();
-        expect(ed.element[0]).toBe(el);
+        expect(ed.domNode === el).toBe(true);
+        expect(ed.domNode).toEqual(el);
         expect(el.getAttribute('readonly')).toBe('readonly');
     });
+
+    it('can create PropertyGrid', () => {
+        var pg: PropertyGrid;
+        var el = <PropertyGrid items={[]} ref={w => pg = w} />;
+        expect(pg?.domNode).toBe(el);
+    });
+
+    it('can create PropertyGrid', () => {
+        var pg: PropertyGrid;
+        var el = <PropertyGrid items={[]} ref={w => pg = w} />;
+        expect(pg?.domNode).toBe(el);
+    });
+
+    it('can create FileUploadEditor with JSX', () => {
+        var el = <FileUploadEditor readOnly={true}  />;
+        expect(el).toBeTruthy();
+        let input = el.querySelector("input[type=file]");
+        expect(input).toBeTruthy();
+        expect(input.getAttribute("disabled")).toBe("disabled");
+    });
+    
+    it('can create FileUploadEditor without JSX and no init call', () => {
+        var el = new FileUploadEditor({ readOnly: true }).domNode;
+        expect(el).toBeTruthy();
+        let input = el.querySelector("input[type=file]");
+        expect(input).toBeTruthy();
+        expect(input.getAttribute("disabled")).toBe("disabled");
+    });    
 });

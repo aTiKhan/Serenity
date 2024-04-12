@@ -1,11 +1,13 @@
-﻿import { Decorators } from "../../decorators";
-import { isEmptyOrNull } from "@serenity-is/corelib/q";
-import { Select2CommonOptions, Select2Editor } from "./select2editor";
+﻿import { Decorators } from "../../types/decorators";
+import { EditorProps } from "../widgets/widget";
+import { ComboboxItem } from "./combobox";
+import { ComboboxCommonOptions, ComboboxEditor } from "./comboboxeditor";
 
 @Decorators.registerClass('Serenity.SelectEditor')
-export class SelectEditor extends Select2Editor<SelectEditorOptions, Select2Item> {
-    constructor(hidden: JQuery, opt?: SelectEditorOptions) {
-        super(hidden, opt);
+export class SelectEditor<P extends SelectEditorOptions = SelectEditorOptions> extends ComboboxEditor<P, ComboboxItem> {
+    constructor(props: EditorProps<P>) {
+        super(props);
+
         this.updateItems();
     }
 
@@ -14,7 +16,7 @@ export class SelectEditor extends Select2Editor<SelectEditorOptions, Select2Item
     }
 
     protected emptyItemText() {
-        if (!isEmptyOrNull(this.options.emptyOptionText)) {
+        if (this.options.emptyOptionText) {
             return this.options.emptyOptionText;
         }
         return super.emptyItemText();
@@ -35,7 +37,7 @@ export class SelectEditor extends Select2Editor<SelectEditorOptions, Select2Item
     }
 }
 
-export interface SelectEditorOptions extends Select2CommonOptions {
+export interface SelectEditorOptions extends ComboboxCommonOptions {
     items?: any[];
     emptyOptionText?: string;
 }

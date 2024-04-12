@@ -1,17 +1,18 @@
-﻿import { Decorators } from "../../decorators";
-import { notifyError, localText } from "@serenity-is/corelib/q";
+﻿import { cancelDialogButton, localText, notifyError, okDialogButton } from "../../base";
+import { Decorators } from "../../types/decorators";
 import { TemplatedDialog } from "../dialogs/templateddialog";
+import { WidgetProps } from "../widgets/widget";
 import { FilterPanel } from "./filterpanel";
 
 @Decorators.registerClass('Serenity.FilterDialog')
-export class FilterDialog extends TemplatedDialog<any> {
+export class FilterDialog<P = {}> extends TemplatedDialog<P> {
 
     private filterPanel: FilterPanel;
 
-    constructor() {
-        super();
+    constructor(props: WidgetProps<P>) {
+        super(props);
 
-        this.filterPanel = new FilterPanel(this.byId('FilterPanel'));
+        this.filterPanel = new FilterPanel({ element: this.findById('FilterPanel') });
         this.filterPanel.set_showInitialLine(true);
         this.filterPanel.set_showSearchButton(false);
         this.filterPanel.set_updateStoreOnReset(false);
@@ -27,24 +28,25 @@ export class FilterDialog extends TemplatedDialog<any> {
         return '<div id="~_FilterPanel"/>';
     }
 
+    protected getDialogOptions() {
+        var opt = super.getDialogOptions();
+        opt.fullScreen = "lg-down";
+        return opt;
+    }
+
     protected getDialogButtons() {
         return [
-            {
-                text: localText('Dialogs.OkButton'),
-                click: () => {
+            okDialogButton({
+                click: (e) => {
                     this.filterPanel.search();
                     if (this.filterPanel.get_hasErrors()) {
+                        e.preventDefault();
                         notifyError(localText('Controls.FilterPanel.FixErrorsMessage'), '', null);
                         return;
                     }
-
-                    this.dialogClose();
                 }
-            },
-            {
-                text: localText('Dialogs.CancelButton'),
-                click: () => this.dialogClose()
-            }
+            }),
+            cancelDialogButton()
         ];
     }
 }

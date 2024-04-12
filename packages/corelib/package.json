@@ -1,42 +1,25 @@
 {
   "name": "@serenity-is/corelib",
-  "version": "6.7.6",
+  "version": "8.4.4",
   "author": "Serenity (https://serenity.is)",
   "bugs": "https://github.com/serenity-is/serenity/issues",
-  "description": "Serenity CoreLib including Q, Serenity and Slick namespaces",
+  "description": "Serenity Core Library",
   "dependencies": {
-    "@serenity-is/sleekgrid": "1.6.0",
-    "@types/jquery": "2.0.48",
-    "@types/jqueryui": "1.12.6",
-    "@types/jquery.validation": "1.16.7"
+    "@serenity-is/sleekgrid": "workspace:*"
   },
   "devDependencies": {
-    "@types/jest": "29.5.1",
-    "tslib": "2.4.1"
+    "tslib": "2.6.2"
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./q": {
-      "types": "./dist/q/index.d.ts",
-      "import": "./dist/q/index.js"
-    },
-    "./slick": {
-      "types": "./dist/slick/index.d.ts",
-      "import": "./dist/slick/index.js"
-    }
+    "./tsconfig.json": "./tsconfig.json"
   },
   "main": "dist/index.js",
   "import": "dist/index.js",
   "types": "dist/index.d.ts",
-  "typesVersions": {
-    "*": {
-      "q": [ "dist/q/index.d.ts" ],
-      "slick": [ "dist/slick/index.d.ts" ]
-    }
-  },
   "files": [
     "dist/**/*.css",
     "dist/**/*.d.ts",
@@ -58,8 +41,10 @@
   "repository": "https://github.com/serenity-is/serenity/packages/corelib",
   "scripts": {
     "build": "rollup -c && node build/build",
-    "test": "pnpm build && pnpm jest --coverage",
-    "doc": "typedoc --plugin typedoc-plugin-markdown --name \"@serenity-is\" --readme ./build/api-readme.md --githubPages false --sourceLinkTemplate https://github.com/serenity-is/serenity/blob/master/{path}#L{line} --out /Sandbox/serenity-is/SerenityIs/SerenityIs.Web/Docs/api/js/corelib --json ./out/typedoc.json src/q src/slick src"
+    "test": "pnpm build && jest --coverage",
+    "jest": "jest",
+    "tsc": "tsc",
+    "doc": "typedoc --plugin typedoc-plugin-markdown --exclude **/lib/**/* --excludePrivate --readme none --githubPages false --sourceLinkTemplate https://github.com/serenity-is/serenity/blob/master/{path}#L{line} --out /Sandbox/serenity-is/SerenityIs/SerenityIs.Web/Docs/api/js/corelib --json ./out/typedoc.json src"
   },
   "type": "module"
 }

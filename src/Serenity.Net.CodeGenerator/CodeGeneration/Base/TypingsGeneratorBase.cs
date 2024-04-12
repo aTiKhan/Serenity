@@ -2,21 +2,22 @@
 using Microsoft.CodeAnalysis;
 using System.Collections.Immutable;
 using System.Threading;
+using INamedTypeSymbol = Microsoft.CodeAnalysis.INamedTypeSymbol;
 #endif
 
 namespace Serenity.CodeGeneration;
 
 public abstract class TypingsGeneratorBase : ImportGeneratorBase
 {
-    private readonly HashSet<string> visited = new();
+    private readonly HashSet<string> visited = [];
     private Queue<TypeDefinition> generateQueue;
-    protected List<TypeDefinition> lookupScripts = new();
-    protected HashSet<string> localTextKeys = new();
-    protected List<GeneratedTypeInfo> generatedTypes = new();
-    protected List<AnnotationTypeInfo> annotationTypes = new();
+    protected List<TypeDefinition> lookupScripts = [];
+    protected List<GeneratedTypeInfo> generatedTypes = [];
+    protected List<AnnotationTypeInfo> annotationTypes = [];
     protected ILookup<string, ExternalType> modularEditorTypeByKey;
     protected ILookup<string, ExternalType> modularFormatterTypeByKey;
     protected ILookup<string, ExternalType> modularDialogTypeByKey;
+    protected TypeDefinition[] emptyTypes = [];
 
     public string ModulesPathAlias { get; set; } = "@/";
     public string ModulesPathFolder { get; set; } = "Modules";
@@ -35,22 +36,14 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
 
     public Compilation Compilation { get; }
 
-    internal class ExportedTypesCollector : SymbolVisitor
+    internal class ExportedTypesCollector(CancellationToken cancellation) : SymbolVisitor
     {
-        private readonly CancellationToken _cancellationToken;
-        private readonly HashSet<INamedTypeSymbol> _exportedTypes;
-
-        public ExportedTypesCollector(CancellationToken cancellation)
-        {
-            _cancellationToken = cancellation;
-            _exportedTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
-        }
-
+        private readonly HashSet<INamedTypeSymbol> _exportedTypes = new(SymbolEqualityComparer.Default);
         public ImmutableArray<INamedTypeSymbol> GetPublicTypes() => _exportedTypes.ToImmutableArray();
 
         public override void VisitAssembly(IAssemblySymbol symbol)
         {
-            _cancellationToken.ThrowIfCancellationRequested();
+            cancellation.ThrowIfCancellationRequested();
             symbol.GlobalNamespace.Accept(this);
         }
 
@@ -58,7 +51,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
         {
             foreach (INamespaceOrTypeSymbol namespaceOrType in symbol.GetMembers())
             {
-                _cancellationToken.ThrowIfCancellationRequested();
+                cancellation.ThrowIfCancellationRequested();
                 namespaceOrType.Accept(this);
             }
         }
@@ -74,7 +67,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
 
         public override void VisitNamedType(INamedTypeSymbol type)
         {
-            _cancellationToken.ThrowIfCancellationRequested();
+            cancellation.ThrowIfCancellationRequested();
 
             if (!IsAccessibleOutsideOfAssembly(type) || !_exportedTypes.Add(type))
                 return;
@@ -86,18 +79,18 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
 
             foreach (INamedTypeSymbol nestedType in nestedTypes)
             {
-                _cancellationToken.ThrowIfCancellationRequested();
+                cancellation.ThrowIfCancellationRequested();
                 nestedType.Accept(this);
             }
         }
     }
 #else
-    protected TypingsGeneratorBase(IGeneratorFileSystem fileSystem, params Assembly[] assemblies)
+    protected TypingsGeneratorBase(IFileSystem fileSystem, params Assembly[] assemblies)
         : this(TypingsUtils.ToDefinitions(fileSystem, assemblies?.Select(x => x.Location)))
     {
     }
 
-    protected TypingsGeneratorBase(IGeneratorFileSystem fileSystem, params string[] assemblyLocations)
+    protected TypingsGeneratorBase(IFileSystem fileSystem, params string[] assemblyLocations)
         : this(TypingsUtils.ToDefinitions(fileSystem, assemblyLocations))
     {
     }
@@ -159,7 +152,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
         }
     }
 
-    protected string GetAssemblyNameFor(TypeReference type)
+    protected static string GetAssemblyNameFor(TypeReference type)
     {
         var assemblyName = 
 #if ISSOURCEGENERATOR
@@ -215,7 +208,6 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
         generateQueue = new Queue<TypeDefinition>();
         visited.Clear();
         lookupScripts.Clear();
-        localTextKeys.Clear();
         generatedTypes.Clear();
         annotationTypes.Clear();
     }
@@ -382,27 +374,10 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
                 }
 #endif
 
-                TypeDefinition[] emptyTypes = Array.Empty<TypeDefinition>();
 
                 foreach (var fromType in types)
                 {
-                    var nestedLocalTexts = TypingsUtils.GetAttr(fromType, "Serenity.Extensibility",
-                        "NestedLocalTextsAttribute", emptyTypes) ??
-                        TypingsUtils.GetAttr(fromType, "Serenity.ComponentModel", 
-                            "NestedLocalTextsAttribute", emptyTypes);
-                    if (nestedLocalTexts != null)
-                    {
-                        string prefix = null;
-#if ISSOURCEGENERATOR
-                        prefix = nestedLocalTexts.NamedArguments.FirstOrDefault(x => x.Key == "Prefix").Value.Value as string;
-#else
-                        if (nestedLocalTexts.HasProperties)
-                            prefix = nestedLocalTexts.Properties.FirstOrDefault(x => x.Name == "Prefix").Argument.Value as string;
-#endif
-
-                        AddNestedLocalTexts(fromType, prefix ?? "");
-                    }
-
+                    PreVisitType(fromType);
                     ScanAnnotationTypeAttributes(fromType);
 
                     if (fromType.IsAbstract ||
@@ -425,7 +400,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
                         TypingsUtils.GetAttr(fromType, "Serenity.Extensibility", "NestedPermissionKeysAttribute", emptyTypes) != null ||
                         TypingsUtils.GetAttr(fromType, "Serenity.ComponentModel", "NestedPermissionKeysAttribute", emptyTypes) != null ||
                         ((TypingsUtils.Contains(baseClasses, "Microsoft.AspNetCore.Mvc", "ControllerBase") ||
-                          TypingsUtils.Contains(baseClasses, "System.Web.Mvc", "Controller")) && // backwards compability
+                          TypingsUtils.Contains(baseClasses, "System.Web.Mvc", "Controller")) && // backwards compatibility
                          fromType.NamespaceOf()?.EndsWith(".Endpoints", StringComparison.Ordinal) == true))
                     {
                         EnqueueType(fromType);
@@ -456,7 +431,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
         }
     }
 
-    private void ScanAnnotationTypeAttributes(TypeDefinition fromType)
+    protected virtual void ScanAnnotationTypeAttributes(TypeDefinition fromType)
     {
         var annotationTypeAttrs = TypingsUtils.GetAttrs(
             fromType.GetAttributes(),
@@ -617,7 +592,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
             nonGeneric = nonGeneric[..genericIdx];
 
         ExternalType scriptType;
-        if (nonGeneric.IndexOf(":", StringComparison.Ordinal) >= 0)
+        if (nonGeneric.Contains(':'))
         {
             scriptType = GetScriptType(nonGeneric);
             if (scriptType != null)
@@ -625,7 +600,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
         }
 
         string ns = "";
-        var dotIdx = nonGeneric.LastIndexOf(".", StringComparison.Ordinal);
+        var dotIdx = nonGeneric.LastIndexOf('.');
         if (dotIdx >= 0)
         {
             ns = nonGeneric[0..dotIdx];
@@ -641,8 +616,8 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
         if ((!string.IsNullOrEmpty(containingAssembly) && tryModule(containingAssembly.Replace("Serenity.", "@serenity-is/").ToLowerInvariant())) ||
             (!string.IsNullOrEmpty(ns) && tryModule(ns.Replace("Serenity.", "@serenity-is/").ToLowerInvariant())) ||
             ((ns == "Serenity" || ns?.StartsWith("Serenity.") == true) &&
-                (tryModule("@serenity-is/corelib/q") ||
                  tryModule("@serenity-is/corelib") ||
+                (tryModule("@serenity-is/corelib/q") ||
                  tryModule("@serenity-is/extensions") ||
                  tryModule("@serenity-is/pro.extensions"))))
         {
@@ -859,8 +834,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
     protected static bool IsPublicServiceMethod(MethodDefinition method, out TypeReference requestType, out TypeReference responseType,
         out string requestParam)
     {
-        if (method == null)
-            throw new ArgumentNullException(nameof(method));
+        ArgumentExceptionHelper.ThrowIfNull(method);
 
         responseType = null;
         requestType = null;
@@ -973,8 +947,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
 
     protected static string GetServiceUrlFromRoute(TypeDefinition controller)
     {
-        if (controller == null)
-            throw new ArgumentNullException(nameof(controller));
+        ArgumentExceptionHelper.ThrowIfNull(controller);
 
         var route = TypingsUtils.GetAttr(controller, "System.Web.Mvc", "RouteAttribute") ??
             TypingsUtils.GetAttr(controller, "Microsoft.AspNetCore.Mvc", "RouteAttribute");
@@ -995,7 +968,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
             , StringComparison.Ordinal);
 #endif
 
-        if (!url.StartsWith("~/", StringComparison.Ordinal) && !url.StartsWith("/", StringComparison.Ordinal))
+        if (!url.StartsWith("~/", StringComparison.Ordinal) && !url.StartsWith('/'))
             url = "~/" + url;
 
         while (true)
@@ -1004,7 +977,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
             if (idx1 <= 0)
                 break;
 
-            var idx2 = url.IndexOf("}", idx1 + 1, StringComparison.Ordinal);
+            var idx2 = url.IndexOf('}', idx1 + 1);
             if (idx2 <= 0)
                 break;
 
@@ -1014,13 +987,13 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
         if (url.StartsWith("~/Services/", StringComparison.OrdinalIgnoreCase))
             url = url["~/Services/".Length..];
 
-        if (url.Length > 1 && url.EndsWith("/", StringComparison.Ordinal))
+        if (url.Length > 1 && url.EndsWith('/'))
             url = url[0..^1];
 
         return url;
     }
 
-    protected virtual void AddNestedLocalTexts(TypeDefinition type, string prefix)
+    protected virtual void PreVisitType(TypeDefinition type)
     {
     }
 
@@ -1033,8 +1006,8 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
         public AnnotationTypeInfo(TypeDefinition annotationType)
         {
             AnnotationType = annotationType;
-            PropertyByName = new Dictionary<string, PropertyDefinition>();
-            Attributes = new List<AttributeInfo>();
+            PropertyByName = [];
+            Attributes = [];
 
             foreach (var property in annotationType.PropertiesOf())
                 if (TypingsUtils.IsPublicInstanceProperty(property))
@@ -1058,8 +1031,8 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
         public bool TypeOnly { get; set; }
     }
 
-    private readonly List<ModuleImport> moduleImports = new();
-    private readonly HashSet<string> moduleImportAliases = new();
+    private readonly List<ModuleImport> moduleImports = [];
+    private readonly HashSet<string> moduleImportAliases = [];
 
     protected void ClearImports()
     {
@@ -1068,7 +1041,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
 
     protected override void AddFile(string filename, bool module = false)
     {
-        if (moduleImports.Any())
+        if (moduleImports.Count != 0)
         {
             if (module)
             {
@@ -1082,15 +1055,16 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
                     .Where(x => x.From != currentFrom)
                     .ToLookup(x => (x.From, x.External));
 
-                if (moduleImportsLookup.Any())
+                if (moduleImportsLookup.Count != 0)
                 {
-                    sb.Insert(0, string.Join(Environment.NewLine, moduleImportsLookup.Select(z =>
+                    sb.Insert(0, string.Join(Environment.NewLine, moduleImportsLookup
+                        .Select(z =>
                     {
                         var from = z.Key.From;
                         if (!z.Key.External)
                         {
-                            if (!from.StartsWith("/", StringComparison.Ordinal) &&
-                                !from.StartsWith(".", StringComparison.Ordinal))
+                            if (!from.StartsWith('/') &&
+                                !from.StartsWith('.'))
                             {
                                 if (System.IO.Path.GetDirectoryName(filename) ==
                                     System.IO.Path.GetDirectoryName(from))
@@ -1105,7 +1079,7 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
                                 from = ModulesPathAlias + from[(ModulesPathFolder.Length + 2)..];
                             }
                             else if (!string.IsNullOrEmpty(RootPathAlias) &&
-                                from.StartsWith("/", StringComparison.Ordinal))
+                                from.StartsWith('/'))
                             {
                                 from = RootPathAlias + from[1..];
                             }
@@ -1114,8 +1088,9 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
                         var importList = string.Join(", ", z.Select(p =>
                             p.Name + (p.Alias != p.Name ? (" as " + p.Alias) : "")));
 
-                        return $"import {{ {importList} }} from \"{from}\";";
-                    })) + Environment.NewLine + Environment.NewLine);
+                        return (from, importList);
+                    }).OrderBy(x => FromOrderKey(x.from), StringComparer.OrdinalIgnoreCase).Select(x => $"import {{ {x.importList} }} from \"{x.from}\";")) + 
+                        Environment.NewLine + Environment.NewLine);
                 }
             }
 
@@ -1126,9 +1101,20 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
         base.AddFile(filename, module);
     }
 
+    private static string FromOrderKey(string from)
+    {
+        if (from == null) 
+            return null;
+
+        /// local imports ordered last
+        return (from.StartsWith('.') ||
+            from.StartsWith('/')) ?
+            char.MaxValue + from : from;
+    }
+
     protected string ImportFromQ(string name)
     {
-        return AddExternalImport("@serenity-is/corelib/q", name);
+        return AddExternalImport("@serenity-is/corelib", name);
     }
 
     protected string ImportFromCorelib(string name)
@@ -1143,11 +1129,8 @@ public abstract class TypingsGeneratorBase : ImportGeneratorBase
 
     protected string AddModuleImport(string from, string name, bool external = false)
     {
-        if (name is null)
-            throw new ArgumentNullException(nameof(name));
-
-        if (from is null)
-            throw new ArgumentNullException(nameof(from));
+        ArgumentExceptionHelper.ThrowIfNull(name);
+        ArgumentExceptionHelper.ThrowIfNull(from);
 
         var existing = moduleImports.FirstOrDefault(x => x.From == from && x.Name == name && x.External == external);
         if (existing != null)

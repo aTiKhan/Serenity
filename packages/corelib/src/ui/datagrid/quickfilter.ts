@@ -1,5 +1,5 @@
-﻿import { ListRequest } from "@serenity-is/corelib/q";
-import { Widget } from "../widgets/widget";
+﻿import { Fluent, ListRequest } from "../../base";
+import { Widget, WidgetProps } from "../widgets/widget";
 
 export interface QuickFilterArgs<TWidget> {
     field?: string;
@@ -11,13 +11,13 @@ export interface QuickFilterArgs<TWidget> {
     handled?: boolean;
 }
 
-export interface QuickFilter<TWidget extends Widget<TOptions>, TOptions> {
+export interface QuickFilter<TWidget extends Widget<P>, P> {
     field?: string;
-    type?: new (element: JQuery, options: TOptions) => TWidget;
+    type?: { new (options?: P): TWidget, prototype: TWidget };
     handler?: (h: QuickFilterArgs<TWidget>) => void;
     title?: string;
-    options?: TOptions;
-    element?: (e: JQuery) => void;
+    options?: P & WidgetProps<{}>;
+    element?: (e: Fluent) => void;
     init?: (w: TWidget) => void;
     separator?: boolean;
     cssClass?: string;

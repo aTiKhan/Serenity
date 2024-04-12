@@ -1,7 +1,7 @@
-﻿import { Column } from "@serenity-is/sleekgrid";
-import { Decorators } from "../../decorators";
-import { Authorization, centerDialog, Culture, htmlEncode, Router, localText, trimToNull } from "@serenity-is/corelib/q";
-import { QuickSearchInput } from "../datagrid/quicksearchinput";
+﻿import { Culture, Dialog, DialogButton, Fluent, cancelDialogButton, faIcon, localText, okDialogButton } from "../../base";
+import { Column } from "@serenity-is/sleekgrid";
+import { Authorization, Router } from "../../q";
+import { Decorators } from "../../types/decorators";
 import { TemplatedDialog } from "../dialogs/templateddialog";
 import { ToolButton } from "../widgets/toolbar";
 import { IDataGrid } from "./idatagrid";
@@ -9,10 +9,10 @@ import { IDataGrid } from "./idatagrid";
 @Decorators.registerClass('Serenity.ColumnPickerDialog')
 @Decorators.resizable()
 @Decorators.responsive()
-export class ColumnPickerDialog extends TemplatedDialog<any> {
+export class ColumnPickerDialog<P = {}> extends TemplatedDialog<P> {
 
-    private ulVisible: JQuery;
-    private ulHidden: JQuery;
+    private ulVisible: Fluent;
+    private ulHidden: Fluent;
     private colById: { [key: string]: Column };
 
     public allColumns: Column[];
@@ -20,31 +20,34 @@ export class ColumnPickerDialog extends TemplatedDialog<any> {
     public defaultColumns: string[];
     public done: () => void;
 
-    constructor() {
-        super();
-
-        new QuickSearchInput(this.byId("Search"), {
-            onSearch: (fld, txt, done) => {
-                txt = trimToNull(txt);
-                if (txt != null)
-                    txt = Select2.util.stripDiacritics(txt.toLowerCase());
-
-                this.element.find('li').each((x, e) => {
-                    $(e).toggle(!txt || Select2.util.stripDiacritics(
-                        $(e).text().toLowerCase()).indexOf(txt) >= 0);
-                });
-                done && done(true);
-            }
-        });
-
-        this.ulVisible = this.byId("VisibleCols");
-        this.ulHidden = this.byId("HiddenCols");
+    protected renderContents() {
         this.dialogTitle = localText("Controls.ColumnPickerDialog.Title");
+
+        var visibles = Fluent("div")
+            .class("column-list visible-list bg-success")
+            .append(Fluent("h5")
+                .append(Fluent("i").class(faIcon("eye")))
+                .append(" ")
+                .append(localText(localText("Controls.ColumnPickerDialog.VisibleColumns"))))
+            .append(this.ulVisible = Fluent("ul"));
+
+        var hiddens = Fluent("div")
+            .class("column-list hidden-list bg-info")
+            .append(Fluent("h5")
+                .append(Fluent("i").class(faIcon("eye-slash")))
+                .append(" ")
+                .append(localText(localText("Controls.ColumnPickerDialog.HiddenColumns"))))
+            .append(this.ulHidden = Fluent("ul"))
+
+        return Fluent("div")
+            .class("columns-container")
+            .append(visibles)
+            .append(hiddens);
     }
 
     public static createToolButton(grid: IDataGrid): ToolButton {
         function onClick() {
-            var picker = new ColumnPickerDialog();
+            var picker = new ColumnPickerDialog({});
             picker.allColumns = (grid as any).allColumns;
             if ((grid as any).initialSettings) {
                 var initialSettings = (grid as any).initialSettings;
@@ -56,11 +59,10 @@ export class ColumnPickerDialog extends TemplatedDialog<any> {
                 (grid as any).allColumns = picker.allColumns;
                 var visible = picker.allColumns.filter(x => x.visible === true);
                 grid.getGrid().setColumns(visible);
-                (grid as any).persistSettings();
-                grid.getView().populate();
+                Promise.resolve((grid as any).persistSettings()).then(() => grid.getView().populate());
             };
 
-            Router && Router.dialog && Router.dialog((grid as any).element, picker.element, () => "columns");
+            Router && Router.dialog && Router.dialog((grid as any).element, picker.domNode, () => "columns");
             picker.dialogOpen();
         }
 
@@ -74,54 +76,54 @@ export class ColumnPickerDialog extends TemplatedDialog<any> {
             hint: localText("Controls.ColumnPickerDialog.Title"),
             action: 'column-picker',
             cssClass: "column-picker-button",
-            icon: 'fa-th-list text-blue',
+            icon: faIcon("th-list", "blue"),
             onClick: onClick
         }
     }
 
-    protected getDialogButtons() {
+    protected getDialogButtons(): DialogButton[] {
         return [
             {
                 text: localText("Controls.ColumnPickerDialog.RestoreDefaults"),
+                cssClass: "btn btn-secondary restore-defaults",
                 click: () => {
-                    let liByKey: { [key: string]: JQuery } = {};
-                    this.ulVisible.children().add(this.ulHidden.children()).each((x, e) => {
-                        let el = $(e);
-                        liByKey[el.data('key')] = el;
-                    });
+                    let liByKey: { [key: string]: HTMLElement } = {};
+                    this.ulVisible.children().concat(...this.ulHidden.children())
+                        .forEach((el: HTMLElement) => {
+                            liByKey[el.dataset.key] = el;
+                        });
 
-                    let last: JQuery = null;
+                    let last: HTMLElement = null;
                     for (let id of this.defaultColumns) {
                         let li = liByKey[id];
                         if (!li)
                             continue;
 
                         if (last == null)
-                            li.prependTo(this.ulVisible);
+                            this.ulVisible.prepend(li);
                         else
-                            li.insertAfter(last);
+                            Fluent(li).insertAfter(last);
 
                         last = li;
-                        let key: string = li.data('key');
+                        let key: string = li.dataset.key;
                         delete liByKey[key];
                     }
 
                     for (let key in liByKey)
-                        liByKey[key].appendTo(this.ulHidden);
+                        this.ulHidden.append(liByKey[key]);
 
                     this.updateListStates();
                 }
             },
-            {
-                text: localText("Dialogs.OkButton"),
+            okDialogButton({
                 click: () => {
                     let newColumns: Column[] = [];
 
                     for (var col of this.allColumns)
                         col.visible = false;
 
-                    this.visibleColumns = this.ulVisible.children().toArray().map(x => {
-                        let id = $(x).data("key");
+                    this.visibleColumns = this.ulVisible.children().map((x: HTMLElement) => {
+                        let id = x.dataset.key;
                         var col = this.colById[id];
                         col.visible = true;
                         newColumns.push(col);
@@ -135,15 +137,9 @@ export class ColumnPickerDialog extends TemplatedDialog<any> {
 
                     this.allColumns = newColumns;
                     this.done && this.done();
-                    this.dialogClose()
                 }
-            },
-            {
-                text: localText("Dialogs.CancelButton"),
-                click: () => {
-                    this.dialogClose()
-                }
-            }
+            }),
+            cancelDialogButton()
         ];
     }
 
@@ -164,20 +160,28 @@ export class ColumnPickerDialog extends TemplatedDialog<any> {
         return col.sourceItem == null || col.sourceItem.allowHide == null || col.sourceItem.allowHide;
     }
 
-    private createLI(col: Column): JQuery {
+    private createLI(col: Column): HTMLElement {
         var allowHide = this.allowHide(col);
-        return $(`
-<li data-key="${col.id}" class="${allowHide ? "" : "cant-hide"}">
-<span class="drag-handle">☰</span>
-${ htmlEncode(this.getTitle(col)) }
-${ allowHide ? `<i class="js-hide fa fa-eye-slash" title="${htmlEncode(localText("Controls.ColumnPickerDialog.HideHint"))}"></i>` : '' }
-<i class="js-show fa fa-eye" title="${ htmlEncode(localText("Controls.ColumnPickerDialog.ShowHint")) }"></i>
-</li>`);
+        var li = Fluent("li")
+            .class(!allowHide && "cant-hide")
+            .data("key", col.id)
+            .append(Fluent("span").class("drag-handle").text("☰"))
+            .append(this.getTitle(col));
+
+        allowHide && li.append(Fluent("i")
+            .class(["js-hide", faIcon("eye-slash")])
+            .attr("title", localText("Controls.ColumnPickerDialog.HideHint")));
+
+        li.append(Fluent("i")
+            .class(["js-show", faIcon("eye")])
+            .attr("title", localText("Controls.ColumnPickerDialog.ShowHint")));
+
+        return li.getNode();
     }
 
     private updateListStates() {
-        this.ulVisible.children().removeClass("bg-info").addClass("bg-success");
-        this.ulHidden.children().removeClass("bg-success").addClass("bg-info");
+        this.ulVisible.children().forEach(x => { x.classList.remove("bg-info"); x.classList.add("bg-success"); });
+        this.ulHidden.children().forEach(x => { x.classList.remove("bg-success"); x.classList.add("bg-info"); });
     }
 
     protected setupColumns(): void {
@@ -214,11 +218,11 @@ ${ allowHide ? `<i class="js-hide fa fa-eye-slash" title="${htmlEncode(localText
             if (!c)
                 continue;
 
-            this.createLI(c).appendTo(this.ulVisible);
+            this.ulVisible.append(this.createLI(c));
         }
 
         for (let c of hiddenColumns) {
-            this.createLI(c).appendTo(this.ulHidden);
+            this.ulHidden.append(this.createLI(c));
         }
 
         this.updateListStates();
@@ -227,16 +231,16 @@ ${ allowHide ? `<i class="js-hide fa fa-eye-slash" title="${htmlEncode(localText
         if (typeof Sortable !== "undefined" && Sortable.create) {
 
             // @ts-ignore
-            Sortable.create(this.ulVisible[0], {
+            Sortable.create(this.ulVisible.getNode(), {
                 group: this.uniqueName + "_group",
                 filter: '.js-hide',
-                onFilter: (evt: any) => {
-                    $(evt.item).appendTo(this.ulHidden);
+                onFilter: (evt: Event & { item: HTMLElement }) => {
+                    this.ulHidden.append(evt.item);
                     this.updateListStates();
                 },
-                onMove: (x: any) => {
-                    if ($(x.dragged).hasClass('cant-hide') &&
-                        x.from == this.ulVisible[0] &&
+                onMove: (x: Event & { dragged: HTMLElement, from: HTMLElement, to: HTMLElement }) => {
+                    if (x.dragged.classList.contains('cant-hide') &&
+                        x.from == this.ulVisible.getNode() &&
                         x.to !== x.from)
                         return false;
                     return true;
@@ -249,8 +253,8 @@ ${ allowHide ? `<i class="js-hide fa fa-eye-slash" title="${htmlEncode(localText
                 group: this.uniqueName + "_group",
                 sort: false,
                 filter: '.js-show',
-                onFilter: (evt: any) => {
-                    $(evt.item).appendTo(this.ulVisible);
+                onFilter: (evt: Event & { item: HTMLElement }) => {
+                    this.ulVisible.append(evt.item);
                     this.updateListStates();
                 },
                 onEnd: () => this.updateListStates()
@@ -259,28 +263,13 @@ ${ allowHide ? `<i class="js-hide fa fa-eye-slash" title="${htmlEncode(localText
     }
 
     protected onDialogOpen(): void {
-        super.onDialogOpen();
-        this.element.find("input").removeAttr("disabled")
-        this.element.closest('.ui-dialog').children(".ui-dialog-buttonpane")
-            .find('button').eq(0).addClass("restore-defaults")
-            .next().focus();
-
         this.setupColumns();
-        centerDialog(this.element);
-    }
 
-    protected getTemplate() {
-        return `
-<div class="search"><input id="~_Search" type="text" disabled /></div>
-<div class="columns-container">
-<div class="column-list visible-list bg-success">
-<h5><i class="fa fa-eye"></i> ${htmlEncode(localText("Controls.ColumnPickerDialog.VisibleColumns"))}</h5>
-<ul id="~_VisibleCols"></ul>
-</div>
-<div class="column-list hidden-list bg-info">
-<h5><i class="fa fa-eye-slash"></i> ${htmlEncode(localText("Controls.ColumnPickerDialog.HiddenColumns"))}</h5>
-<ul id="~_HiddenCols"></ul>
-</div>
-</div>`;
+        super.onDialogOpen();
+
+        var restoreButton = Dialog.getInstance(this.domNode)?.getFooterNode()?.querySelector(".restore-defaults");
+        if (restoreButton)
+            (restoreButton.nextElementSibling as HTMLElement)?.focus?.();
+
     }
 }

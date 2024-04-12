@@ -1,7 +1,8 @@
-﻿import { Decorators } from "../../decorators";
+﻿import { Fluent, ValidatableElement, Validator, tryGetText } from "../../base";
 import { IReadOnly, IStringValue } from "../../interfaces";
-import { isEmptyOrNull, trimToNull, tryGetText } from "@serenity-is/corelib/q";
-import { Widget } from "../widgets/widget";
+import { ValidationHelper } from "../../q";
+import { Decorators } from "../../types/decorators";
+import { EditorProps, EditorWidget } from "../widgets/widget";
 
 export interface EmailEditorOptions {
     domain?: string;
@@ -9,27 +10,27 @@ export interface EmailEditorOptions {
 }
 
 @Decorators.registerEditor('Serenity.EmailEditor', [IStringValue, IReadOnly])
-@Decorators.element('<input type="text"/>')
-export class EmailEditor extends Widget<EmailEditorOptions> {
+export class EmailEditor<P extends EmailEditorOptions = EmailEditorOptions> extends EditorWidget<P> {
 
-    constructor(input: JQuery, opt: EmailEditorOptions) {
-        super(input, opt);
+    static override createDefaultElement() { return Fluent("input").attr("type", "text").getNode(); }   
+    declare readonly domNode: HTMLInputElement;
+    private readonly domain: HTMLInputElement;
 
+    constructor(props: EditorProps<P>) {
+        super(props);
         EmailEditor.registerValidationMethods();
 
-        input.addClass('emailuser');
+        this.domNode.classList.add('emailuser');
 
-        var spanAt = $('<span/>').text('@').addClass('emailat').insertAfter(input);
+        var spanAt = Fluent("span").text('@').class('emailat').insertAfter(this.domNode);
 
-        var domain = $('<input type="text"/>').addClass('emaildomain').insertAfter(spanAt);
-        domain.bind('blur.' + this.uniqueName, function () {
-            var validator = domain.closest('form').data('validator');
-            if (validator != null) {
-                validator.element(input[0]);
-            }
+        var domain = Fluent("input").attr("type", "text").class('emaildomain').insertAfter(spanAt);
+        domain.on('blur.' + this.uniqueName, function () {
+            ValidationHelper.validateElement(this.domNode);
         });
+        this.domain = domain.getNode();
 
-        if (!isEmptyOrNull(this.options.domain)) {
+        if (this.options.domain) {
             domain.val(this.options.domain);
         }
 
@@ -37,54 +38,50 @@ export class EmailEditor extends Widget<EmailEditorOptions> {
             domain.attr('readonly', 'readonly').addClass('disabled').attr('tabindex', '-1');
         }
 
-        input.bind('keypress.' + this.uniqueName, e => {
-            if (e.which === 64) {
+        this.element.on('keypress.' + this.uniqueName, (e: KeyboardEvent) => {
+            if (e.key === "@") {
                 e.preventDefault();
                 if (!this.options.readOnlyDomain) {
-                    domain.focus();
-                    domain.select();
+                    domain.getNode().focus();
+                    domain.getNode().select();
                 }
             }
         });
 
-        domain.bind('keypress.' + this.uniqueName, function (e1) {
-            if (e1.which === 64) {
-                e1.preventDefault();
-            }
+        domain.on('keypress.' + this.uniqueName, function (e: KeyboardEvent) {
+            if (e.key === "@")
+                e.preventDefault();
         });
 
         if (!this.options.readOnlyDomain) {
-            input.change(e2 => this.set_value(input.val()));
+            Fluent.on(this.domNode, "change", e => this.set_value(this.domNode.value));
         }
     }
 
     static registerValidationMethods(): void {
-        if (!$.validator || !$.validator.methods || $.validator.methods['emailuser'] != null)
-            return;
 
-        $.validator.addMethod('emailuser', function (value, element) {
+        Validator.addMethod('emailuser', function (value, element) {
 
-            var domain = $(element).nextAll('.emaildomain');
-            if (domain.length > 0 && domain.attr('readonly') == null) {
+            var domain = Fluent(element).nextSibling(".emaildomain").getNode();
+            if (domain && domain.getAttribute('readonly') == null) {
 
-                if (this.optional(element) && this.optional(domain[0])) {
+                if (Validator.optional(element) && Validator.optional(domain as ValidatableElement)) {
                     return true;
                 }
 
-                return $.validator.methods.email.call(this, value + '@' + domain.val(), element);
+                return Validator.methods.email(value + '@' + (domain as any).value, element);
             }
             else {
-                return $.validator.methods.email.call(this, value + '@dummy.com', element);
+                return Validator.methods.email(value + '@dummy.com', element);
             }
-        }, tryGetText("Validation.Email") ?? $.validator.messages.email);
+        }, tryGetText("Validation.Email"));
     }
 
     get_value(): string {
-        var domain = this.element.nextAll('.emaildomain');
-        var value = this.element.val();
-        var domainValue = domain.val();
-        if (isEmptyOrNull(value)) {
-            if (this.options.readOnlyDomain || isEmptyOrNull(domainValue)) {
+        var value = this.domNode.value;
+        var domainValue = this.domain.value;
+        if (!value) {
+            if (this.options.readOnlyDomain || !domainValue) {
                 return '';
             }
             return '@' + domainValue;
@@ -97,31 +94,30 @@ export class EmailEditor extends Widget<EmailEditorOptions> {
     }
 
     set_value(value: string): void {
-        var domain = this.element.nextAll('.emaildomain');
-        value = trimToNull(value);
-        if (value == null) {
+        value = value?.trim();
+        if (!value) {
             if (!this.options.readOnlyDomain)
-                domain.val('');
-            this.element.val('');
+                this.domain.value = '';
+            this.domNode.value = "";
         }
         else {
             var parts = value.split('@');
             if (parts.length > 1) {
                 if (!this.options.readOnlyDomain) {
-                    domain.val(parts[1]);
-                    this.element.val(parts[0]);
+                    this.domain.value = parts[1];
+                    this.domNode.value = parts[0];
                 }
-                else if (!isEmptyOrNull(this.options.domain)) {
+                else if (this.options.domain) {
                     if (parts[1] !== this.options.domain)
-                        this.element.val(value);
-                    else 
-                        this.element.val(parts[0]);
+                        this.domNode.value = value;
+                    else
+                        this.domNode.value = parts[0];
                 }
-                else 
-                    this.element.val(parts[0]);
+                else
+                    this.domNode.value = parts[0];
             }
             else
-                this.element.val(parts[0]);
+                this.domNode.value = parts[0];
         }
     }
 
@@ -130,23 +126,25 @@ export class EmailEditor extends Widget<EmailEditorOptions> {
     }
 
     get_readOnly(): boolean {
-        var domain = this.element.nextAll('.emaildomain');
-        return !(this.element.attr('readonly') == null &&
-            (!this.options.readOnlyDomain || domain.attr('readonly') == null));
+        return !(this.domNode.getAttribute("readonly") == null &&
+            (!this.options.readOnlyDomain || this.domain.getAttribute('readonly') == null));
     }
 
     set_readOnly(value: boolean): void {
-        var domain = this.element.nextAll('.emaildomain');
         if (value) {
-            this.element.attr('readonly', 'readonly').addClass('readonly');
+            this.domNode.setAttribute('readonly', 'readonly');
+            this.domNode.classList.add('readonly');
             if (!this.options.readOnlyDomain) {
-                domain.attr('readonly', 'readonly').addClass('readonly');
+                this.domain.setAttribute('readonly', 'readonly');
+                this.domain.classList.add('readonly');
             }
         }
         else {
-            this.element.removeAttr('readonly').removeClass('readonly');
+            this.domNode.removeAttribute('readonly');
+            this.domNode.classList.remove('readonly');
             if (!this.options.readOnlyDomain) {
-                domain.removeAttr('readonly').removeClass('readonly');
+                this.domain.removeAttribute('readonly');
+                this.domain.classList.remove('readonly');
             }
         }
     }

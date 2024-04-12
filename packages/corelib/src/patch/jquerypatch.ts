@@ -1,62 +1,108 @@
-﻿export function jQueryPatch($: any) {
-    
-    function applyJQueryUIFixes(): boolean {
-        if (typeof $ == "undefined" || !$.ui || !$.ui.dialog || !$.ui.dialog.prototype)
-            return false;
-            
-        $.ui.dialog.prototype._allowInteraction = function (event: any) {
-            if ($(event.target).closest(".ui-dialog").length) {
-                return true;
-            }
-            return !!$(event.target).closest(".ui-datepicker, .select2-drop, .cke, .cke_dialog, .modal, #support-modal").length;
-        };
+﻿import { faIcon, getCookie, getTypeFullName, getjQuery } from "../base";
+import { isMobileView } from "../q";
+import { getWidgetFrom, tryGetWidget } from "../ui/widgets/widgetutils";
 
-        (function (orig) {
-            $.ui.dialog.prototype._focusTabbable = function () {
-                if ($(document.documentElement).hasClass('mobile-device')) {
-                    this.uiDialog && this.uiDialog.focus();
-                    return;
-                }
-                orig.call(this);
-            }
-        })($.ui.dialog.prototype._focusTabbable);
+function applyGetWidgetExtensions($: any) {
+    if (!$ || !$.fn)
+        return;
 
-        (function (orig) {
-            $.ui.dialog.prototype._createTitlebar = function () {
-                orig.call(this);
-                this.uiDialogTitlebar.find('.ui-dialog-titlebar-close').html('<i class="fa fa-times" />');
-            }
-        })($.ui.dialog.prototype._createTitlebar);
+    $.fn.tryGetWidget = function tryGetWidget$<TWidget>(this: ArrayLike<HTMLElement>, type?: { new(...args: any[]): TWidget }): TWidget {
+        return tryGetWidget(this[0], type);
     }
 
-    !applyJQueryUIFixes() && typeof $ !== "undefined" && $.fn && $(applyJQueryUIFixes);
+    $.fn.getWidget = function getWidget$<TWidget>(this: ArrayLike<HTMLElement>, type?: { new(...args: any[]): TWidget }): TWidget {
+        if (!this?.length)
+            throw new Error(`Searching for widget of type '${getTypeFullName(type)}' on a non-existent element! (${(this as any)?.selector})`);
 
-    if (typeof $ !== "undefined" && $.fn) {
+        return getWidgetFrom(this[0], type);
+    };
+}
 
-        // for backward compatibility
-        if (!$.toJSON)
-            $.toJSON = JSON.stringify;
-        if (!$.parseJSON)
-            $.parseJSON = JSON.parse;
+function applyJQueryUIFixes($: any): boolean {
+    if (!$ || !$.ui || !$.ui.dialog || !$.ui.dialog.prototype)
+        return false;
 
-        ($ as any).cleanData = (function (orig) {
-            return function (elems: any[]) {
-                var events, elem, i, e;
-                var cloned = elems;
-                for (i = 0; (elem = cloned[i]) != null; i++) {
-                    try {
-                        events = ($ as any)._data(elem, "events");
-                        if (events && events.remove) {
-                            // html collection might change during remove event, so clone it!
-                            if (cloned === elems)
-                                cloned = Array.prototype.slice.call(elems);
-                            $(elem).triggerHandler("remove");
-                            delete events.remove;
+    $.ui.dialog.prototype._allowInteraction = function (event: any) {
+        if ($(event.target).closest(".ui-dialog").length) {
+            return true;
+        }
+        return !!$(event.target).closest(".ui-datepicker, .select2-drop, .cke, .cke_dialog, .modal, #support-modal").length;
+    };
+
+    (function (orig) {
+        $.ui.dialog.prototype._focusTabbable = function () {
+            if (isMobileView) {
+                this.uiDialog && this.uiDialog.focus();
+                return;
+            }
+            orig.call(this);
+        }
+    })($.ui.dialog.prototype._focusTabbable);
+
+    (function (orig) {
+        $.ui.dialog.prototype._createTitlebar = function () {
+            orig.call(this);
+            this.uiDialogTitlebar.find('.ui-dialog-titlebar-close').html(`<i class="${faIcon("times")}" />`);
+        }
+    })($.ui.dialog.prototype._createTitlebar);
+}
+
+function applyCleanDataPatch($: any) {
+    if (!$ || !$.fn || $.isMock)
+        return;
+
+    // for backward compatibility
+    if (!$.toJSON)
+        $.toJSON = JSON.stringify;
+    if (!$.parseJSON)
+        $.parseJSON = JSON.parse;
+
+    $.cleanData = (function (orig) {
+        return function (elems: any[]) {
+            var events, elem, i, e;
+            var cloned = elems;
+            for (i = 0; (elem = cloned[i]) != null; i++) {
+                try {
+                    events = ($ as any)._data(elem, "events");
+                    if (events && events.remove) {
+                        let remove = events.remove;
+                        delete events.remove;
+                        for (var x of remove) {
+                            if (typeof x?.handler === "function") {
+                                try {
+                                    x.handler.call(elem, ({ target: elem }));
+                                }
+                                catch {
+                                }
+                            }
                         }
-                    } catch (e) { }
-                }
-                orig(elems);
-            };
-        })(($ as any).cleanData);
-    }
+                    }
+                } catch (e) { }
+            }
+            orig(elems);
+        };
+    })(($ as any).cleanData);
+}
+
+function applyAjaxCSRFToken($: any) {
+    $?.ajaxSetup?.({
+        beforeSend: function (xhr: XMLHttpRequest, opt: any) {
+            if (!opt || !opt.crossDomain) {
+                var token = getCookie('CSRF-TOKEN');
+                if (token)
+                    xhr.setRequestHeader('X-CSRF-TOKEN', token);
+            }
+        }
+    });
+}
+
+export function jQueryPatch(): boolean {
+    let $ = getjQuery();
+    if (!$)
+        return false;
+    applyJQueryUIFixes($);
+    applyCleanDataPatch($);
+    applyGetWidgetExtensions($);
+    applyAjaxCSRFToken($);
+    return true;
 }

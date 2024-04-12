@@ -1,4 +1,4 @@
-﻿namespace Serenity.Tests.Services;
+namespace Serenity.Tests.Services;
 
 public class ServiceCollectionExtensions_AddCustomRequestHandlersTests
 {
@@ -15,7 +15,7 @@ public class ServiceCollectionExtensions_AddCustomRequestHandlersTests
     [Fact]
     public void Does_Not_Throw_If_TypeSource_Is_Added_To_Collection()
     {
-        var typeSource = new DefaultTypeSource(Array.Empty<Assembly>());
+        var typeSource = new DefaultTypeSource([]);
         var collection = new ServiceCollection();
         collection.AddSingleton<ITypeSource>(typeSource);
         Assert.Single(collection);
@@ -320,32 +320,20 @@ public class ServiceCollectionExtensions_AddCustomRequestHandlersTests
     {
     }
 
-    private class TestSaveHandler1 : SaveRequestHandler<TestRow>
+    private class TestSaveHandler1(IRequestContext context) : SaveRequestHandler<TestRow>(context)
     {
-        public TestSaveHandler1(IRequestContext context) : base(context)
-        {
-        }
     }
 
-    private class TestListHandler1 : ListRequestHandler<TestRow>
+    private class TestListHandler1(IRequestContext context) : ListRequestHandler<TestRow>(context)
     {
-        public TestListHandler1(IRequestContext context) : base(context)
-        {
-        }
     }
 
-    private class TestRetrieveHandler1 : RetrieveRequestHandler<TestRow>
+    private class TestRetrieveHandler1(IRequestContext context) : RetrieveRequestHandler<TestRow>(context)
     {
-        public TestRetrieveHandler1(IRequestContext context) : base(context)
-        {
-        }
     }
 
-    private class TestDeleteHandler1 : DeleteRequestHandler<TestRow>
+    private class TestDeleteHandler1(IRequestContext context) : DeleteRequestHandler<TestRow>(context)
     {
-        public TestDeleteHandler1(IRequestContext context) : base(context)
-        {
-        }
     }
 
     public class TestRow : Row<TestRow.RowFields>, IIdRow
